@@ -5,6 +5,7 @@ import { CURRENT_SCHEMA_VERSION, migrate } from './migrations';
 import { adjustStaffAssignment, applyPitch, buyBuildingUpgrade, hireStaff } from '../core/actions';
 import { resolveEconomyTick } from '../core/economy';
 import { OFFLINE_CAP_MS, resolveOffline, type PayrollStoppage } from '../core/offlineResolution';
+import { resolveProcesses } from '../core/time';
 import { trackFirstOccurrence } from './telemetry';
 
 export const SAVE_KEY = 'aurora-program-save';
@@ -57,11 +58,21 @@ interface AwaySummaryStore {
 function computeBootOffline(): { initialState: GameState; awaySummary: AwaySummary | null } {
   const loaded = loadGame();
   const now = Date.now();
-  const offline = resolveOffline(loaded.resources, loaded.buildings, loaded.staff, loaded.lastSeenAt, now, OFFLINE_CAP_MS);
+  const offline = resolveOffline(
+    loaded.resources,
+    loaded.buildings,
+    loaded.staff,
+    loaded.processes,
+    loaded.lastSeenAt,
+    now,
+    OFFLINE_CAP_MS,
+    loaded.economyFlags.payrollUnpaid,
+  );
 
   const initialState: GameState = {
     ...loaded,
     resources: offline.resources,
+    processes: offline.processes,
     economyFlags: { ...loaded.economyFlags, payrollUnpaid: offline.payrollUnpaid },
     lastSeenAt: now,
   };
@@ -97,8 +108,11 @@ export interface GameActions {
   hire: (role: RoleId) => void;
   /** delta is typically +1/-1 from a UI stepper; no-ops if it would violate slots/hired. */
   assign: (role: RoleId, buildingId: BuildingId, delta: number) => void;
-  /** Called once per animation frame by the game loop (see core/tick.ts + main.tsx). */
-  applyTick: (deltaMs: number) => void;
+  /** Called once per animation frame by the game loop (see core/tick.ts + main.tsx).
+   * `warp` (dev builds only, default 1) is the real caller passing a possibly-warped
+   * multiplier — see `applyTick`'s implementation for why processes need it separately
+   * from `deltaMs`. */
+  applyTick: (deltaMs: number, warp?: number) => void;
 }
 
 export type Store = GameState & GameActions;
@@ -141,15 +155,31 @@ export const useGameStore = create<Store>()((set, get) => ({
     if (staff) set({ staff });
   },
 
-  applyTick: (deltaMs) => {
+  applyTick: (deltaMs, warp = 1) => {
     const state = get();
     const { resources, payrollUnpaid } = resolveEconomyTick(
       state.resources,
       state.buildings,
       state.staff,
-      deltaMs,
+      deltaMs * warp,
     );
-    set({ resources, economyFlags: { ...state.economyFlags, payrollUnpaid } });
+
+    // Time-warp applies "at the timestamp layer" (SPRINTS.md Sprint 2 task 3), not by
+    // giving processes their own scaled-rate concept: each frame, warp creates
+    // `deltaMs * (warp - 1)` of extra virtual time, which we spend by pulling every
+    // in-flight process's `startedAt` back by that amount. The completion check itself
+    // (`resolveProcesses`) then runs against the real clock — the exact same call and
+    // the exact same comparison offline resolution uses (rule 6) — so nothing downstream
+    // needs to know warp was involved, and once warp returns to x1 no more shifting
+    // happens (no drifting virtual clock to persist or migrate).
+    const warpBonusMs = deltaMs * (warp - 1);
+    const shiftedProcesses =
+      warpBonusMs > 0
+        ? state.processes.map((p) => ({ ...p, startedAt: p.startedAt - warpBonusMs }))
+        : state.processes;
+    const { remaining: processes } = resolveProcesses(shiftedProcesses, Date.now());
+
+    set({ resources, processes, economyFlags: { ...state.economyFlags, payrollUnpaid } });
   },
 }));
 

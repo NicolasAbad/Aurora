@@ -515,3 +515,59 @@ All 5 tasks done; acceptance verified (see below).
   passive production reachable in Sprint 0-2); the `AwaySummary` interface itself is
   general (any resource could appear), so no rework expected when later sprints add
   offline-relevant resources (Materials, Hardware, etc.).
+
+## Sprint 2 addendum — edge-case review found and closed a real gap (2026-07-25)
+
+Owner asked for explicit per-edge-case test confirmation before Sprint 3. Answering from
+code/tests (not memory) surfaced that **process resolution was never actually wired into
+either the online tick or the offline boot path** — `core/time.ts`'s `resolveProcesses`
+existed and was unit-tested in isolation, but nothing called it, so a process could never
+complete, online or offline, regardless of how much time passed. Invisible until now
+because no Sprint 0-2 gameplay action creates a process (research is Sprint 4). Fixed,
+not just flagged, since a passing test requires the wiring to exist:
+
+- `core/offlineResolution.ts`: `resolveOffline` gained a `processes` parameter and now
+  also calls `resolveProcesses(processes, now)` — against the real, **uncapped** `now`,
+  independent of the resource offline cap, matching ECONOMY §11 ("processes at 100%").
+  Returns `processes` (remaining) and `completedProcesses`.
+- `state/persistStore.ts`: `computeBootOffline` now feeds `loaded.processes` in and
+  writes the resolved `processes` back into `initialState`.
+- `state/persistStore.ts` / `main.tsx`: `applyTick` now also resolves processes **online**,
+  every frame — previously they'd only ever have advanced by reopening the tab. Time-warp
+  (SPRINTS.md task 3: "applied at the timestamp layer... processes and economy accelerate
+  consistently") is implemented by pulling each in-flight process's `startedAt` back by
+  the warp *bonus* (`deltaMs * (warp - 1)`) each frame, then resolving against the real
+  clock — the same `resolveProcesses` call offline resolution makes, no separate
+  virtual-clock state to persist or drift.
+- Reward/effect application on process completion is deliberately **not** implemented —
+  no process kind has a defined payload or reward yet (that's Sprint 4 research, Sprint 5
+  certification, etc. content); building a dispatcher now would mean inventing semantics
+  ahead of the docs. `completedProcesses` is returned/available for whichever sprint adds
+  that to consume.
+- Separately, the same review caught a real latent bug while checking the "clock moved
+  backward" edge case: `resolveOffline` initialized `payrollUnpaid` to a hardcoded
+  `false`, so when zero time is applied (clock rewind, or a same-instant reload) an
+  already-insolvent save would have its payroll-unpaid flag silently cleared without any
+  actual resolution happening. Fixed by carrying forward the caller's
+  `economyFlags.payrollUnpaid` as the starting value instead of assuming solvency.
+
+**Edge-case test coverage (all in `src/core/offlineResolution.test.ts` unless noted):**
+
+| # | Edge case | Test |
+|---|---|---|
+| 1a | Process completes mid-offline-window (parallel: one finishes, one doesn't) | `completes a process that finishes mid-offline-window, leaving a still-running parallel one untouched` |
+| 1b | Insolvency begins mid-window; stoppage window reported | `reports a payroll-stoppage window once funding runs out, and stays unpaid to the end` (stoppage tracking) + `economy.test.ts`'s `pauses ALL staffed production and does not deduct salary when insolvent` (production-halt guarantee, reused verbatim per rule 6) |
+| 1c | Insolvency already active at close persists, no partial offline recovery | `stays unpaid for the entire window when already insolvent at close, with no partial recovery` |
+| 1d | Clock moved backward (lastSeenAt in the future); no negative elapsed, no double-grant | `clamps elapsed/applied time to 0 and leaves resources and processes untouched` + `does not silently clear an already-unpaid payroll when zero time is applied` (the bug fix above) |
+| 1e | 10h resource cap vs. a 12h process — independent | `completes a 12h process at 100% even though the resource cap only applies 10h` |
+| warp/processes | Time-warp reaches process completion, not just economy | `src/state/persistStore.test.ts`, describe block `applyTick — time-warp reaches process resolution (SPRINTS.md task 3)` (4 tests: no completion at x1, completion at x600, remaining-time check, and two parallel processes resolved independently through the real store's `applyTick` — the online-path counterpart to 1a's offline version) |
+
+91 tests passing (up from 82), lint/build clean. `ProcessProgress`'s lack of a live UI
+consumer (noted above) is unaffected by this — the queue now advances correctly
+underneath it; a Sprint 4 research node is what will actually render it.
+
+**CLAUDE.md updated** (owner, same pass): per-sprint workflow step 5 now states
+acceptance is verified through the integrated path (real store, real resolution flow,
+end to end), never by isolated unit tests alone — codifying the exact lesson from this
+addendum (`resolveProcesses` unit-tested but never called) and echoing the Sprint 1/2
+Playwright-methodology lesson: verification has to exercise the real path.

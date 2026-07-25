@@ -90,5 +90,5 @@ interface GameState { schemaVersion: number; lastSeenAt: number;
 2. List tasks; confirm every needed value exists in ECONOMY_MODEL.md
 3. Implement core → data → UI, core tests first
 4. Run `sim/run.ts` when the sprint touches economy values; verify sanity rules still hold
-5. Verify acceptance + save/load regression; for any sprint that touches UI, run a rendered smoke check (Playwright headless via the run skill's fallback — installed in the scratchpad, NEVER added as a project dependency) covering the sprint's new interactions, and screenshot-verify at least one multi-word/edge-case label
+5. Verify acceptance + save/load regression — **acceptance criteria are verified through the integrated path (real store, real resolution flow, end to end), never by isolated unit tests alone**: a unit-tested function nobody calls is not an accepted feature. For any sprint that touches UI, run a rendered smoke check (Playwright headless via the run skill's fallback — installed in the scratchpad, NEVER added as a project dependency) covering the sprint's new interactions, and screenshot-verify at least one multi-word/edge-case label
 6. Commit per task; on sprint close, update `docs/PROGRESS.md` with status and deviations

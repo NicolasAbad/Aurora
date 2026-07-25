@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { createInitialState } from '../data/initialState';
 import { loadGame, saveGame, SAVE_KEY, useGameStore } from './persistStore';
 import { CURRENT_SCHEMA_VERSION } from './migrations';
+import type { Process } from '../core/types';
 
 beforeEach(() => {
   localStorage.clear();
@@ -109,5 +110,67 @@ describe('game store actions (Sprint 1 acceptance loop)', () => {
     pitch();
     applyTick(60_000);
     expect(useGameStore.getState().economyFlags.payrollUnpaid).toBe(false);
+  });
+});
+
+// SPRINTS.md Sprint 2 task 3: "global time multiplier applied at the timestamp layer,
+// so ... processes ... accelerate consistently. Without this, multi-hour timers are
+// untestable." Confirms warp actually reaches process completion, not just economy.
+describe('applyTick — time-warp reaches process resolution (SPRINTS.md task 3)', () => {
+  beforeEach(() => {
+    useGameStore.setState(createInitialState());
+  });
+
+  // `applyTick(deltaMs, warp)` shifts startedAt back by the warp *bonus* on the
+  // assumption that `deltaMs` of real wall-clock time has already elapsed since the
+  // process started (true in the real game loop, whose deltaMs comes from an actual
+  // requestAnimationFrame timestamp delta). Backdating startedAt by exactly deltaMs
+  // here models that same assumption for a synchronous, real-time-free unit test.
+  function tenMinuteProcess(deltaMs: number): Process {
+    return {
+      id: 'p1',
+      kind: 'research',
+      startedAt: Date.now() - deltaMs,
+      durationMs: 10 * 60_000,
+      payload: {},
+    };
+  }
+
+  it('does not complete a 10-min process after a 1s real tick at warp x1', () => {
+    useGameStore.setState({ processes: [tenMinuteProcess(1000)] });
+    useGameStore.getState().applyTick(1000, 1);
+    expect(useGameStore.getState().processes).toHaveLength(1);
+  });
+
+  it('completes the same 10-min process after a 1s real tick at warp x600 (equivalent to 10 real minutes)', () => {
+    useGameStore.setState({ processes: [tenMinuteProcess(1000)] });
+    useGameStore.getState().applyTick(1000, 600);
+    expect(useGameStore.getState().processes).toHaveLength(0);
+  });
+
+  it('leaves a still-running process\'s remaining time reduced by the warped amount, not the real amount', () => {
+    useGameStore.setState({ processes: [tenMinuteProcess(1000)] });
+    useGameStore.getState().applyTick(1000, 60); // 1s real * x60 = 60s of virtual progress
+    const [p] = useGameStore.getState().processes;
+    // The process should now look ~60s further along than its real age (~1s) would
+    // suggest — the warp bonus (59s), on top of the 1s that had genuinely elapsed.
+    expect(Date.now() - p.startedAt).toBeGreaterThanOrEqual(59_000);
+  });
+
+  // Sprint 2 acceptance: "two parallel processes resolve correctly" — through the real
+  // store's applyTick (the online path), not just resolveProcesses in isolation.
+  it('resolves two parallel processes independently through the real store', () => {
+    const now = Date.now();
+    const fast: Process = { id: 'fast', kind: 'research', startedAt: now - 1000, durationMs: 5 * 60_000, payload: {} };
+    const slow: Process = { id: 'slow', kind: 'research', startedAt: now - 1000, durationMs: 20 * 60_000, payload: {} };
+    useGameStore.setState({ processes: [fast, slow] });
+
+    // 1s real tick at x600 = 600s (10 min) of virtual progress: `fast` (5 min) completes,
+    // `slow` (20 min) doesn't.
+    useGameStore.getState().applyTick(1000, 600);
+
+    const remaining = useGameStore.getState().processes;
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].id).toBe('slow');
   });
 });
