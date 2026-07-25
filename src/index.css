@@ -1,0 +1,407 @@
+/* UI_SPEC §1: dark control-room theme, single accent CSS variable (default signal orange). */
+:root {
+  --bg: #0a0b0d;
+  --panel: #16181c;
+  --border: #2a2d33;
+  --text: #e6e8eb;
+  --text-dim: #8b909a;
+  --accent: #ff7a1a;
+  --amber: #e0b23c;
+  font-family:
+    'IBM Plex Mono', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.ticker {
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ticker__row {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.ticker__row--secondary {
+  opacity: 0.75;
+  font-size: 0.85em;
+}
+
+.ticker__stat {
+  display: flex;
+  flex-direction: column;
+  min-width: 96px;
+}
+
+.ticker__stat--near-cap .ticker__value {
+  color: var(--amber);
+}
+
+.ticker__stat--over-cap .ticker__value {
+  color: var(--accent);
+}
+
+.ticker__label {
+  font-size: 0.75em;
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ticker__value {
+  font-variant-numeric: tabular-nums;
+  font-size: 1.1em;
+}
+
+.ticker__rate {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.8em;
+  color: var(--text-dim);
+}
+
+.complex-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+
+.complex-tabs__tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text);
+  padding: 10px 18px;
+  font: inherit;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.complex-tabs__tab--active {
+  border-bottom-color: var(--accent);
+}
+
+.complex-tabs__tab--locked {
+  color: var(--text-dim);
+  border-style: dashed;
+  cursor: not-allowed;
+}
+
+.complex-tabs__condition {
+  font-size: 0.7em;
+}
+
+.complex-panel {
+  padding: 20px;
+  flex: 1;
+}
+
+.building-tile {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 4px;
+  padding: 16px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.building-tile__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.building-tile__level {
+  color: var(--text-dim);
+}
+
+.pitch-button {
+  background: var(--accent);
+  color: #1a1200;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 16px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pitch-button:disabled {
+  background: var(--border);
+  color: var(--text-dim);
+  cursor: not-allowed;
+}
+
+.pitch-button-wrap {
+  position: relative;
+  display: inline-block;
+}
+
+.pitch-feedback {
+  position: absolute;
+  left: 50%;
+  top: -4px;
+  transform: translateX(-50%);
+  color: var(--accent);
+  font-weight: 600;
+  pointer-events: none;
+  animation: pitch-feedback-float 0.9s ease-out forwards;
+}
+
+@keyframes pitch-feedback-float {
+  from {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  to {
+    opacity: 0;
+    transform: translate(-50%, -28px);
+  }
+}
+
+.campus-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.building-tile__rate {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+.building-tile__staff-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stepper button {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.stepper button:disabled {
+  color: var(--text-dim);
+  cursor: not-allowed;
+}
+
+.upgrade-button {
+  background: var(--border);
+  color: var(--text);
+  border: none;
+  border-radius: 4px;
+  padding: 8px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.upgrade-button:not(:disabled):hover {
+  background: var(--accent);
+  color: #1a1200;
+}
+
+.upgrade-button:disabled {
+  color: var(--text-dim);
+  cursor: not-allowed;
+}
+
+.staff-panel {
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 4px;
+  padding: 16px;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.staff-panel__header {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 600;
+}
+
+.staff-panel__salary {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85em;
+}
+
+.staff-panel__row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.staff-panel__row button {
+  background: var(--border);
+  color: var(--text);
+  border: none;
+  border-radius: 4px;
+  padding: 6px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.staff-panel__row button:disabled {
+  color: var(--text-dim);
+  cursor: not-allowed;
+}
+
+.staff-panel__locked {
+  color: var(--text-dim);
+  font-size: 0.85em;
+}
+
+.payroll-banner {
+  background: #3a1414;
+  color: #ff6b6b;
+  border-bottom: 1px solid var(--border);
+  padding: 8px 16px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.away-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.away-modal {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 24px;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.away-modal h2 {
+  margin: 0;
+}
+
+.away-modal__gains {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.away-modal__note,
+.away-modal__stoppage {
+  color: var(--amber);
+  font-size: 0.9em;
+}
+
+.away-modal button {
+  align-self: flex-start;
+  background: var(--accent);
+  color: #1a1200;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 16px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.time-warp-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: #1a1006;
+  border-bottom: 1px dashed var(--accent);
+  font-size: 0.85em;
+}
+
+.time-warp-control__label {
+  color: var(--text-dim);
+}
+
+.time-warp-control__option {
+  background: var(--border);
+  color: var(--text);
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.time-warp-control__option--active {
+  background: var(--accent);
+  color: #1a1200;
+}
+
+.process-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.process-progress__bar {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.process-progress__fill {
+  height: 100%;
+  background: var(--accent);
+}
+
+.process-progress__remaining {
+  color: var(--text-dim);
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
+}
