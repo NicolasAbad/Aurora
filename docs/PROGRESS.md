@@ -571,3 +571,31 @@ acceptance is verified through the integrated path (real store, real resolution 
 end to end), never by isolated unit tests alone — codifying the exact lesson from this
 addendum (`resolveProcesses` unit-tested but never called) and echoing the Sprint 1/2
 Playwright-methodology lesson: verification has to exercise the real path.
+
+## Sprint 2 acceptance — re-verified end to end through the real store (2026-07-25)
+
+Per the new step 5 rule, re-checked all three Sprint 2 acceptance clauses through the
+actual production code path (not isolated unit calls):
+
+- **"Close 1h and return shows correct summary"** — re-ran the Playwright away-modal
+  check after the `computeBootOffline` changes (it now also resolves the process queue).
+  No regression: identical output to the original Sprint 2 verification (+3,672 Funding
+  for a 1h gap), zero console errors. Screenshot: `11-reverify-away-modal.png`.
+- **"Two parallel processes resolve correctly"** — already covered through the real store
+  on both paths: offline via `resolveOffline` (the function `computeBootOffline` actually
+  calls) in the 1a test, online via `useGameStore.getState().applyTick` (the function
+  `main.tsx` actually calls every frame) in the new `resolves two parallel processes
+  independently through the real store` test. Didn't duplicate this a third time in
+  Playwright — `ProcessProgress` has no UI consumer yet (Sprint 4), so there's nothing
+  further a browser check would add over the real-store test.
+- **"A full simulated day runs in <3 min at x600"** — verified directly through the real
+  running app: loaded a fresh save (Finance staffed, net rate 1.7 F/s), clicked the actual
+  ×600 `TimeWarpControl` button, and let 150 real seconds elapse (`page.waitForTimeout`,
+  not a computed estimate). Funding went from 1,001 to 154K — 1000 + 90,000 simulated
+  seconds (25h) × 1.7 F/s ≈ 154,000, matching the prediction almost exactly. 25 simulated
+  hours elapsed in 150 real seconds (under the 180s/3min bar, consistent with the math:
+  24h × 3600s ÷ 600 = 144 real seconds for a full day). Zero console errors. Screenshot:
+  `12-day-in-3min-x600.png`.
+
+All three acceptance clauses hold through the integrated path. Sprint 2 is genuinely
+closed; proceeding to Sprint 3.
