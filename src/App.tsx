@@ -13,6 +13,8 @@ import { TimeWarpControl } from './ui/TimeWarpControl';
 import { DevResetButton } from './ui/DevResetButton';
 import { useGameStore } from './state/persistStore';
 import { RESOURCE_NAME } from './data/resourceNames';
+import { isUnlockConditionMet, unlockContextFromState } from './core/unlockConditions';
+import { BUILDINGS } from './data/buildings';
 import type { ComplexId } from './core/types';
 
 function ProductionPanel() {
@@ -52,6 +54,23 @@ function ProductionPanel() {
   );
 }
 
+// UI_SPEC §2b: Payload Processing stays completely hidden until Aurora I success (its
+// appearance IS the post-climax beat) — everything else in Complex C is reachable as
+// soon as the tab itself is (ComplexTabs' testStand tech gate).
+function TestingPanel() {
+  const payloadProcessingUnlocked = useGameStore((s) =>
+    isUnlockConditionMet(BUILDINGS.payloadProcessing.unlockCondition, unlockContextFromState(s)),
+  );
+
+  return (
+    <div className="campus-grid">
+      <BuildingTile buildingId="testStand" />
+      <BuildingTile buildingId="launchRail" />
+      {payloadProcessingUnlocked && <BuildingTile buildingId="payloadProcessing" />}
+    </div>
+  );
+}
+
 export function App() {
   const [activeComplex, setActiveComplex] = useState<ComplexId>('campus');
 
@@ -84,6 +103,7 @@ export function App() {
           </>
         )}
         {activeComplex === 'production' && <ProductionPanel />}
+        {activeComplex === 'testing' && <TestingPanel />}
       </main>
     </div>
   );

@@ -21,7 +21,7 @@ const ROLE_IDS: RoleId[] = ['technician', 'engineer', 'scientist', 'controller']
 
 export function createInitialState(): GameState {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     lastSeenAt: Date.now(),
     resources: {
       funding: { amount: 0, cap: 500, lifetimeEarned: 0 },
@@ -50,6 +50,13 @@ export function createInitialState(): GameState {
       ]),
     ) as unknown as GameState['buildings'],
     research: { completed: [], inProgress: null },
+    certifications: {
+      engines: {
+        probe1: { attempted: false, certified: false, extendedCertified: false },
+        orbital1: { attempted: false, certified: false, extendedCertified: false },
+      },
+      inProgress: null,
+    },
     processes: [],
     modifiers: [],
     mission: {

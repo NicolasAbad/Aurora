@@ -988,3 +988,130 @@ flagged, not resolved, per "doc ambiguity = stop and ask":**
    process display) should follow is now genuinely ambiguous. Not touched; flagged for the
    owner before Sprint 5's UI step specifically, since Sprint 5's core/data work doesn't
    depend on the answer but its UI step does.
+
+## Both flagged items resolved by the owner (2026-07-26)
+
+CLAUDE.md and SPRINTS.md replaced again: `BuildingState` restored in CLAUDE.md's schema —
+reconciled field-for-field against `src/core/types.ts`'s shipped `BuildingState`
+(`level`, `upgrades`, `starvedIndicator`, `fedStreakMs`, same order) and it matches
+exactly, so no code or doc correction was needed beyond confirming the match. New rule 5b
+codifies "diff a replacement doc against the repo first; if it drops something shipped
+code depends on, keep the code and flag it" — the process this pass already followed.
+The "v3.0" content is a real, owner-authored addendum from manual play (untrackable
+promotion timer, staff invisible outside Campus, "400 Funding" reading wrong as a price)
+that got lost in an earlier compact; it now has an explicit owner, **Sprint 4.5 —
+Presentation conventions**, scheduled to run before Sprint 5's UI step so nothing gets
+built twice against the old convention. Sprint 5 order of work, per the owner: (a)
+core/data now, unblocked; (b) Sprint 4.5 in full; (c) Sprint 5's UI, on the new
+convention from the start. Rule 5 also now states explicitly that an additive optional
+field needs neither migration nor version bump — ratifying the `expiresAt` call, noted
+here rather than revisited case by case going forward.
+
+## Sprint 5 (core/data portion) — Testing, certifications, scripted failure (2026-07-26)
+
+Per the owner's ordering above, only the core/data slice of Sprint 5 lands now — the
+Mission Log feed component, `data/narrative.ts`, and any certification-triggering UI are
+held for after Sprint 4.5 (they're new UI surfaces; certification buttons in particular
+would render costs, which is exactly what Sprint 4.5 is about to change). What's built
+here is real, tested, and reachable through the actual store — just not yet clickable
+from a certification-specific button, mirroring the established "infra ahead of
+consumer" pattern (Sprint 2's `ProcessProgress`, Sprint 3's `minHardwareTier`).
+
+**Built:**
+- Schema (v2→v3 migration, same commit per rule 5): `EngineId` (`'probe1'|'orbital1'` —
+  Orbital-1 listed now, Sprint 7 content only, so it never needs its own migration later,
+  same precedent as `PadId`/`HardwareTier`), `EngineCertificationState`
+  (`attempted`/`certified`/`extendedCertified` — deliberately generic, not
+  Probe-1-specific: `attempted` covers both Probe-1's scripted-failure test 1 AND
+  Orbital-1's future probabilistic attempt, since both gate a "retry" the same way).
+  `GameState` gains `certifications: { engines, inProgress }`, same shape/pattern as
+  `research`. CLAUDE.md's schema block updated to match, same commit.
+- `src/data/certifications.ts` (new) — Probe-1's three tests (`probe1Test1`/`Test2`/
+  `Extended`) per ECONOMY §6 v2.5 values, each tagged `stage: 'first'|'retry'|'extended'`
+  (generic sequencing vocabulary, not test-id-specific, so Orbital-1's future
+  probabilistic first/retry shape can reuse the same field).
+- `src/core/certification.ts` (new) — `isCertificationTestAvailable` (mirrors
+  `core/research.ts`'s `isNodeAvailable` shape) and `resolveCertification` (timestamp-
+  based, one test in progress at a time, same pattern as `resolveResearch`). Probe-1's
+  three outcomes are resolved directly by `stage` rather than through a generic
+  probabilistic-outcome abstraction — deliberately not generalized for Orbital-1's actual
+  80%-chance certification (a committed roll, rule 12) since Probe-1 alone is entirely
+  deterministic (GDD §7: "the FIRST static fire ALWAYS fails") and doesn't need that
+  machinery yet.
+- `src/core/hardware.ts` — `creditHardware` gained an `oneTime` parameter (default
+  `false`, so Fabrication's existing call site is unaffected): the scripted failure's
+  6H recovery is a reward, not passive production, so it ignores the cap like every other
+  one-time grant (GDD §1c) rather than silently capping mid-recovery.
+  `core/actions.ts` gained `startCertification` (afford-check, cost deduction, process
+  creation — the same shape as `startResearch`).
+- `src/core/unlockConditions.ts` (new) — `isUnlockConditionMet` finally gives
+  `BuildingDef.unlockCondition` real teeth: it's been on every `BuildingDef` since Sprint
+  0 but nothing ever evaluated it generically (Complex B's tab unlock was hand-coded to
+  its one specific condition, Complex C/D were hardcoded `false`). `auroraISuccess` is
+  derived from `mission.launches` (no dedicated flag needed — `LaunchRecord` already
+  carries `missionType`/`success`).
+- **Found and fixed the same bug class Sprint 3 fixed for Complex B:** `ComplexTabs.tsx`
+  had Testing/Launch both hardcoded `unlocked: false` regardless of state — Testing was
+  genuinely unreachable no matter how much tech got researched. Fixed Testing to be
+  state-driven (`research.completed.includes('testStand')`). **Left Launch hardcoded-
+  locked on purpose**: its tech gate (`flightProgram`) is already technically reachable
+  since the Program branch is complete, but Complex D has no panel content until Sprint 7
+  builds VAB/Pad/Launch Control/Tracking Station — making the tab state-driven now would
+  unlock it onto a blank screen for a sufficiently-researched player. Sprint 7 is where
+  this becomes state-driven, matching Testing today.
+- `src/App.tsx` gained `TestingPanel` (Test Stand + Launch Rail tiles via the existing,
+  unmodified `BuildingTile`; Payload Processing conditionally rendered via
+  `isUnlockConditionMet` — stays hidden, since nothing sets `auroraISuccess` yet,
+  correctly matching UI_SPEC §2b's "stays hidden until Aurora I success").
+- `src/state/persistStore.ts` — certifications wired through both paths per rule 6:
+  `computeBootOffline` resolves any in-progress test across an offline gap (same
+  dedicated-slot pattern as research); `applyTick` applies the same warp-shift trick
+  processes/research already use. **Found and fixed a real gap while wiring this in:**
+  the away-summary's `researchGained` compared `offline.resources` (before certification
+  resolution), so a certification completing during an offline gap would have its Flight
+  Data silently missing from the "While you were away" summary math — fixed to compare
+  against `certificationResolution.resources` instead. New `startCertificationTest` store
+  action.
+
+**Verification:**
+- 192 tests passing (up from 158), typecheck/lint/build clean, dev-only tooling confirmed
+  still absent from the production bundle (`grep -c` on `dist/assets/*.js` → 0).
+  `sim/run.ts` re-run (untouched by this work) — no regression: day-5 pacing floor still
+  PASS, Flight Data shares unchanged (23.7%/25.0% sonda/satellite).
+- Playwright, through a real browser: confirmed the Testing tab is genuinely locked on a
+  fresh save. **Found a real methodology trap of my own making, caught before it produced
+  a false "broken" report:** the first verification attempt tried to reach `testStand`
+  the same way Sprint 4 bootstrapped to a Scientist — real clicks, then a single ~50s
+  real-time `warpWaitThenReset` to bank enough Research at the Lab's tiny 0.03 R/s base
+  rate. That's exactly the anti-pattern `feedback_verification_timing_traps.md` already
+  warns about: 50 real seconds at ×600 is 8+ virtual hours, and salary drains at the warp
+  multiplier for the entire window (450 F/s with 1 Technician + 1 Scientist) — insolvency
+  hit partway through and paused the Lab along with everything else, banking only 34 R
+  instead of the expected ~450. Rather than re-tuning the economy of a script whose actual
+  goal was DOM reactivity (not re-proving the bootstrap economy, which is already fully
+  covered by `core/certification.test.ts` and the real-store tests in
+  `persistStore.test.ts`), switched to the same `page.addInitScript()` localStorage-
+  injection technique Sprint 2's away-modal check established: inject a save with the
+  Program branch already researched, then verify the UI reacts correctly to real state.
+  Confirmed: Testing tab unlocks the moment `testStand` is in `research.completed`;
+  "Engine Test Stand" and "Launch Rail" tiles render with correct costs; Payload
+  Processing stays hidden; Launch stays locked; the Materials branch showing "Aluminum
+  alloys" as a real node (not just an empty save being ignored) confirms the injected
+  state genuinely loaded. Screenshot-verified both the tab bar and the panel itself
+  (`24-sprint5-testing-tab.png`, `24-sprint5-testing-panel.png`). Zero console errors.
+
+**Scope notes:**
+- SPRINTS Sprint 5 tasks 1-3 and 5 (Test Stand reachability, certifications as processes,
+  scripted failure, Flight Data wiring) are done at the core/data/minimal-reachability
+  level. Task 5's "Flight Experience visible as a resource" is satisfied for free by the
+  existing generic `Ticker` (already iterates every `ResourceId` and reveals a row once
+  `lifetimeEarned > 0` — no code change needed, confirmed by `core/certification.test.ts`
+  crediting `flightxp` correctly).
+- Task 4 (Mission Log feed component + `data/narrative.ts`) is NOT started. It doesn't
+  strictly depend on the cost-rendering convention question (narrative entries are text
+  pulled by ID, not price tags) — flagging that in case the owner would rather pull it
+  forward — but it wasn't in the owner's explicit "start there" list, so it's held for
+  after Sprint 4.5 along with the certification-triggering buttons, pending confirmation.
+- Sprint 5 is NOT closed: its acceptance criterion ("full test-fail-narrative-retry-
+  certify flow works and is narrated") needs the narration and the trigger UI, both
+  deliberately deferred. Proceeding to Sprint 4.5 next, then back to finish Sprint 5's UI.

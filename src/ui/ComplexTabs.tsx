@@ -2,13 +2,7 @@ import { useGameStore } from '../state/persistStore';
 import type { ComplexId } from '../core/types';
 
 const PRODUCTION_UNLOCK_FUNDING = 300; // ECONOMY §4: Complex B unlock, lifetime Funding
-
-// Unlock gates per GDD §3 / ECONOMY_MODEL §4 complex headers. Testing/Launch are not
-// reachable until their tech nodes exist (Sprint 4+) — still visible-but-locked in v1.
-const STATIC_COMPLEXES: { id: ComplexId; label: string; condition: string }[] = [
-  { id: 'testing', label: 'Testing', condition: 'Unlocks with tech: Test stand' },
-  { id: 'launch', label: 'Launch', condition: 'Unlocks with tech: Flight program' },
-];
+const TESTING_UNLOCK_TECH = 'testStand'; // ECONOMY §4: Complex C unlock, tech "Test stand"
 
 interface ComplexTabsProps {
   active: ComplexId;
@@ -17,6 +11,7 @@ interface ComplexTabsProps {
 
 export function ComplexTabs({ active, onSelect }: ComplexTabsProps) {
   const lifetimeFunding = useGameStore((s) => s.resources.funding.lifetimeEarned);
+  const testingUnlocked = useGameStore((s) => s.research.completed.includes(TESTING_UNLOCK_TECH));
 
   const complexes = [
     { id: 'campus' as const, label: 'Campus', unlocked: true, condition: '' },
@@ -26,7 +21,18 @@ export function ComplexTabs({ active, onSelect }: ComplexTabsProps) {
       unlocked: lifetimeFunding >= PRODUCTION_UNLOCK_FUNDING,
       condition: 'Unlocks at 300 lifetime Funding',
     },
-    ...STATIC_COMPLEXES.map((c) => ({ ...c, unlocked: false })),
+    {
+      id: 'testing' as const,
+      label: 'Testing',
+      unlocked: testingUnlocked,
+      condition: 'Unlocks with tech: Test stand',
+    },
+    // Launch (Complex D) stays hardcoded-locked: its tech gate (Flight program) is
+    // technically reachable already (the Program branch is complete since Sprint 4),
+    // but Complex D has no panel content until Sprint 7 builds VAB/Pad/Launch Control/
+    // Tracking Station — unlocking the tab now would open onto a blank screen. Sprint 7
+    // is where this becomes state-driven like Testing just did.
+    { id: 'launch' as const, label: 'Launch', unlocked: false, condition: 'Unlocks with tech: Flight program' },
   ];
 
   return (

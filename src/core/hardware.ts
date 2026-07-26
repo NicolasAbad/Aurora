@@ -44,15 +44,20 @@ export function currentHardwareTier(completedTech: string[]): HardwareTier {
 }
 
 /** Credits `amount` Hardware at `tier` into byTier, keeping `amount`/`lifetimeEarned` in
- * sync with the sum(byTier) invariant (CLAUDE.md schema note). Halts at cap like any
- * other passive production (GDD §1c) — the cap is shared across tiers. */
+ * sync with the sum(byTier) invariant (CLAUDE.md schema note). Passive production
+ * (`oneTime: false`, the default — Fabrication's only caller so far) halts at cap like
+ * any other passive grant (GDD §1c) — the cap is shared across tiers. `oneTime: true`
+ * (Sprint 5: recovering Hardware from a failed certification test, the same "reward,
+ * not production" category as Aurora I's rewards) ignores the cap, mirroring
+ * core/economy.ts's applyGrant exactly. */
 export function creditHardware(
   hardware: HardwareState,
   amount: number,
   tier: HardwareTier,
+  oneTime = false,
 ): HardwareState {
   if (amount <= 0) return hardware;
-  const room = hardware.cap === null ? amount : Math.max(0, hardware.cap - hardware.amount);
+  const room = oneTime || hardware.cap === null ? amount : Math.max(0, hardware.cap - hardware.amount);
   const added = Math.min(amount, room);
   if (added <= 0) return hardware;
   return {

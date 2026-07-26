@@ -1,0 +1,132 @@
+import { describe, expect, it } from 'vitest';
+import { createInitialState } from '../data/initialState';
+import { CERTIFICATION_TESTS_BY_ID } from '../data/certifications';
+import { isCertificationTestAvailable, resolveCertification, type CertificationState } from './certification';
+import type { EngineCertificationState, Process } from './types';
+
+const MIN = 60_000;
+
+function engineState(overrides: Partial<EngineCertificationState> = {}): EngineCertificationState {
+  return { attempted: false, certified: false, extendedCertified: false, ...overrides };
+}
+
+function test(id: string) {
+  const t = CERTIFICATION_TESTS_BY_ID.get(id);
+  if (!t) throw new Error(`unknown test id: ${id}`);
+  return t;
+}
+
+describe('isCertificationTestAvailable', () => {
+  it('the first-stage test is available only before any attempt', () => {
+    expect(isCertificationTestAvailable(test('probe1Test1'), engineState())).toBe(true);
+    expect(isCertificationTestAvailable(test('probe1Test1'), engineState({ attempted: true }))).toBe(false);
+  });
+
+  it('the retry-stage test is available only after an attempt and before certification', () => {
+    expect(isCertificationTestAvailable(test('probe1Test2'), engineState())).toBe(false);
+    expect(isCertificationTestAvailable(test('probe1Test2'), engineState({ attempted: true }))).toBe(true);
+    expect(
+      isCertificationTestAvailable(test('probe1Test2'), engineState({ attempted: true, certified: true })),
+    ).toBe(false);
+  });
+
+  it('the extended test is available only once certified and not already extended', () => {
+    expect(isCertificationTestAvailable(test('probe1Extended'), engineState({ certified: true }))).toBe(true);
+    expect(isCertificationTestAvailable(test('probe1Extended'), engineState())).toBe(false);
+    expect(
+      isCertificationTestAvailable(
+        test('probe1Extended'),
+        engineState({ certified: true, extendedCertified: true }),
+      ),
+    ).toBe(false);
+  });
+});
+
+describe('resolveCertification', () => {
+  function makeState(overrides: Partial<CertificationState> = {}): CertificationState {
+    return { engines: createInitialState().certifications.engines, inProgress: null, ...overrides };
+  }
+
+  it('does nothing when nothing is in progress', () => {
+    const state = createInitialState();
+    const result = resolveCertification(makeState(), state.resources, [], [], Date.now());
+    expect(result.justCompleted).toBeNull();
+  });
+
+  it('does nothing before the duration has elapsed', () => {
+    const state = createInitialState();
+    const process: Process = { id: 'c1', kind: 'certification', startedAt: 0, durationMs: 25 * MIN, payload: { testId: 'probe1Test1' } };
+    const result = resolveCertification(makeState({ inProgress: process }), state.resources, [], [], 10 * MIN);
+    expect(result.justCompleted).toBeNull();
+    expect(result.certifications.inProgress).toBe(process);
+  });
+
+  it('probe1Test1 is a scripted failure: +30 XP, +250 Research (Flight Data), recovers 6 Hardware, fires N-07, unlocks the retry', () => {
+    const state = createInitialState();
+    state.resources.hardware.amount = 4; // e.g. what's left after the 10H the test consumed to start
+    state.resources.hardware.byTier.aluminum = 4;
+    state.resources.hardware.cap = 50;
+    const process: Process = { id: 'c1', kind: 'certification', startedAt: 0, durationMs: 25 * MIN, payload: { testId: 'probe1Test1' } };
+
+    const result = resolveCertification(makeState({ inProgress: process }), state.resources, [], [], 25 * MIN);
+
+    expect(result.justCompleted).toEqual({ testId: 'probe1Test1', outcome: 'scriptedFailure' });
+    expect(result.certifications.inProgress).toBeNull();
+    expect(result.certifications.engines.probe1).toEqual({ attempted: true, certified: false, extendedCertified: false });
+    expect(result.resources.hardware.amount).toBe(10); // 4 + 6 recovered
+    expect(result.resources.flightxp.amount).toBe(30);
+    expect(result.resources.research.amount).toBe(250); // Flight Data = Research
+    expect(result.narrativeSeen).toEqual(['N-07']);
+  });
+
+  it('does not duplicate N-07 if it was already seen (idempotent)', () => {
+    const state = createInitialState();
+    const process: Process = { id: 'c1', kind: 'certification', startedAt: 0, durationMs: 25 * MIN, payload: { testId: 'probe1Test1' } };
+    const result = resolveCertification(makeState({ inProgress: process }), state.resources, ['N-07'], [], 25 * MIN);
+    expect(result.narrativeSeen).toEqual(['N-07']);
+  });
+
+  it('probe1Test2 is a guaranteed success: grants the static-fire-success reward and certifies the engine', () => {
+    const state = createInitialState();
+    const process: Process = { id: 'c1', kind: 'certification', startedAt: 0, durationMs: 25 * MIN, payload: { testId: 'probe1Test2' } };
+    const result = resolveCertification(
+      makeState({ inProgress: process, engines: { ...makeState().engines, probe1: engineState({ attempted: true }) } }),
+      state.resources,
+      [],
+      [],
+      25 * MIN,
+    );
+
+    expect(result.justCompleted).toEqual({ testId: 'probe1Test2', outcome: 'success' });
+    expect(result.certifications.engines.probe1).toEqual({ attempted: true, certified: true, extendedCertified: false });
+    expect(result.resources.flightxp.amount).toBe(15);
+    expect(result.resources.reputation.amount).toBe(2);
+    expect(result.resources.research.amount).toBe(150);
+  });
+
+  it('probe1Extended grants no resource reward, only flips extendedCertified', () => {
+    const state = createInitialState();
+    const process: Process = { id: 'c1', kind: 'certification', startedAt: 0, durationMs: 25 * MIN, payload: { testId: 'probe1Extended' } };
+    const result = resolveCertification(
+      makeState({
+        inProgress: process,
+        engines: { ...makeState().engines, probe1: engineState({ attempted: true, certified: true }) },
+      }),
+      state.resources,
+      [],
+      [],
+      25 * MIN,
+    );
+
+    expect(result.justCompleted).toEqual({ testId: 'probe1Extended', outcome: 'success' });
+    expect(result.certifications.engines.probe1.extendedCertified).toBe(true);
+    expect(result.resources).toBe(state.resources); // untouched — no reward
+  });
+
+  it('is purely timestamp-based: a huge jump in `now` resolves the same as checking incrementally', () => {
+    const state = createInitialState();
+    const process: Process = { id: 'c1', kind: 'certification', startedAt: 0, durationMs: 25 * MIN, payload: { testId: 'probe1Test1' } };
+    const result = resolveCertification(makeState({ inProgress: process }), state.resources, [], [], 3 * 60 * MIN);
+    expect(result.justCompleted).not.toBeNull();
+  });
+});

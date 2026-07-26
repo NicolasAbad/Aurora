@@ -2,6 +2,7 @@
 // per-frame resolution). Each returns the updated state slice on success, or `null` if
 // the action isn't currently valid — callers (the store) simply no-op on `null`.
 import { BUILDINGS } from '../data/buildings';
+import { CERTIFICATION_TESTS_BY_ID } from '../data/certifications';
 import { PROMOTIONS } from '../data/roles';
 import { RESEARCH_BY_ID } from '../data/researchTree';
 import {
@@ -12,6 +13,7 @@ import {
   totalStaffCap,
   unassignedCount,
 } from './staff';
+import { isCertificationTestAvailable, type CertificationState } from './certification';
 import { applyGrant, costAtLevel, pitchYield } from './economy';
 import { hardwareAtOrAboveTier, spendHardware } from './hardware';
 import { isNodeAvailable, type ResearchState } from './research';
@@ -260,6 +262,42 @@ export function startResearch(
         startedAt: now,
         durationMs: node.durationMs,
         payload: { nodeId },
+      },
+    },
+  };
+}
+
+export interface StartCertificationResult {
+  resources: GameState['resources'];
+  certifications: CertificationState;
+}
+
+/** ECONOMY §6: starts `testId` if it's currently available for its engine (sequencing
+ * per core/certification.ts's isCertificationTestAvailable), nothing else is already
+ * testing ("one test at a time", same pattern as research), and Hardware+Propellant
+ * cover its cost — paid upfront, same as every other timed process here. */
+export function startCertification(
+  resources: GameState['resources'],
+  certifications: CertificationState,
+  testId: string,
+  now: number,
+): StartCertificationResult | null {
+  if (certifications.inProgress) return null;
+  const test = CERTIFICATION_TESTS_BY_ID.get(testId);
+  if (!test) return null;
+  if (!isCertificationTestAvailable(test, certifications.engines[test.engineId])) return null;
+  if (!canAffordCost(resources, test.consumes)) return null;
+
+  return {
+    resources: payCost(resources, test.consumes),
+    certifications: {
+      ...certifications,
+      inProgress: {
+        id: `certification-${testId}-${now}`,
+        kind: 'certification',
+        startedAt: now,
+        durationMs: test.durationMs,
+        payload: { testId },
       },
     },
   };

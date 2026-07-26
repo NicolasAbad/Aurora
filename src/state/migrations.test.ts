@@ -29,3 +29,36 @@ describe('migrate — v1 to v2 (Sprint 3: starvation hysteresis state)', () => {
     expect(migrated.buildings.fabrication.starvedIndicator).toBe(false);
   });
 });
+
+describe('migrate — v2 to v3 (Sprint 5: certification state)', () => {
+  it('adds an all-false certifications slot to a v2 save, certifying nothing retroactively', () => {
+    const v2Save = { schemaVersion: 2, resources: { funding: { amount: 42 } } };
+
+    const migrated = migrate(v2Save, 2) as {
+      schemaVersion: number;
+      resources: { funding: { amount: number } };
+      certifications: {
+        engines: Record<string, { attempted: boolean; certified: boolean; extendedCertified: boolean }>;
+        inProgress: null;
+      };
+    };
+
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(migrated.certifications).toEqual({
+      engines: {
+        probe1: { attempted: false, certified: false, extendedCertified: false },
+        orbital1: { attempted: false, certified: false, extendedCertified: false },
+      },
+      inProgress: null,
+    });
+    // Pre-existing fields untouched.
+    expect(migrated.resources.funding.amount).toBe(42);
+  });
+
+  it('walking from v1 also lands on v3 with both migrations applied', () => {
+    const v1Save = { schemaVersion: 1, buildings: { finance: { level: 1, upgrades: [] } } };
+    const migrated = migrate(v1Save, 1) as { schemaVersion: number; certifications: unknown };
+    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.certifications).not.toBeUndefined();
+  });
+});

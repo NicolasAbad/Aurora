@@ -1,6 +1,6 @@
 // CLAUDE.md rule 5: every schema change ships a migration in the same commit.
 // Registry maps a version N to the function that upgrades a raw save from N to N+1.
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 3;
 
 export type Migration = (state: Record<string, unknown>) => Record<string, unknown>;
 
@@ -17,8 +17,26 @@ function v1ToV2(state: Record<string, unknown>): Record<string, unknown> {
   return { ...state, schemaVersion: 2, buildings: migratedBuildings };
 }
 
+/** v2 -> v3 (Sprint 5, ECONOMY §6): new top-level `certifications` slot, same shape as
+ * `research` (one test in progress, permanent per-engine progress). A pre-existing save
+ * has certified nothing yet — every engine starts at all-false, nothing in progress. */
+function v2ToV3(state: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...state,
+    schemaVersion: 3,
+    certifications: {
+      engines: {
+        probe1: { attempted: false, certified: false, extendedCertified: false },
+        orbital1: { attempted: false, certified: false, extendedCertified: false },
+      },
+      inProgress: null,
+    },
+  };
+}
+
 export const MIGRATIONS: Record<number, Migration> = {
   1: v1ToV2,
+  2: v2ToV3,
 };
 
 export function migrate(

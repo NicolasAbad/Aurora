@@ -45,6 +45,13 @@
 5. Role promotions (Classroom upgrade) as timed process.
 **Acceptance:** Basic logistics reduces transfer 25% via modifier; Remote Ops raises the offline cap via modifier; save/load preserves in-progress research.
 
+## Sprint 4.5 — Presentation conventions (1–2 days, UI only)
+*Owner of the v3.0 doc changes (ECONOMY §12, UI_SPEC §2c/§4). Runs BEFORE Sprint 5's UI work so nothing is built twice against the old convention. No core/data/economy changes — presentation only.*
+1. **Cost & amount rendering (UI_SPEC §4, replaces the v2.8 abbreviation rule):** costs render as icon + number with no resource noun; Funds render as `$400` / `$1.25M`; full names only in ticker, tooltips, staff/economy panels and reward summaries; every icon gets a tooltip/long-press with its full name. Retrofit every existing screen (tiles, hire buttons, upgrade buttons, research panel, away modal, ticker).
+2. **Active process strip (UI_SPEC §2c):** persistent strip under the ticker; NO process may exist without a chip (the promotion timer being untrackable is the bug that motivated this). Label + remaining time + progress fill, soonest-first, tappable, collapses to zero height when empty, "+N" overflow past 4.
+3. **Staff availability chip in every complex tab header** (unassigned pool only), tappable to the staff panel.
+**Acceptance:** a promotion is trackable end-to-end from the strip; the Production tab shows correct availability without navigating to Campus; no price tag anywhere renders a resource noun (Playwright-verified).
+
 ## Sprint 5 — Testing & designed failure (3 days)
 1. Complex C: Engine Test Stand (build + slots).
 2. Certifications as processes (§6), including extended certification for every engine type.

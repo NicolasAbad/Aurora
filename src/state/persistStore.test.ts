@@ -58,6 +58,25 @@ describe('loadGame', () => {
     expect(loaded.modifiers.map((m) => m.id)).toEqual(['still-active', 'permanent']);
   });
 
+  // Sprint 5: certifications have their own dedicated slot, same shape/pattern as
+  // research's own "round-trips in-progress research" acceptance test above.
+  it('round-trips in-progress certification and per-engine progress', () => {
+    const state = createInitialState();
+    state.certifications.engines.probe1.attempted = true;
+    state.certifications.inProgress = {
+      id: 'certification-probe1Test2-12345',
+      kind: 'certification',
+      startedAt: 12345,
+      durationMs: 25 * 60_000,
+      payload: { testId: 'probe1Test2' },
+    };
+    saveGame(state);
+
+    const loaded = loadGame();
+    expect(loaded.certifications.inProgress).toEqual(state.certifications.inProgress);
+    expect(loaded.certifications.engines.probe1.attempted).toBe(true);
+  });
+
   it('falls back to initial state on corrupt JSON instead of throwing', () => {
     localStorage.setItem(SAVE_KEY, '{not valid json');
     expect(() => loadGame()).not.toThrow();
@@ -217,6 +236,45 @@ describe('applyTick — time-warp reaches process resolution (SPRINTS.md task 3)
     const remaining = useGameStore.getState().processes;
     expect(remaining).toHaveLength(1);
     expect(remaining[0].id).toBe('slow');
+  });
+});
+
+// Sprint 5 acceptance (core/data portion — UI narration lands after Sprint 4.5):
+// the full test-fail-retry-certify sequence through the REAL store, not isolated core
+// calls (CLAUDE.md's "acceptance verified through the integrated path" rule).
+describe('certification flow through the real store (Sprint 5)', () => {
+  beforeEach(() => {
+    const state = createInitialState();
+    state.resources.hardware.amount = 100;
+    state.resources.hardware.byTier.aluminum = 100;
+    state.resources.hardware.cap = 200;
+    state.resources.propellant.amount = 300;
+    state.resources.propellant.cap = 500;
+    useGameStore.setState(state);
+  });
+
+  it('probe1Test1 resolves as a scripted failure, then unlocks probe1Test2, which certifies the engine', () => {
+    const { startCertificationTest, applyTick } = useGameStore.getState();
+
+    startCertificationTest('probe1Test1');
+    expect(useGameStore.getState().certifications.inProgress).not.toBeNull();
+
+    applyTick(1000, 2000); // >= 25 simulated minutes in one warped tick
+
+    expect(useGameStore.getState().certifications.inProgress).toBeNull();
+    expect(useGameStore.getState().certifications.engines.probe1.attempted).toBe(true);
+    expect(useGameStore.getState().certifications.engines.probe1.certified).toBe(false);
+    expect(useGameStore.getState().narrative.seen).toContain('N-07');
+    expect(useGameStore.getState().resources.flightxp.amount).toBe(30);
+
+    startCertificationTest('probe1Test2');
+    expect(useGameStore.getState().certifications.inProgress).not.toBeNull();
+
+    applyTick(1000, 600 * 26);
+
+    expect(useGameStore.getState().certifications.engines.probe1.certified).toBe(true);
+    // 30 (test1) + 15 (test2's static-fire-success reward)
+    expect(useGameStore.getState().resources.flightxp.amount).toBe(45);
   });
 });
 

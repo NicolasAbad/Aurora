@@ -11,9 +11,11 @@ import {
   buyBuildingUpgrade,
   buyInternalUpgrade,
   hireStaff,
+  startCertification,
   startPromotion,
   startResearch,
 } from '../core/actions';
+import { resolveCertification } from '../core/certification';
 import { resolveEconomyTick } from '../core/economy';
 import { applyModifiers, pruneExpiredModifiers } from '../core/modifiers';
 import { OFFLINE_CAP_MS, resolveOffline, type PayrollStoppage } from '../core/offlineResolution';
@@ -121,13 +123,26 @@ function computeBootOffline(): { initialState: GameState; awaySummary: AwaySumma
   const researchResolution = resolveResearch(loaded.research, loaded.modifiers, now);
   const staffAfterCompletions = applyCompletedProcesses(loaded.staff, offline.completedProcesses);
 
+  // Certifications have their own dedicated slot too (Sprint 5, same reasoning as
+  // research above): resolved separately against the uncapped, real `now` — a
+  // certification test's own timer runs at 100% offline (ECONOMY §11), same as research.
+  const certificationResolution = resolveCertification(
+    loaded.certifications,
+    offline.resources,
+    loaded.narrative.seen,
+    loaded.research.completed,
+    now,
+  );
+
   const initialState: GameState = {
     ...loaded,
-    resources: offline.resources,
+    resources: certificationResolution.resources,
     buildings: offline.buildings,
     processes: offline.processes,
     staff: staffAfterCompletions,
     research: researchResolution.research,
+    certifications: certificationResolution.certifications,
+    narrative: { ...loaded.narrative, seen: certificationResolution.narrativeSeen },
     // Modifier.expiresAt contract: pruned again here (not just at load) against the
     // POST-GAP `now` — a modifier that expired partway through an offline gap must not
     // survive into the fresh boot state just because it was still alive at load time.
@@ -143,7 +158,11 @@ function computeBootOffline(): { initialState: GameState; awaySummary: AwaySumma
           appliedMs: offline.appliedMs,
           capped: offline.capped,
           fundingGained: offline.resources.funding.amount - loaded.resources.funding.amount,
-          researchGained: offline.resources.research.amount - loaded.resources.research.amount,
+          // Uses certificationResolution.resources, not offline.resources: a
+          // certification test resolving during the gap credits Flight Data into
+          // Research too (ECONOMY §8), same as it would from a live tick — omitting it
+          // here would silently under-report the summary for that gap.
+          researchGained: certificationResolution.resources.research.amount - loaded.resources.research.amount,
           stoppage: offline.stoppage,
         }
       : null;
@@ -177,6 +196,9 @@ export interface GameActions {
   startResearchNode: (nodeId: string) => void;
   /** No-ops if the Classroom isn't built, no unassigned unit of `from`, or Funding is short. */
   startPromotion: (from: RoleId, to: RoleId) => void;
+  /** No-ops if the test isn't available for its engine, something else is already
+   * testing, or Hardware/Propellant are short. */
+  startCertificationTest: (testId: string) => void;
   /** Called once per animation frame by the game loop (see core/tick.ts + main.tsx).
    * `warp` (dev builds only, default 1) is the real caller passing a possibly-warped
    * multiplier — see `applyTick`'s implementation for why processes need it separately
@@ -257,6 +279,14 @@ export const useGameStore = create<Store>()((set, get) => ({
     if (result) set(result);
   },
 
+  startCertificationTest: (testId) => {
+    const state = get();
+    const result = startCertification(state.resources, state.certifications, testId, Date.now());
+    if (result) {
+      set({ ...result, telemetry: trackFirstOccurrence(state.telemetry, 'first_certification_started', { testId }) });
+    }
+  },
+
   applyTick: (deltaMs, warp = 1) => {
     const state = get();
     const { resources, buildings, payrollUnpaid } = resolveEconomyTick(
@@ -298,12 +328,33 @@ export const useGameStore = create<Store>()((set, get) => ({
         : state.research;
     const researchResolution = resolveResearch(shiftedResearch, state.modifiers, Date.now());
 
-    set({
+    // Certifications: same warp-shift, same dedicated-slot pattern as research above.
+    const shiftedCertifications =
+      warpBonusMs > 0 && state.certifications.inProgress
+        ? {
+            ...state.certifications,
+            inProgress: {
+              ...state.certifications.inProgress,
+              startedAt: state.certifications.inProgress.startedAt - warpBonusMs,
+            },
+          }
+        : state.certifications;
+    const certificationResolution = resolveCertification(
+      shiftedCertifications,
       resources,
+      state.narrative.seen,
+      state.research.completed,
+      Date.now(),
+    );
+
+    set({
+      resources: certificationResolution.resources,
       buildings,
       processes,
       staff: staffAfterCompletions,
       research: researchResolution.research,
+      certifications: certificationResolution.certifications,
+      narrative: { ...state.narrative, seen: certificationResolution.narrativeSeen },
       modifiers: researchResolution.modifiers,
       economyFlags: { ...state.economyFlags, payrollUnpaid },
     });

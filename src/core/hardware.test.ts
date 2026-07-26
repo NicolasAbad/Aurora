@@ -35,6 +35,20 @@ describe('creditHardware', () => {
     const hw = makeHardware({ amount: 5, byTier: { aluminum: 5, titanium: 0 } });
     expect(creditHardware(hw, 0, 'aluminum')).toBe(hw);
   });
+
+  // Sprint 5: recovering Hardware from a failed certification test is a reward, not
+  // passive production — GDD §1c's "one-time payments ignore caps" applies here too,
+  // mirroring core/economy.ts's applyGrant.
+  it('ignores the cap when oneTime is true', () => {
+    const result = creditHardware(makeHardware({ amount: 95, cap: 100 }), 10, 'aluminum', true);
+    expect(result.amount).toBe(105);
+    expect(result.byTier.aluminum).toBe(10);
+  });
+
+  it('still halts at the cap by default (oneTime defaults to false)', () => {
+    const result = creditHardware(makeHardware({ amount: 95, cap: 100 }), 10, 'aluminum');
+    expect(result.amount).toBe(100);
+  });
 });
 
 describe('hardwareAtOrAboveTier', () => {

@@ -14,7 +14,8 @@
 2. **No scope creep.** Nothing outside the GDD, nothing outside the current sprint. New ideas go to `docs/BACKLOG.md`, not into code. No monetization code of any kind in v1.
 3. **Content = data, systems = pure functions.** All content (buildings, tech, narrative, contracts, events, records) lives in `/src/data` as typed objects. All logic lives in `/src/core` as pure functions with no React. UI only consumes the store.
 4. **Centralized modifiers.** Every bonus (tech, internal upgrade, XP node, event outcome) registers in `core/modifiers.ts`; systems query them. Never hardcode a bonus inside a system. Event effects like E-04's salary premium are modifiers, never special-cased individuals.
-5. **Versioned saves always.** Schema change = migration written in the same commit. `schemaVersion` bumps with every schema change.
+5. **Versioned saves always.** A schema change that requires transforming existing data = migration written in the same commit, with a `schemaVersion` bump. A purely **additive optional field** (absent = the existing behavior, e.g. `expiresAt?`) needs neither a migration nor a bump — note it in PROGRESS.md instead of writing a no-op migration.
+5b. **Docs can regress in transit.** The owner sometimes sends whole replacement files authored from their own copy, which can silently revert schema sections that were added in-repo during a sprint. Before applying a replacement doc, diff it against the repo version; if it DROPS anything the shipped code depends on, do not change code to match — flag it and keep the code. Shipped, tested behavior beats a doc line that looks like a transit error.
 6. **Time by timestamp, never tick accumulation.** Processes store `startedAt + durationMs`, resolved against `Date.now()`. Offline reuses the exact same resolution logic as online.
 7. **Tests for `/core`.** economy, time (incl. offline + insolvency), confidence, contracts have tests before UI integration. Offline math is the #1 idle-game bug source.
 8. **Every sprint ends playable** with its SPRINTS.md acceptance criterion verified.
@@ -79,11 +80,22 @@ interface MissionState {
 
 interface EconomyFlags { payrollUnpaid: boolean; } // GDD §1b insolvency state, drives UI banner
 
+// ECONOMY §6: only Probe-1 has certification content in v1 (Sprint 5); Orbital-1
+// (Sprint 7) is listed now so `engines` never needs a migration later.
+type EngineId = 'probe1'|'orbital1';
+interface EngineCertificationState { attempted: boolean; certified: boolean; extendedCertified: boolean; }
+
+interface BuildingState { level: number; upgrades: string[];
+  starvedIndicator: boolean; // §4b: shown from the first starved tick
+  fedStreakMs: number;       // §4b hysteresis: indicator clears after 3 consecutive fed ticks
+}
+
 interface GameState { schemaVersion: number; lastSeenAt: number;
   resources: Record<Exclude<ResourceId,'hardware'>, ResourceState> & { hardware: HardwareState };
   staff: StaffState;
-  buildings: Record<BuildingId, { level: number; upgrades: string[] }>;
+  buildings: Record<BuildingId, BuildingState>;
   research: { completed: string[]; inProgress: Process | null };
+  certifications: { engines: Record<EngineId, EngineCertificationState>; inProgress: Process | null };
   processes: Process[]; modifiers: Modifier[]; mission: MissionState;
   economyFlags: EconomyFlags;
   contracts: ContractState; records: string[]; narrative: { seen: string[] };

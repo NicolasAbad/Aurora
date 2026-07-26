@@ -8,6 +8,7 @@ import {
   applyRushOrder,
   buyBuildingUpgrade,
   hireStaff,
+  startCertification,
   startPromotion,
   startResearch,
 } from './actions';
@@ -261,6 +262,73 @@ describe('startPromotion', () => {
     state.resources.funding.amount = 50; // needs 100
     state.staff.pools.technician.hired = 1;
     expect(startPromotion(state.resources, state.staff, state.processes, true, 'technician', 'engineer', Date.now())).toBeNull();
+  });
+});
+
+describe('startCertification', () => {
+  function fundedState() {
+    const state = createInitialState();
+    state.resources.hardware.amount = 20;
+    state.resources.hardware.byTier.aluminum = 20;
+    state.resources.propellant.amount = 100;
+    state.resources.propellant.cap = 200;
+    return state;
+  }
+
+  it('starts the first available test (probe1Test1), deducting Hardware+Propellant and setting inProgress', () => {
+    const state = fundedState();
+    const now = Date.now();
+    const result = startCertification(state.resources, state.certifications, 'probe1Test1', now);
+    expect(result).not.toBeNull();
+    expect(result!.resources.hardware.amount).toBe(10); // 20 - 10
+    expect(result!.resources.propellant.amount).toBe(50); // 100 - 50
+    expect(result!.certifications.inProgress).toEqual({
+      id: `certification-probe1Test1-${now}`,
+      kind: 'certification',
+      startedAt: now,
+      durationMs: 25 * 60_000,
+      payload: { testId: 'probe1Test1' },
+    });
+  });
+
+  it('refuses probe1Test2 before probe1Test1 has resolved (sequencing)', () => {
+    const state = fundedState();
+    expect(startCertification(state.resources, state.certifications, 'probe1Test2', Date.now())).toBeNull();
+  });
+
+  it('allows probe1Test2 once probe1Test1 has been attempted', () => {
+    const state = fundedState();
+    state.certifications.engines.probe1.attempted = true;
+    const result = startCertification(state.resources, state.certifications, 'probe1Test2', Date.now());
+    expect(result).not.toBeNull();
+  });
+
+  it('refuses probe1Extended before the engine is certified', () => {
+    const state = fundedState();
+    state.certifications.engines.probe1.attempted = true; // test1 done, not yet certified
+    expect(startCertification(state.resources, state.certifications, 'probe1Extended', Date.now())).toBeNull();
+  });
+
+  it('refuses when something is already testing (one test at a time)', () => {
+    const state = fundedState();
+    state.certifications.inProgress = {
+      id: 'x',
+      kind: 'certification',
+      startedAt: Date.now(),
+      durationMs: 1000,
+      payload: { testId: 'probe1Test1' },
+    };
+    expect(startCertification(state.resources, state.certifications, 'probe1Test1', Date.now())).toBeNull();
+  });
+
+  it('refuses when Hardware/Propellant cannot cover the cost', () => {
+    const state = createInitialState(); // 0 Hardware, 0 Propellant
+    expect(startCertification(state.resources, state.certifications, 'probe1Test1', Date.now())).toBeNull();
+  });
+
+  it('refuses an unknown test id', () => {
+    const state = fundedState();
+    expect(startCertification(state.resources, state.certifications, 'notARealTest', Date.now())).toBeNull();
   });
 });
 

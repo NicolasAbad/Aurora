@@ -185,6 +185,22 @@ export interface EconomyFlags {
   payrollUnpaid: boolean; // GDD §1b insolvency state, drives UI banner
 }
 
+// ECONOMY §6: only Probe-1 has certification content in v1 (Sprint 5); Orbital-1 is
+// Sprint 7 (Aurora I). Listed now so `engines` never needs a migration when Orbital-1's
+// certification lands — same "closed union covers every named future event" precedent
+// as PadId/HardwareTier.
+export type EngineId = 'probe1' | 'orbital1';
+
+// Generic flags, not Probe-1-specific: `attempted` covers both Probe-1's scripted-failure
+// test 1 AND (Sprint 7) Orbital-1's probabilistic base-cert attempt, since both gate a
+// "retry" the same way. `certified`/`extendedCertified` are self-explanatory (ECONOMY §6:
+// every engine gets an optional extended pass once certified).
+export interface EngineCertificationState {
+  attempted: boolean;
+  certified: boolean;
+  extendedCertified: boolean;
+}
+
 // ECONOMY §4b (v2.7): input-starved consumers pause per building, per tick, binary.
 // starvedIndicator is the DISPLAYED state (hysteresis-smoothed); fedStreakMs accumulates
 // while fed and resets to 0 on any starved tick — the indicator only clears once
@@ -236,6 +252,9 @@ export interface GameState {
   staff: StaffState;
   buildings: Record<BuildingId, BuildingState>;
   research: { completed: string[]; inProgress: Process | null };
+  // Sprint 5 (ECONOMY §6): same shape as `research` above — one test in progress at a
+  // time, permanent per-engine progress that survives save/load.
+  certifications: { engines: Record<EngineId, EngineCertificationState>; inProgress: Process | null };
   processes: Process[];
   modifiers: Modifier[];
   mission: MissionState;
