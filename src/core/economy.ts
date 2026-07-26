@@ -101,7 +101,7 @@ function resolveConsumer(
   deltaMs: number,
 ): { buildingState: BuildingState; materials: ResourceState; producedAmount: number } {
   const def = BUILDINGS[buildingId];
-  const ratio = buildingStaffRatio(staff, buildingId);
+  const ratio = buildingStaffRatio(staff, buildingId, buildingState.level);
   const desiredOutput =
     productionPerSecond(def.production!.basePerSec, buildingState.level, ratio) * deltaSec;
   const consumePerUnit = def.production!.consumes!.materials!;
@@ -157,7 +157,7 @@ export function resolveEconomyTick(
     productionPerSecond(
       BUILDINGS.finance.production!.basePerSec,
       buildings.finance.level,
-      buildingStaffRatio(staff, 'finance'),
+      buildingStaffRatio(staff, 'finance', buildings.finance.level),
     ) * deltaSec;
   funding = applyGrant(funding, financeAmount, false);
 
@@ -165,7 +165,7 @@ export function resolveEconomyTick(
     productionPerSecond(
       BUILDINGS.supplyDepot.production!.basePerSec,
       buildings.supplyDepot.level,
-      buildingStaffRatio(staff, 'supplyDepot'),
+      buildingStaffRatio(staff, 'supplyDepot', buildings.supplyDepot.level),
     ) * deltaSec;
   let materials = applyGrant(resources.materials, supplyDepotAmount, false);
 
@@ -173,7 +173,7 @@ export function resolveEconomyTick(
     productionPerSecond(
       BUILDINGS.rndLab.production!.basePerSec,
       buildings.rndLab.level,
-      buildingStaffRatio(staff, 'rndLab'),
+      buildingStaffRatio(staff, 'rndLab', buildings.rndLab.level),
     ) * deltaSec;
   const research = applyGrant(resources.research, rndAmount, false);
 

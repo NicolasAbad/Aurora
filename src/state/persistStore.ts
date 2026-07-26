@@ -37,11 +37,28 @@ export function loadGame(): GameState {
   }
 }
 
+// Sprint 3.5's dev-only reset button found a real race: removeItem() immediately
+// followed by location.reload() isn't enough, because reload() fires `beforeunload`,
+// and startAutosave()'s handler calls saveGame() with the CURRENT (pre-reset) in-memory
+// state — silently re-writing the save right after it was cleared, before the reloaded
+// page ever reads it (the same class of bug Sprint 2's away-modal test hit). Guarding
+// saveGame itself with this flag is what makes the removal actually stick.
+let resetInProgress = false;
+
 /** Every save stamps the current time as `lastSeenAt` — however the session ends
  * (clean unload, tab kill, crash), the next load's offline-gap calc starts from the
  * last successful save, not a stale value from hours earlier. */
 export function saveGame(state: GameState): void {
+  if (resetInProgress) return;
   localStorage.setItem(SAVE_KEY, JSON.stringify({ ...state, lastSeenAt: Date.now() }));
+}
+
+/** Dev-only (CLAUDE.md rule 11, gated at the call site like TimeWarpControl): wipes the
+ * save and reloads, for manual testing ahead of Sprint 8's real hard-reset UI. */
+export function hardResetSave(): void {
+  resetInProgress = true;
+  localStorage.removeItem(SAVE_KEY);
+  window.location.reload();
 }
 
 export interface AwaySummary {
@@ -176,7 +193,7 @@ export const useGameStore = create<Store>()((set, get) => ({
 
   assign: (role, buildingId, delta) => {
     const state = get();
-    const staff = adjustStaffAssignment(state.staff, role, buildingId, delta);
+    const staff = adjustStaffAssignment(state.staff, role, buildingId, delta, state.buildings[buildingId].level);
     if (staff) set({ staff });
   },
 

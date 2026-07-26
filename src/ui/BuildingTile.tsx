@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../state/persistStore';
 import { BUILDINGS } from '../data/buildings';
+import { RESOURCE_NAME } from '../data/resourceNames';
 import { costAtLevel, productionPerSecond } from '../core/economy';
 import { formatAmount, formatRate } from '../core/format';
 import {
@@ -11,16 +12,6 @@ import {
   unassignedCount,
 } from '../core/staff';
 import type { BuildingId, ResourceId, RoleId } from '../core/types';
-
-const RESOURCE_ABBR: Record<ResourceId, string> = {
-  funding: 'F',
-  materials: 'M',
-  hardware: 'H',
-  propellant: 'P',
-  research: 'R',
-  reputation: 'Rep',
-  flightxp: 'XP',
-};
 
 const ROLE_LABELS: Record<RoleId, string> = {
   technician: 'Technician',
@@ -49,10 +40,12 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
   const costEntries = Object.entries(cost) as [ResourceId, number][];
   const canAfford = costEntries.every(([id, amount]) => resources[id].amount >= amount);
   const costLabel = costEntries
-    .map(([id, amount]) => `${formatAmount(amount)} ${RESOURCE_ABBR[id]}`)
+    .map(([id, amount]) => `${formatAmount(amount)} ${RESOURCE_NAME[id]}`)
     .join(' + ');
 
-  const roles = Object.keys(def.slots ?? {}) as RoleId[];
+  // ECONOMY §4 (v2.8): "slots exist only at building level >= 1" — an unbuilt building
+  // must not appear as an assignment target at all, not just refuse the click.
+  const roles = level >= 1 ? (Object.keys(def.slots ?? {}) as RoleId[]) : [];
 
   return (
     <div className="building-tile">
@@ -64,9 +57,13 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
       {def.production && (
         <div className="building-tile__rate">
           {formatRate(
-            productionPerSecond(def.production.basePerSec, level, buildingStaffRatio(staff, buildingId)),
+            productionPerSecond(
+              def.production.basePerSec,
+              level,
+              buildingStaffRatio(staff, buildingId, level),
+            ),
           )}
-          /s {RESOURCE_ABBR[def.production.resource]}
+          /s {RESOURCE_NAME[def.production.resource]}
           {def.production.consumes && starvedIndicator && (
             <span className="building-tile__starved"> — STARVED</span>
           )}
@@ -75,7 +72,7 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
 
       {roles.map((role) => {
         const assigned = assignedToBuilding(staff, role, buildingId);
-        const slots = buildingSlotCount(buildingId, role);
+        const slots = buildingSlotCount(buildingId, role, level);
         const canAssign = assigned < slots && unassignedCount(staff, role) > 0;
         return (
           <div key={role} className="building-tile__staff-row">

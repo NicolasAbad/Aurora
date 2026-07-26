@@ -220,15 +220,17 @@ describe('resolveEconomyTick — Complex B consumers (ECONOMY §4b)', () => {
     // Supply Depot output tuned to exactly match Fabrication's per-tick demand, leaving
     // nothing for Refinery — fixed §4b claim order (Fabrication before Refinery) means
     // this resolves the SAME way every tick, not an alternating/proportional split.
+    // Supply Depot lv2, full ratio (2 Tech): 1.5 * 2 * 1 = 3.0 M/s. Fabrication lv5, full
+    // ratio (1 Eng + 1 Tech): consumes 0.3 * 5 * 2 = 3.0 M/s — an exact match, with every
+    // level an integer (ECONOMY §4 v2.8: slots only exist at level >= 1, so a fractional
+    // level can no longer be used as a shortcut to an arbitrary rate).
     let state = createInitialState();
-    // Supply Depot needs 2 Technician slots for full ratio; only staffing 1 gives ratio
-    // 0.5, so the level is doubled to compensate: 1.5 M/s * 0.8 * 0.5 ratio = 0.6 M/s.
-    state.buildings.supplyDepot.level = 0.8;
-    state.staff.pools.technician.hired = 1;
-    state.staff.pools.technician.assigned.supplyDepot = 1;
-    state.buildings.fabrication.level = 1; // needs 0.6 M/s at full ratio
-    state.staff.pools.engineer.hired = 2;
+    state.buildings.supplyDepot.level = 2;
     state.staff.pools.technician.hired = 2;
+    state.staff.pools.technician.assigned.supplyDepot = 2;
+    state.buildings.fabrication.level = 5;
+    state.staff.pools.engineer.hired = 2;
+    state.staff.pools.technician.hired += 1;
     state.staff.pools.engineer.assigned.fabrication = 1;
     state.staff.pools.technician.assigned.fabrication = 1;
     state.buildings.refinery.level = 1; // needs 0.5 M/s at full ratio

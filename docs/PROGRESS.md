@@ -701,3 +701,79 @@ All 5 tasks done; acceptance verified (see below).
   `payCost` path — a latent invariant bug (`sum(byTier) !== amount` after any hardware
   spend) that happened to never be exercised yet, closed as part of the same cost-check
   wiring rather than left for whichever sprint first spends Hardware.
+
+## v2.8 / "Sprint 3.5" — owner manual-play findings (2026-07-26)
+
+First manual play session surfaced four items, addressed before Sprint 4. Two doc rules
+landed alongside the owner's decisions: ECONOMY §4 ratifies the Sprint 3 bottleneck
+staffRatio and adds "slots exist only at level >= 1"; UI_SPEC §4 adds the no-abbreviation
+and cooldown-feel rules.
+
+**1. Dev-only reset button.** `DevResetButton` (gated behind `__DEV_TOOLS__`, mirrors
+`TimeWarpControl`) wipes the save and reloads. Found and fixed a real race while building
+it: `localStorage.removeItem()` immediately followed by `location.reload()` isn't enough
+— reload fires `beforeunload`, and the autosave handler calls `saveGame()` with the
+current (pre-reset) in-memory state, silently resurrecting the save before the reloaded
+page ever reads it (the same class of bug Sprint 2's away-modal Playwright check hit).
+Fixed with a module-level guard (`resetInProgress`) that makes `saveGame()` a no-op once
+`hardResetSave()` has fired. Regression test in `persistStore.test.ts` (placed last in
+the file deliberately — the guard has no reset hook, mirroring how only a real reload
+clears it in production, so it would break every later `saveGame()`-dependent test in the
+same file if it ran earlier).
+
+**2. Killed the abbreviation leak.** Audited every label: `Ticker`, `AwayModal`, and
+`PayrollBanner` were already compliant (full names throughout). `BuildingTile` (cost
+labels, production rate suffix) and `StaffHiring` (hire button cost) were not — both used
+a `RESOURCE_ABBR` map ("150 F", "2.0/s F"). Replaced with `data/resourceNames.ts`'s
+`RESOURCE_NAME` (single source of truth for the full display name, now shared by every
+consumer). Manual-action feedback ("+5 M") switched to bare numbers ("+5"), matching
+Pitch's own pre-existing convention rather than inventing a new short-name format.
+
+**3. Fixed the level-0 assignment bug.** `buildingSlotCount`/`staffRatioForBuilding`/
+`buildingStaffRatio` all gained a `level` parameter and return 0 below level 1 — an
+unbuilt building has no slots, full stop. `adjustStaffAssignment` threads the building's
+level through and refuses assignment accordingly; `BuildingTile` doesn't render
+assignment rows at all for an unbuilt building (roles list is empty below level 1), so
+there's no dead stepper to click in the first place. Economy output was never actually
+wrong (the `* level` factor in `productionPerSecond` already zeroed production
+regardless), but the assignment STATE itself was — staff could sit "assigned" to a
+building that could never produce, occupying a slot that shouldn't have existed and
+blocking that hire from being assigned somewhere real. `hireStaff` is untouched, per the
+explicit instruction: hiring ahead of building is a legitimate choice, salary burn is its
+real cost.
+
+**4. Pitch cooldown feel.** `ManualActionButton` gained a visible recharge fill
+(CSS animation, duration = the cooldown) and a shake when a click lands during cooldown
+— UI_SPEC §4's "must read as rhythm, never a dead button." This required removing the
+button's native `disabled` attribute during cooldown specifically (a disabled element
+never receives the click that needs acknowledging); unaffordable/locked states still use
+native `disabled` via the separate `disabled` prop, so that distinction is preserved.
+Consolidated `PitchButton` to use `ManualActionButton` under the hood (added callback-form
+`feedbackText` support for Pitch's level-dependent yield) rather than duplicating the same
+cooldown-feel logic twice — Gather Materials and Rush Order get the identical treatment
+for free, satisfying UI_SPEC §4's general rule rather than just Pitch's specific mention.
+
+**Process note — a rule-1 violation, corrected going forward:** the multi-role bottleneck
+staffRatio (Sprint 3) was implemented and only flagged afterward, unlike the starvation/
+contention questions from the same sprint, which were correctly asked upfront. The owner
+ratified the pick but named the process gap: an undefined mechanic case is a stop-and-ask
+regardless of how confident the implementation is that only one answer makes sense. Saved
+to memory (`feedback_stop_and_ask_on_docs.md`) so future undefined-mechanic cases get
+batched into the same upfront question as any other open ambiguity for that piece of work.
+
+**Verification:** 120 tests passing (up from 117), including the level-0 assignment
+regression and the reset-race regression. Typecheck/lint/build clean; dev-only
+`DevResetButton` confirmed absent from the production bundle. Playwright, through the
+real store: Fabrication shows 0 assignment rows unbuilt, 2 once built; the Fabrication
+upgrade button reads "Upgrade (350 Funding + 100 Materials)" and Rush Order reads
+"Rush Order (150 Funding)" — zero single-letter abbreviations found in a full-page text
+scan; the recharge overlay is present immediately after a Pitch click and gone once the
+cooldown elapses; a click landing during cooldown reliably shakes (confirmed via an
+isolated timing check after the first combined run raced its own assertion — Playwright
+checking a `requestAnimationFrame`-deferred class update on the very next synchronous
+line, not a product bug); the reset button shows its confirm dialog, wipes the save, and
+reloads to a genuinely fresh 0 Funding state. Zero console errors throughout.
+
+**Deferred, no action:** SPRINTS.md's Sprint 11 gained "contextual job titles" (per-
+building flavor titles on staff slots, presentation-only, roles/data untouched). Noted for
+when that sprint starts.

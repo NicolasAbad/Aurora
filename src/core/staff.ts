@@ -22,7 +22,10 @@ export function isRoleUnlocked(role: RoleId, completedTech: string[]): boolean {
   return unlockTech === null || completedTech.includes(unlockTech);
 }
 
-export function buildingSlotCount(buildingId: BuildingId, role: RoleId): number {
+/** ECONOMY §4 (v2.8): "slots exist only at building level >= 1" — an unbuilt building
+ * has no assignment targets at all, regardless of what its BuildingDef declares. */
+export function buildingSlotCount(buildingId: BuildingId, role: RoleId, level: number): number {
+  if (level < 1) return 0;
   return BUILDINGS[buildingId].slots?.[role] ?? 0;
 }
 
@@ -50,23 +53,24 @@ export function staffRatioForBuilding(
   staff: StaffState,
   buildingId: BuildingId,
   role: RoleId,
+  level: number,
 ): number {
-  const slots = buildingSlotCount(buildingId, role);
+  const slots = buildingSlotCount(buildingId, role, level);
   if (slots === 0) return 0;
   return assignedToBuilding(staff, role, buildingId) / slots;
 }
 
 /**
  * Overall staffRatio for a building that may require MULTIPLE roles (e.g. Fabrication:
- * 1 Engineer + 1 Technician) — not specified in ECONOMY §4's formula text, so treated as
- * a bottleneck: production needs every required role staffed, so the building's ratio is
- * the MINIMUM across its required roles' individual ratios (an empty Engineer slot means
- * 0 output even with a full Technician slot). Single-role buildings reduce to the same
- * value staffRatioForBuilding would give; no-slot buildings (Warehouse, etc.) return 1
- * (ratio is irrelevant — they have no `production` to scale).
+ * 1 Engineer + 1 Technician) — ECONOMY §4 (v2.8): the bottleneck rule, ratifying the
+ * Sprint 3 implementation. Production needs every required role staffed, so the
+ * building's ratio is the MINIMUM across its required roles' individual ratios (an
+ * empty Engineer slot means 0 output even with a full Technician slot). Single-role
+ * buildings reduce to the same value staffRatioForBuilding would give; no-slot buildings
+ * (Warehouse, etc.) return 1 (ratio is irrelevant — they have no `production` to scale).
  */
-export function buildingStaffRatio(staff: StaffState, buildingId: BuildingId): number {
+export function buildingStaffRatio(staff: StaffState, buildingId: BuildingId, level: number): number {
   const roles = Object.keys(BUILDINGS[buildingId].slots ?? {}) as RoleId[];
   if (roles.length === 0) return 1;
-  return Math.min(...roles.map((role) => staffRatioForBuilding(staff, buildingId, role)));
+  return Math.min(...roles.map((role) => staffRatioForBuilding(staff, buildingId, role, level)));
 }

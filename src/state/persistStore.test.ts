@@ -1,6 +1,6 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createInitialState } from '../data/initialState';
-import { loadGame, saveGame, SAVE_KEY, useGameStore } from './persistStore';
+import { hardResetSave, loadGame, saveGame, SAVE_KEY, useGameStore } from './persistStore';
 import { CURRENT_SCHEMA_VERSION } from './migrations';
 import type { Process } from '../core/types';
 
@@ -172,5 +172,31 @@ describe('applyTick — time-warp reaches process resolution (SPRINTS.md task 3)
     const remaining = useGameStore.getState().processes;
     expect(remaining).toHaveLength(1);
     expect(remaining[0].id).toBe('slow');
+  });
+});
+
+// Sprint 3.5: hardResetSave found a real race — removeItem() + reload() isn't enough,
+// because reload() fires `beforeunload`, and the autosave handler re-saves the CURRENT
+// in-memory state right after the key was cleared, before the reloaded page ever reads
+// it. Placed last in this file: hardResetSave permanently flips a module-level guard
+// with no reset hook (mirroring what only a real page reload undoes in production), so
+// it would break every subsequent saveGame() call in this test file if it ran earlier.
+describe('hardResetSave (Sprint 3.5) — must be the last describe block in this file', () => {
+  it('clears the save and makes a subsequent saveGame() (simulating the beforeunload race) a no-op', () => {
+    saveGame(createInitialState());
+    expect(localStorage.getItem(SAVE_KEY)).not.toBeNull();
+
+    const reload = vi.fn();
+    vi.stubGlobal('location', { ...window.location, reload });
+
+    hardResetSave();
+    expect(localStorage.getItem(SAVE_KEY)).toBeNull();
+    expect(reload).toHaveBeenCalled();
+
+    // Simulates the autosave's beforeunload handler firing after hardResetSave already
+    // removed the key but before/during the same reload — without the guard, this would
+    // silently resurrect the save.
+    saveGame(createInitialState());
+    expect(localStorage.getItem(SAVE_KEY)).toBeNull();
   });
 });

@@ -1,6 +1,8 @@
 # UI_SPEC.md — Aurora Program — Interface specification v1
 *Web-first (desktop + mobile responsive), Android wrap later reuses the mobile layout.*
 
+**v2.8 changes:** no single-letter resource abbreviations in player-facing UI; manual-action cooldowns get visible recharge + acknowledged clicks (§4).
+
 **v2.6 changes:** progressive-disclosure rules added (§2b) — default is hidden-until-relevant; the full content surface is never visible from the start.
 
 **v2.1 changes:** payroll-unpaid ticker state and paused-building indicator added (§4); above-cap display rule added (§2); accent color default set to signal orange (owner may flip to cyan — single CSS variable).
@@ -44,6 +46,8 @@ Default rule: **hidden until relevant** — the player never opens the game onto
 7. **Contracts panel** (appears with the Launch Rail for tier-0 offers; expands with satellite tiers post-Aurora I): offer cards (client, requirements with have/need coloring — including tier badges for Titanium requirements, deadline, pay), active contract with its build/queue status, pad queue visualization (who holds each pad — including Pad B once built).
 
 ## 4. States & feedback rules
+- **Resource names are never abbreviated to single letters in player-facing UI.** "F", "M", "H", "P" are doc-internal shorthand only — costs and amounts render as icon + value, or value + full/short name ("150 Funding", "40 Propellant"). Suffix formatting (§ECONOMY 12) applies to the number, never to the resource name.
+- **Manual-action cooldowns are always visible and acknowledged:** the button shows a recharge animation (radial or fill) for the cooldown duration, and a click landing during cooldown gives immediate feedback (subtle shake/flash) — a cooldown must read as rhythm, never as a dead button.
 - Every affordable action is visually distinct the moment it becomes affordable (border pulse once, then steady highlight).
 - Every timer shows remaining time in human units (2h 14m, 45s).
 - Every resource deduction/gain animates from the triggering element toward the ticker.

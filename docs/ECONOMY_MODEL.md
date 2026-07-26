@@ -1,6 +1,8 @@
 # ECONOMY_MODEL.md — Aurora Program — Complete baseline numbers
 *Every value in the game. Claude Code does NOT invent numbers: if a value isn't here, ask and add it here first. Tick = 1 second (logical economy rate; the render loop is delta-based per CLAUDE.md rule 6). Baseline for the Sprint-0 headless simulator (`sim/run.ts`); adjust only via the simulator, updating this file.*
 
+**v2.8 changes (owner manual-play findings + ratification):** multi-role staffRatio defined as bottleneck (min across roles) — ratifying the Sprint 3 implementation; staff slots exist only at building level ≥ 1 (assignment to unbuilt buildings was a bug); player-facing UI never shows single-letter resource abbreviations (UI_SPEC §4); pitch cooldown gets visible recharge feedback (UI_SPEC §4) — the 1 s cadence itself stays (economy lock); dev-only reset button added ahead of Sprint 8's real one.
+
 **v2.7 changes (semantics, NOT a balance unlock — no values touched):** tick resolution order and starvation/contention rules defined (§4b) — binary per-building starvation pause, fixed consumer claim order, salaries resolve first.
 
 **v2.5 changes (multi-seed sweep, seeds 1–10 × 45d):** Flight Data ×~1.7 across the board (median era shares were 14.7%/15.9% vs the 20–35% target — decision rule's "raise Flight Data, don't touch the lab" branch applied); salary sanity band widened to 30–55% (settling at ~53–55% is intended pressure — the insolvency mechanic exists to make it interactive — not a miss); day-1 `basicEngineering` stall accepted as bootstrap pacing with a contingent FTUE fix parked in BACKLOG and tooltip T-09 added.
@@ -41,6 +43,7 @@ Sanity rule: total salaries = 30–55% of passive Funding income at 5 checkpoint
 Insolvency behavior (Funding 0, salaries due): GDD §1b — staffed production pauses, no debt, no quitting, manual verbs remain. Applies identically offline.
 
 ## 4. Buildings — cost `base × factor^level`; production `base × level × staffRatio`
+**staffRatio for multi-role buildings = the MINIMUM filled ratio across its roles (bottleneck rule):** Fabrication with its Engineer slot filled but no Technician produces 0 — a missing discipline halts the line, consistent with §4b's binary philosophy. **Slots exist only at building level ≥ 1** — an unbuilt (level 0) building has no slots and must not appear as an assignment target; hiring into the pool without an assignment is always allowed (Quarters cap is the only limit).
 ### Complex A — Campus (unlocked at start)
 | Building | Base cost | Factor | Effect | Slots |
 |---|---|---|---|---|

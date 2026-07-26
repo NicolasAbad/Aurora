@@ -169,13 +169,17 @@ export function hireStaff(
 /**
  * Adjusts how many `role` are assigned to `buildingId` by `delta` (+1/-1 from a UI
  * stepper). Refuses to assign past the building's slot count or past how many of that
- * role are actually hired-and-unassigned; refuses to unassign below zero.
+ * role are actually hired-and-unassigned; refuses to unassign below zero. `buildingLevel`
+ * gates ECONOMY §4 (v2.8): slots exist only at level >= 1, so an unbuilt building always
+ * refuses assignment (buildingSlotCount returns 0) — hiring into the pool with no
+ * building yet is still a legitimate, unrestricted choice (that's `hireStaff`, untouched).
  */
 export function adjustStaffAssignment(
   staff: StaffState,
   role: RoleId,
   buildingId: BuildingId,
   delta: number,
+  buildingLevel: number,
 ): StaffState | null {
   if (delta === 0) return null;
   const pool = staff.pools[role];
@@ -183,7 +187,7 @@ export function adjustStaffAssignment(
   if (nextAssigned < 0) return null;
 
   if (delta > 0) {
-    if (nextAssigned > buildingSlotCount(buildingId, role)) return null;
+    if (nextAssigned > buildingSlotCount(buildingId, role, buildingLevel)) return null;
     if (unassignedCount(staff, role) < delta) return null;
   }
 

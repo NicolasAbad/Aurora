@@ -139,7 +139,8 @@ describe('adjustStaffAssignment', () => {
   it('assigns an unassigned hired unit up to the building slot count', () => {
     const state = createInitialState();
     state.staff.pools.technician.hired = 1;
-    const staff = adjustStaffAssignment(state.staff, 'technician', 'finance', 1);
+    state.buildings.finance.level = 1;
+    const staff = adjustStaffAssignment(state.staff, 'technician', 'finance', 1, 1);
     expect(staff).not.toBeNull();
     expect(staff!.pools.technician.assigned.finance).toBe(1);
   });
@@ -147,22 +148,33 @@ describe('adjustStaffAssignment', () => {
   it('refuses to assign more than are hired-and-unassigned', () => {
     const state = createInitialState();
     state.staff.pools.technician.hired = 0;
-    expect(adjustStaffAssignment(state.staff, 'technician', 'finance', 1)).toBeNull();
+    state.buildings.finance.level = 1;
+    expect(adjustStaffAssignment(state.staff, 'technician', 'finance', 1, 1)).toBeNull();
   });
 
   it('refuses to assign past the building slot count (Finance: 2 Technician)', () => {
     const state = createInitialState();
     state.staff.pools.technician.hired = 3;
     state.staff.pools.technician.assigned.finance = 2;
-    expect(adjustStaffAssignment(state.staff, 'technician', 'finance', 1)).toBeNull();
+    state.buildings.finance.level = 1;
+    expect(adjustStaffAssignment(state.staff, 'technician', 'finance', 1, 1)).toBeNull();
   });
 
   it('unassigns down to zero but not below', () => {
     const state = createInitialState();
     state.staff.pools.technician.hired = 1;
     state.staff.pools.technician.assigned.finance = 1;
-    const staff = adjustStaffAssignment(state.staff, 'technician', 'finance', -1);
+    state.buildings.finance.level = 1;
+    const staff = adjustStaffAssignment(state.staff, 'technician', 'finance', -1, 1);
     expect(staff!.pools.technician.assigned.finance).toBe(0);
-    expect(adjustStaffAssignment(staff!, 'technician', 'finance', -1)).toBeNull();
+    expect(adjustStaffAssignment(staff!, 'technician', 'finance', -1, 1)).toBeNull();
+  });
+
+  // ECONOMY §4 (v2.8) regression: staff could previously be assigned to a level-0
+  // (unbuilt) building, occupying a "slot" that doesn't exist and producing nothing.
+  it('refuses to assign to an unbuilt (level 0) building even if hired-and-unassigned', () => {
+    const state = createInitialState();
+    state.staff.pools.technician.hired = 1; // finance.level stays 0 (default, unbuilt)
+    expect(adjustStaffAssignment(state.staff, 'technician', 'finance', 1, 0)).toBeNull();
   });
 });

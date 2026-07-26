@@ -8,7 +8,9 @@ import { StaffHiring } from './ui/StaffHiring';
 import { PayrollBanner } from './ui/PayrollBanner';
 import { AwayModal } from './ui/AwayModal';
 import { TimeWarpControl } from './ui/TimeWarpControl';
+import { DevResetButton } from './ui/DevResetButton';
 import { useGameStore } from './state/persistStore';
+import { RESOURCE_NAME } from './data/resourceNames';
 import type { ComplexId } from './core/types';
 
 function ProductionPanel() {
@@ -25,7 +27,7 @@ function ProductionPanel() {
           <ManualActionButton
             label="Gather materials"
             cooldownMs={1000}
-            feedbackText="+5 M"
+            feedbackText="+5"
             onAction={gatherMaterials}
           />
         )}
@@ -33,10 +35,10 @@ function ProductionPanel() {
       <BuildingTile buildingId="fabrication">
         {fabricationLevel >= 1 && (
           <ManualActionButton
-            label="Rush Order (150 F)"
+            label={`Rush Order (150 ${RESOURCE_NAME.funding})`}
             cooldownMs={5 * 60_000}
             disabled={funding < 150}
-            feedbackText="+100 M"
+            feedbackText="+100"
             onAction={rushOrder}
           />
         )}
@@ -54,7 +56,12 @@ export function App() {
   return (
     <div className="app">
       <AwayModal />
-      {__DEV_TOOLS__ && <TimeWarpControl />}
+      {__DEV_TOOLS__ && (
+        <div className="dev-tools-row">
+          <TimeWarpControl />
+          <DevResetButton />
+        </div>
+      )}
       <Ticker />
       <PayrollBanner />
       <ComplexTabs active={activeComplex} onSelect={setActiveComplex} />

@@ -38,9 +38,15 @@ describe('isRoleUnlocked', () => {
 });
 
 describe('buildingSlotCount / assignment helpers', () => {
-  it('reads Finance slots (2 Technician) from data/buildings.ts', () => {
-    expect(buildingSlotCount('finance', 'technician')).toBe(2);
-    expect(buildingSlotCount('finance', 'scientist')).toBe(0);
+  it('reads Finance slots (2 Technician) from data/buildings.ts once built', () => {
+    expect(buildingSlotCount('finance', 'technician', 1)).toBe(2);
+    expect(buildingSlotCount('finance', 'scientist', 1)).toBe(0);
+  });
+
+  // ECONOMY §4 (v2.8): "slots exist only at building level >= 1" — the Sprint 3.5 bug
+  // fix. Same building/role the data declares 2 Technician slots for, but at level 0.
+  it('is 0 for an unbuilt (level 0) building regardless of what the data declares', () => {
+    expect(buildingSlotCount('finance', 'technician', 0)).toBe(0);
   });
 
   it('tracks hired/assigned/unassigned correctly', () => {
@@ -57,7 +63,7 @@ describe('buildingSlotCount / assignment helpers', () => {
     const state = createInitialState();
     state.staff.pools.technician.hired = 2;
     state.staff.pools.technician.assigned.finance = 1;
-    expect(staffRatioForBuilding(state.staff, 'finance', 'technician')).toBe(0.5);
+    expect(staffRatioForBuilding(state.staff, 'finance', 'technician', 1)).toBe(0.5);
   });
 });
 
@@ -66,21 +72,21 @@ describe('buildingStaffRatio', () => {
     const state = createInitialState();
     state.staff.pools.technician.hired = 2;
     state.staff.pools.technician.assigned.finance = 1;
-    expect(buildingStaffRatio(state.staff, 'finance')).toBe(0.5);
+    expect(buildingStaffRatio(state.staff, 'finance', 1)).toBe(0.5);
   });
 
-  it('is the MINIMUM across roles for a multi-role building (Fabrication: 1 Eng + 1 Tech) — a bottleneck, not specified numerically in ECONOMY §4 but the only sensible reading of "requires both"', () => {
+  it('is the MINIMUM across roles for a multi-role building (Fabrication: 1 Eng + 1 Tech) — the bottleneck rule, ratified and codified in ECONOMY §4 (v2.8)', () => {
     const state = createInitialState();
     state.staff.pools.engineer.hired = 1;
     state.staff.pools.technician.hired = 1;
     state.staff.pools.engineer.assigned.fabrication = 1; // engineer slot full (ratio 1)
     // technician slot left empty (ratio 0) — Fabrication needs BOTH, so overall ratio is 0.
-    expect(buildingStaffRatio(state.staff, 'fabrication')).toBe(0);
+    expect(buildingStaffRatio(state.staff, 'fabrication', 1)).toBe(0);
   });
 
   it('returns 1 for a building with no slots (ratio is irrelevant — nothing to scale)', () => {
     const state = createInitialState();
-    expect(buildingStaffRatio(state.staff, 'warehouse')).toBe(1);
+    expect(buildingStaffRatio(state.staff, 'warehouse', 1)).toBe(1);
   });
 });
 

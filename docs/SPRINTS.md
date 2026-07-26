@@ -92,7 +92,7 @@
 **Acceptance:** full v1 arc playable; every XP node produces its measurable effect.
 
 ## Sprint 11 — Polish (3 days)
-Rolling number animation, checklist transitions, minimal optional sound (countdown + success), full narrative text review, accessibility pass, performance (tick must not re-render unchanged tiles — Zustand selectors).
+Rolling number animation, checklist transitions, minimal optional sound (countdown + success), full narrative text review, accessibility pass, performance (tick must not re-render unchanged tiles — Zustand selectors). **Contextual job titles:** staff slots display a per-building flavor title as secondary text (e.g. Finance: "Fundraising associate"; Launch Pad: "Pad crew") while the mechanical role stays visible — presentation only, roles/pools/data untouched; titles live in NARRATIVE_EVENTS (new §, referenced by ID).
 
 ## Sprint 12 — Web playtest (public)
 1. Deploy (itch.io + Vercel), feedback form.

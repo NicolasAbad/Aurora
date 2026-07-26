@@ -139,6 +139,8 @@ body {
 }
 
 .pitch-button {
+  position: relative;
+  overflow: hidden; /* clips the recharge fill to the button's rounded shape */
   background: var(--accent);
   color: #1a1200;
   border: none;
@@ -155,12 +157,57 @@ body {
   cursor: not-allowed;
 }
 
-.pitch-button-wrap {
+/* UI_SPEC §4 (v2.8): every manual-action button (Pitch, Gather Materials, Rush Order)
+ * shares this cooldown-feel — a visible recharge fill for the cooldown duration, and a
+ * shake when a click lands during it, so the button reads as rhythm, not as dead. */
+.manual-action-wrap {
   position: relative;
   display: inline-block;
 }
 
-.pitch-feedback {
+.manual-action-button__label {
+  position: relative;
+  z-index: 1;
+}
+
+.manual-action-button__recharge {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  transform-origin: left;
+  animation-name: manual-action-recharge-fill;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+  pointer-events: none;
+}
+
+@keyframes manual-action-recharge-fill {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.manual-action-button--shake {
+  animation: manual-action-shake 0.25s ease-in-out;
+}
+
+@keyframes manual-action-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+.manual-action-feedback {
   position: absolute;
   left: 50%;
   top: -4px;
@@ -227,6 +274,8 @@ body {
 }
 
 .upgrade-button {
+  position: relative;
+  overflow: hidden; /* clips the recharge fill (.manual-action-button__recharge) */
   background: var(--border);
   color: var(--text);
   border: none;
@@ -357,14 +406,32 @@ body {
   cursor: pointer;
 }
 
+.dev-tools-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #1a1006;
+  border-bottom: 1px dashed var(--accent);
+}
+
 .time-warp-control {
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 6px 16px;
-  background: #1a1006;
-  border-bottom: 1px dashed var(--accent);
   font-size: 0.85em;
+}
+
+.dev-reset-button {
+  margin-right: 16px;
+  background: var(--border);
+  color: var(--text);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 0.85em;
+  cursor: pointer;
 }
 
 .time-warp-control__label {

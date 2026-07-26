@@ -1,6 +1,7 @@
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../state/persistStore';
 import { ROLES } from '../data/roles';
+import { RESOURCE_NAME } from '../data/resourceNames';
 import {
   hiringCost,
   isRoleUnlocked,
@@ -50,7 +51,7 @@ export function StaffHiring() {
             </span>
             {unlocked ? (
               <button type="button" disabled={!canHire} onClick={() => hire(role)}>
-                Hire ({formatAmount(cost)} F)
+                Hire ({formatAmount(cost)} {RESOURCE_NAME.funding})
               </button>
             ) : (
               <span className="staff-panel__locked">Requires tech: {ROLES[role].unlockTech}</span>
