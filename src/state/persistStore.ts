@@ -15,7 +15,7 @@ import {
   startResearch,
 } from '../core/actions';
 import { resolveEconomyTick } from '../core/economy';
-import { applyModifiers } from '../core/modifiers';
+import { applyModifiers, pruneExpiredModifiers } from '../core/modifiers';
 import { OFFLINE_CAP_MS, resolveOffline, type PayrollStoppage } from '../core/offlineResolution';
 import { resolveResearch } from '../core/research';
 import { resolveProcesses } from '../core/time';
@@ -35,7 +35,11 @@ export function loadGame(): GameState {
     const fromVersion = typeof parsed.schemaVersion === 'number' ? parsed.schemaVersion : 0;
     const migrated =
       fromVersion === CURRENT_SCHEMA_VERSION ? parsed : migrate(parsed, fromVersion);
-    return migrated as unknown as GameState;
+    const state = migrated as unknown as GameState;
+    // Modifier.expiresAt contract (CLAUDE.md): pruned on load, not just filtered at
+    // query time, so a save that sat around past an event's 2h expiry doesn't carry
+    // dead entries forward indefinitely.
+    return { ...state, modifiers: pruneExpiredModifiers(state.modifiers, Date.now()) };
   } catch {
     // Corrupt save: never crash the app on load (Sprint 8 adds a user-facing import
     // validation path for the Settings screen; this is the silent boot-time fallback).
@@ -56,7 +60,11 @@ let resetInProgress = false;
  * last successful save, not a stale value from hours earlier. */
 export function saveGame(state: GameState): void {
   if (resetInProgress) return;
-  localStorage.setItem(SAVE_KEY, JSON.stringify({ ...state, lastSeenAt: Date.now() }));
+  const now = Date.now();
+  localStorage.setItem(
+    SAVE_KEY,
+    JSON.stringify({ ...state, modifiers: pruneExpiredModifiers(state.modifiers, now), lastSeenAt: now }),
+  );
 }
 
 /** Dev-only (CLAUDE.md rule 11, gated at the call site like TimeWarpControl): wipes the
@@ -92,7 +100,7 @@ function computeBootOffline(): { initialState: GameState; awaySummary: AwaySumma
   // registered modifier ('offline.capMs', +6h) — queried against modifiers as they stood
   // at close, not anything this same gap's research might complete (matches the online
   // tick's "a modifier only takes effect the moment it's registered" behavior).
-  const offlineCapMs = applyModifiers(OFFLINE_CAP_MS, loaded.modifiers, 'offline.capMs');
+  const offlineCapMs = applyModifiers(OFFLINE_CAP_MS, loaded.modifiers, 'offline.capMs', now);
   const offline = resolveOffline(
     loaded.resources,
     loaded.buildings,
@@ -120,7 +128,10 @@ function computeBootOffline(): { initialState: GameState; awaySummary: AwaySumma
     processes: offline.processes,
     staff: staffAfterCompletions,
     research: researchResolution.research,
-    modifiers: researchResolution.modifiers,
+    // Modifier.expiresAt contract: pruned again here (not just at load) against the
+    // POST-GAP `now` — a modifier that expired partway through an offline gap must not
+    // survive into the fresh boot state just because it was still alive at load time.
+    modifiers: pruneExpiredModifiers(researchResolution.modifiers, now),
     economyFlags: { ...loaded.economyFlags, payrollUnpaid: offline.payrollUnpaid },
     lastSeenAt: now,
   };

@@ -263,7 +263,7 @@ describe('resolveOffline — offline cap modifier (ECONOMY §5: Remote Ops)', ()
 
     const extendedCapMs = applyModifiers(OFFLINE_CAP_MS, [
       { id: 'research:remoteOps', source: 'remoteOps', target: 'offline.capMs', op: 'add', value: 6 * HOUR },
-    ], 'offline.capMs');
+    ], 'offline.capMs', 0);
     const withRemoteOps = resolveOffline(state.resources, state.buildings, state.staff, [], [], 0, twelveHours, extendedCapMs);
     expect(withRemoteOps.appliedMs).toBe(twelveHours);
     expect(withRemoteOps.capped).toBe(false);

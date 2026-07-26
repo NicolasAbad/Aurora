@@ -883,3 +883,108 @@ All 5 tasks done; acceptance verified (see below).
   nodes' concrete effects remain undefined by design — infra (the tree, the resolution
   logic, the modifier system) is ready for whichever sprint defines them, matching the
   established "build the mechanism, not speculative content" restraint from Sprints 2-3.
+
+## Design review (2026-07-26) — 8 findings, all ruled on, docs replaced to v3.1
+
+A full read-through of all 6 docs plus outside research (idle-game design literature,
+real sounding-rocket programs) surfaced 8 concrete issues, reported to the owner without
+touching any doc or code. All 8 were ruled on and landed directly in GDD/ECONOMY/
+NARRATIVE/UI_SPEC/SPRINTS/CLAUDE.md v3.1 (owner-authored, not this session's edit).
+Recorded here so the relevant future sprint doesn't have to rediscover them:
+
+1. **Modifier.expiresAt** — done now, see below.
+2. **Event preconditions** — NARRATIVE §3 general rule: every event declares one;
+   absence is a spec error. E-04 now requires ≥1 Scientist already hired/promoted (it
+   accelerates the promotion bootstrap, never skips it); E-01 requires Refinery built;
+   E-02/E-05/E-06 require Complex B. **Sprint 9's `core/events.ts` must check these before
+   rolling any event** — not implemented yet, no event code exists.
+3. **Tier-0 contract Confidence** — uses the sonda formula (§7a), 100% reachable with
+   extended cert, same as a story S-1. Only satellite tiers are the real gambling space.
+   **Sprint 6/9 relevant** — tier-0 confidence math must route through the sonda formula,
+   not a separate contract-Confidence path.
+4. **Reputation gates on satellite contracts** — SCOPED economy unlock (not a general
+   relock): tier 1 ≥ 20 Rep, tier 2 ≥ 50 Rep, both framed as safety nets (clean play
+   accumulates ~105 Rep by Aurora I) rather than pacing gates. **Sprint 9 must sim-verify
+   they never bind under clean play**, same check as Pad B's existing ≥40 gate.
+5. **Clean Room** — resolved as a real tier-2 prerequisite (the VAB upgrade), not a
+   naming coincidence; the tier itself is renamed "constellation batches" to end the
+   collision. **Sprint 9's contract-tier gating must check for the upgrade, not just
+   Hardware tier.**
+6-8. **Doc hygiene** — GDD §9 and SPRINTS Sprint 10 no longer cite "VAB queues" (a
+   research-tree node, already shipped Sprint 4) as an XP-tree mechanic-changer; GDD §5
+   dropped "express re-certification" (never had a node); E-01 gated per #2 above.
+
+**Lower-urgency, applied when convenient (before Sprint 8), not yet done:** `sim/run.ts`
+needs a third `casual` profile (~30 min/day) and a pacing-ceiling flag (human > day 12).
+Both instrumentation only — no ECONOMY_MODEL values change. Noted here as a standing
+task; will land before Sprint 8 per the owner's instruction, not blocking Sprint 5-7.
+
+## v3.1 — Modifier.expiresAt — COMPLETE (2026-07-26)
+
+The one design-review item with an immediate code consequence (E-05's temporary "+10%
+process duration for 2h" needs a modifier that can expire; nothing else from the review
+touches Sprint 0-4 code, since contracts/events/XP-trees don't exist yet).
+
+**Built:**
+- `src/core/types.ts`: `Modifier` gains `expiresAt?: number` (epoch ms, absent =
+  permanent), matching CLAUDE.md's v3.1 schema exactly.
+- `src/core/modifiers.ts`: `applyModifiers` gains a required `now` parameter (rule 6:
+  /core never reads the clock itself) and filters out any modifier whose `expiresAt <=
+  now` at query time, even if it hasn't been pruned from the array yet. New
+  `pruneExpiredModifiers(modifiers, now)` drops expired entries outright.
+- `src/state/persistStore.ts`: pruning wired into all three places CLAUDE.md's contract
+  names — `loadGame()` (prunes right after migrating), `saveGame()` (prunes before
+  writing), and `computeBootOffline()` (prunes again against the POST-GAP `now`, so a
+  modifier that expired partway through an offline gap can't survive into the fresh boot
+  state just because it was still alive at the moment of load). `applyModifiers`'s call
+  site for the offline-cap modifier now passes `now` through.
+- Deliberately did NOT thread `modifiers` through `resolveOffline`'s own signature —
+  `computeBootOffline` is already the established composition point where modifiers get
+  queried against offline state (the existing `offline.capMs` modifier query works the
+  same way, not inside `resolveOffline` itself), so pruning at the same point keeps the
+  architecture consistent instead of widening `resolveOffline`'s already-9-parameter
+  signature and rewriting its 11 existing tests for a capability Sprint 9 is what
+  actually exercises.
+
+**No schema migration / no `CURRENT_SCHEMA_VERSION` bump.** `expiresAt` is optional and
+"absent = permanent" is exactly what every existing saved modifier already means — old
+data is already valid under the new type with no transformation needed, unlike Sprint 3's
+`starvedIndicator`/`fedStreakMs` (required fields needing an explicit default backfill,
+which is what actually required v1→v2). Flagging this reasoning explicitly rather than
+assuming it's obviously right, since CLAUDE.md rule 5 reads unconditionally ("schemaVersion
+bumps with every schema change") — happy to add a no-op v2→v3 migration if the intent was
+stricter than "no old save can silently misbehave."
+
+**Verification:** 158 tests passing (up from 150 at Sprint 4 close) — new coverage in
+`modifiers.test.ts` (expiry at/before/after the boundary, permanent modifiers unaffected,
+`pruneExpiredModifiers` itself) and `persistStore.test.ts` (load prunes, save prunes
+independently of load). Typecheck (`tsc -b`), lint, and production build all clean.
+`sim/run.ts` re-run (unaffected — no economy value or sim code touched): human profile
+still reaches Aurora I on day 5, pacing floor **PASS**; salary ratio 54.2-55.0% across the
+5 checkpoints (target 30-55%); Flight Data share 23.7% sonda / 25.0% satellite (target
+20-35%) — consistent with the locked v2.5 economy, no drift.
+
+**Two issues found while verifying the v3.1 doc replacement against actual code/state —
+flagged, not resolved, per "doc ambiguity = stop and ask":**
+
+1. **CLAUDE.md schema regression:** the v3.1 replacement's `GameState.buildings` line
+   reverted to `Record<BuildingId, { level: number; upgrades: string[] }>`, dropping the
+   `starvedIndicator`/`fedStreakMs` fields (and the `BuildingState` interface itself) that
+   Sprint 3/v2.7 added via a real, tested v1→v2 migration and that `core/economy.ts`
+   currently depends on for the starvation-hysteresis indicator. Code was left exactly as
+   it is (untouched) — did not delete the fields to match the doc, since that would break
+   a tested, shipped mechanic on a doc discrepancy that looks like it came from replacing
+   CLAUDE.md against an older base rather than a deliberate decision to remove starvation
+   tracking.
+2. **Undisclosed "v3.0" doc content:** `ECONOMY_MODEL.md` and `UI_SPEC.md` both carry a
+   "v3.0 changes" entry (predating v3.1) — a full cost-rendering overhaul (icon+number for
+   costs, `$` prefix for Funding/"Funds", no resource nouns in price tags, explicitly
+   *replacing* the v2.8 "no abbreviations" rule the current UI is built and tested
+   against) plus a new UI_SPEC §2c "active process strip" and a staff-availability chip
+   per complex tab. None of this was part of the design-review conversation. It isn't
+   assigned to any SPRINTS.md task, and it directly conflicts with how every existing
+   screen (`BuildingTile`, `StaffHiring`, `ManualActionButton`, `PromotionPanel`) currently
+   renders costs — which convention Sprint 5's new UI (Test Stand costs, certification
+   process display) should follow is now genuinely ambiguous. Not touched; flagged for the
+   owner before Sprint 5's UI step specifically, since Sprint 5's core/data work doesn't
+   depend on the answer but its UI step does.

@@ -42,14 +42,14 @@
 ## 3. Random events (v1 pool — 15% check per 10 active min, ≥30 min apart, never during countdown)
 | ID | Event | Option A | Option B |
 |---|---|---|---|
-| E-01 | **Surprise inspection** — "A municipal inspector showed up unannounced. He eyes the Refinery with suspicion." | Pay the 'preventive' fine (−5% current Funding) | Halt Production 20 min for the guided tour |
+| E-01 | **Surprise inspection** — "A municipal inspector showed up unannounced. He eyes the Refinery with suspicion." *(precondition: Refinery built)* | Pay the 'preventive' fine (−5% current Funding) | Halt Production 20 min for the guided tour |
 | E-02 | **Investor offer** — "A fund offers quick capital in exchange for being named 'strategic partner' in the press." | +1,000 Funding, −10 Reputation | Decline gracefully (+3 Reputation) |
 | E-03 | **Defect found** — "A technician found a micro-fracture in a Hardware batch." (only if ≥15 H) | Scrap the batch (−15 Hardware) | Use it anyway (−10 Confidence next launch) |
-| E-04 | **Star scientist** — "A renowned scientist wants in. So do her salary expectations." | Hire (+1 Scientist to the pool at no hiring cost; permanent modifier `salary.flat +0.60 F/s` — her premium; implemented via core/modifiers.ts, never as a tracked individual) | Let her go |
-| E-05 | **Documentary crew** — "A production company wants to film the program. 'We'll barely be in the way,' they promise." | Accept (+15 Reputation, processes +10% duration for 2 h) | Decline |
+| E-04 | **Star scientist** — "A renowned scientist wants in. So do her salary expectations." *(precondition: the player already has ≥1 Scientist — this event ACCELERATES a solved bootstrap, it must never SKIP it)* | Hire (+1 Scientist to the pool at no hiring cost; permanent modifier `salary.flat +0.60 F/s` — her premium; implemented via core/modifiers.ts, never as a tracked individual) | Let her go |
+| E-05 | **Documentary crew** — "A production company wants to film the program. 'We'll barely be in the way,' they promise." | Accept (+15 Reputation, processes +10% duration for 2 h — a TEMPORARY modifier with `expiresAt`, per CLAUDE.md) | Decline |
 | E-06 | **Scrapyard deal** — "A factory closed down and offers its materials 'at a friendly price.'" | Buy (300 Materials for 200 Funding) | Pass |
 
-Rules: events wait as a pending card (never block play); E-03 requires ≥15 Hardware; event rewards that grant resources are one-time payments and ignore caps (GDD §1c).
+Rules: events wait as a pending card (never block play); **every event declares a precondition explicitly — an absent precondition is a spec error, not "no gate"** (E-01: Refinery built; E-03: ≥15 Hardware; E-04: ≥1 Scientist; E-02/E-05/E-06: Complex B built, the baseline gate so no event fires during the opening minutes); event rewards that grant resources are one-time payments and ignore caps (GDD §1c).
 
 ## 4. Contract clients & flavor
 Tier 0 (sounding payloads): Coastal State University · Ionosphere Research Group · MicroGravity Labs · HamSat Collective

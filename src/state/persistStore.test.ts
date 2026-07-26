@@ -41,6 +41,23 @@ describe('loadGame', () => {
     expect(loaded.research.inProgress).toEqual(state.research.inProgress);
   });
 
+  // Modifier.expiresAt contract (CLAUDE.md): pruned on load, not just filtered at
+  // query time — a save that sat around past a temporary event effect's expiry
+  // shouldn't carry the dead entry forward.
+  it('prunes an expired modifier on load, keeping permanent and not-yet-expired ones', () => {
+    const state = createInitialState();
+    const now = Date.now();
+    state.modifiers = [
+      { id: 'expired', source: 'E-05', target: 'process.duration', op: 'mult', value: 1.1, expiresAt: now - 1000 },
+      { id: 'still-active', source: 'E-05', target: 'process.duration', op: 'mult', value: 1.1, expiresAt: now + 1_000_000 },
+      { id: 'permanent', source: 'E-04', target: 'salary.flat', op: 'add', value: 0.6 },
+    ];
+    saveGame(state);
+
+    const loaded = loadGame();
+    expect(loaded.modifiers.map((m) => m.id)).toEqual(['still-active', 'permanent']);
+  });
+
   it('falls back to initial state on corrupt JSON instead of throwing', () => {
     localStorage.setItem(SAVE_KEY, '{not valid json');
     expect(() => loadGame()).not.toThrow();
@@ -65,6 +82,18 @@ describe('saveGame', () => {
     state.resources.materials.amount = 42;
     saveGame(state);
     expect(JSON.parse(localStorage.getItem(SAVE_KEY)!).resources.materials.amount).toBe(42);
+  });
+
+  // Modifier.expiresAt contract: pruned before the write itself, independent of
+  // loadGame's own prune — checked against the raw JSON on disk, not the round trip.
+  it('prunes an expired modifier before writing, independent of loadGame', () => {
+    const state = createInitialState();
+    state.modifiers = [
+      { id: 'expired', source: 'E-05', target: 'process.duration', op: 'mult', value: 1.1, expiresAt: Date.now() - 1000 },
+    ];
+    saveGame(state);
+    const raw = JSON.parse(localStorage.getItem(SAVE_KEY)!) as { modifiers: unknown[] };
+    expect(raw.modifiers).toEqual([]);
   });
 });
 

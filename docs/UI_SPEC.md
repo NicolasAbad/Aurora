@@ -1,6 +1,8 @@
 # UI_SPEC.md — Aurora Program — Interface specification v1
 *Web-first (desktop + mobile responsive), Android wrap later reuses the mobile layout.*
 
+**v3.0 changes:** cost/amount rendering rules (§4 — icon+number for costs, $ symbol for Funds, full names only in ticker/tooltips); persistent active-process strip (§2c); staff availability visible from every complex tab (§2).
+
 **v2.8 changes:** no single-letter resource abbreviations in player-facing UI; manual-action cooldowns get visible recharge + acknowledged clicks (§4).
 
 **v2.6 changes:** progressive-disclosure rules added (§2b) — default is hidden-until-relevant; the full content surface is never visible from the start.
@@ -36,6 +38,16 @@ Default rule: **hidden until relevant** — the player never opens the game onto
 - **Records board:** earned records show fully; unearned ones render as dimmed unnamed placeholders ("———") — countable, not readable. Cheap anticipation without spoiling the arc.
 - **Contracts panel:** does not exist in the UI until the Launch Rail is built.
 
+## 2c. Active process strip (every timer is always trackable)
+Directly under the ticker, a persistent horizontal strip lists **every** running process — research, certification, integration, transfer, training/promotion, contract build, weather window — as compact chips: `[icon] Label · 12m 04s` with a thin progress fill. Rules:
+- **No process may exist without a chip.** Building-tile progress bars remain, but they are a convenience duplicate, never the only tracker: processes not tied to a visible tile (promotions above all) would otherwise be invisible, which is the bug this section exists to prevent.
+- Tapping a chip jumps to the relevant panel/tile.
+- Empty state: the strip collapses to zero height (no "nothing running" row).
+- Chips complete with a brief flash, then the result lands in the Mission Log where applicable.
+- Sorted by remaining time ascending (next completion first). Beyond 4 concurrent, overflow collapses into a "+N" chip that expands on tap.
+
+**Staff availability everywhere:** every complex tab shows a compact staff chip in its header — `Available: 2 Tech · 1 Eng` (unassigned pool only) — so assignment decisions never require navigating to Campus first. Tapping it opens the staff panel.
+
 ## 3. Screens
 1. **Main dashboard** — ticker + tabs + tiles (above).
 2. **Staff panel** (from Campus tab or ticker tap): role pools, hire buttons with next cost, assignment matrix (building × role steppers), salary total/s vs income/s, capacity bar (Quarters).
@@ -46,7 +58,12 @@ Default rule: **hidden until relevant** — the player never opens the game onto
 7. **Contracts panel** (appears with the Launch Rail for tier-0 offers; expands with satellite tiers post-Aurora I): offer cards (client, requirements with have/need coloring — including tier badges for Titanium requirements, deadline, pay), active contract with its build/queue status, pad queue visualization (who holds each pad — including Pad B once built).
 
 ## 4. States & feedback rules
-- **Resource names are never abbreviated to single letters in player-facing UI.** "F", "M", "H", "P" are doc-internal shorthand only — costs and amounts render as icon + value, or value + full/short name ("150 Funding", "40 Propellant"). Suffix formatting (§ECONOMY 12) applies to the number, never to the resource name.
+- **Cost & amount rendering (systemic rule — replaces the old "no single-letter abbreviations" rule, which treated only the symptom):**
+  - **Costs and price tags render as icon + number, with NO resource noun**: `[⚡] 400 · [🔧] 30`. Reading "400 Funding" or "30 Hardware" as a price is the bug — prices carry units, not internal data names.
+  - **Funds use the currency symbol `$` as a prefix and no noun at all**: `$400`, `$1.25M`. This is the only resource with a symbol instead of an icon.
+  - **Full resource names appear only in the ticker, tooltips, the staff/economy panels, and reward summaries** — places where the player is reading *about* a resource rather than paying with it.
+  - Doc-internal shorthand (F/M/H/P) never appears in player-facing UI, ever.
+  - Every icon has a tooltip/long-press with the resource's full name — icons alone must never be the only identification.
 - **Manual-action cooldowns are always visible and acknowledged:** the button shows a recharge animation (radial or fill) for the cooldown duration, and a click landing during cooldown gives immediate feedback (subtle shake/flash) — a cooldown must read as rhythm, never as a dead button.
 - Every affordable action is visually distinct the moment it becomes affordable (border pulse once, then steady highlight).
 - Every timer shows remaining time in human units (2h 14m, 45s).

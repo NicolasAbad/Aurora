@@ -57,7 +57,12 @@ interface Process { id: string; kind: 'research'|'certification'|'integration'|'
   payload: Record<string, unknown>; }
 
 interface Modifier { id: string; source: string; target: string; // e.g. 'certification.duration'
-  op: 'mult'|'add'; value: number; }
+  op: 'mult'|'add'; value: number;
+  expiresAt?: number; // epoch ms; absent = permanent. Temporary modifiers (E-05's 2h process penalty)
+  // are resolved by timestamp like every other time-based thing (rule 6) — never by tick countdown.
+  // Expired modifiers are filtered at query time in core/modifiers.ts AND pruned on save/load and
+  // offline resolution, so an offline gap can never leave a stale effect applied.
+}
 
 // Missions are PER PAD from schemaVersion 1 — Pad B (Sprint 9) must not require a migration.
 type PadId = 'padA'|'padB';
@@ -74,16 +79,10 @@ interface MissionState {
 
 interface EconomyFlags { payrollUnpaid: boolean; } // GDD §1b insolvency state, drives UI banner
 
-// ECONOMY §4b (v2.7): starvedIndicator is hysteresis-smoothed (clears after fedStreakMs
-// crosses the clear threshold, not on the first fed tick) so per-building starvation
-// indicators don't flicker when supply hovers at the boundary. Present on every
-// building; unused for ones with no `consumes` requirement.
-interface BuildingState { level: number; upgrades: string[]; starvedIndicator: boolean; fedStreakMs: number; }
-
 interface GameState { schemaVersion: number; lastSeenAt: number;
   resources: Record<Exclude<ResourceId,'hardware'>, ResourceState> & { hardware: HardwareState };
   staff: StaffState;
-  buildings: Record<BuildingId, BuildingState>;
+  buildings: Record<BuildingId, { level: number; upgrades: string[] }>;
   research: { completed: string[]; inProgress: Process | null };
   processes: Process[]; modifiers: Modifier[]; mission: MissionState;
   economyFlags: EconomyFlags;

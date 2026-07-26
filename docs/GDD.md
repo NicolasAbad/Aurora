@@ -42,7 +42,7 @@ A **long, finite, narrative incremental/idle game** in the style of Kittens Game
 | Hardware | Fabrication (tiers: Aluminum→Titanium→Composites) | VAB stage integration, contracts | Warehouse |
 | Propellant | Refinery (continuous) | Every launch and engine test (recurring) | Propellant Depot (own cap) |
 | Staff | Hiring | Building assignment; salaries scale by role | Crew Quarters |
-| Reputation | Mission milestones, contracts, **Program Records** ⟨KSP⟩ | Gates: big funding rounds, better candidates, premium contracts; lost on failed deadlines. **Floor: 0 (never negative).** | — |
+| Reputation | Mission milestones, contracts, **Program Records** ⟨KSP⟩ | Gates: Funding Rounds (Rep ≥ 25/75), satellite contract tiers (Rep ≥ 20/50), Launch Pad B (Rep ≥ 40); lost on failed deadlines. Every claimed gate is backed by a rule in ECONOMY §2/§4/§10 — do not add aspirational gates here without a mechanic. **Floor: 0 (never negative).** | — |
 | Flight Experience | Launches/tests (× Tracking multiplier) | Permanent efficiency trees | — |
 
 **Hardware tiers:** Hardware is tracked **per tier** (Aluminum, Titanium; Composites v2) sharing a single Warehouse cap. Recipes and contracts may require a minimum tier (e.g. tier-2 contracts require Titanium Hardware). Fabrication produces at its current tier. *(Staff is managed via its own StaffState, not as a numeric ResourceState — see CLAUDE.md.)*
@@ -103,7 +103,7 @@ Rules: processes run at 100% while offline (resources **and salaries** at 60%, 1
 
 - **Materials**: Aluminum → Titanium (→ Composites v2) — better Hardware, required by higher engines
 - **Propulsion**: engine types (each must be certified at the Test Stand); gates each rocket class
-- **Operations**: automation (VAB queues, auto-refuel, express re-certification), logistics, **Remote Ops (offline cap 10 h → 16 h)** — the manual→automated arc is literally a branch
+- **Operations**: automation (VAB queues, auto-refuel), logistics, **Remote Ops (offline cap 10 h → 16 h)** — the manual→automated arc is literally a branch
 - **Program**: unlocks buildings, mission classes, and (era 2) the crewed program
 
 Research inflow now includes **Flight Data** from every test and launch ⟨KSP science-from-missions⟩ — late-game research is funded by flying, not only by lab idle time. Flight Data values are sized to pay for meaningful tech nodes (ECONOMY §8), not decorative trickle.
@@ -170,7 +170,7 @@ Micro-milestones awarded automatically the first time each threshold is crossed,
 
 ## 9. Flight Experience — deep trees (the prestige replacement)
 
-Earned per test/launch/contract (× Tracking multiplier). Four permanent trees (ECONOMY_MODEL §9); depth rule: every tree has at least one node that **changes a mechanic** (VAB queues, partial reusability, parallel integration), not just a percentage.
+Earned per test/launch/contract (× Tracking multiplier). Four permanent trees (ECONOMY_MODEL §9); depth rule: every tree has at least one node that **changes a mechanic** (partial reusability, parallel integration — the XP trees of ECONOMY §9; note these are distinct from the research tree's own Operations branch), not just a percentage.
 
 ---
 

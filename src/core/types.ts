@@ -138,6 +138,13 @@ export interface Modifier {
   target: string; // e.g. 'certification.duration'
   op: 'mult' | 'add';
   value: number;
+  // epoch ms; absent = permanent. Temporary modifiers (E-05's 2h process-duration
+  // penalty, Sprint 9) are resolved by timestamp like every other time-based thing
+  // (rule 6) — never by tick countdown. Expired modifiers are filtered at query time
+  // (core/modifiers.ts's applyModifiers) AND pruned on save/load and offline
+  // resolution (pruneExpiredModifiers), so an offline gap can never leave a stale
+  // effect applied.
+  expiresAt?: number;
 }
 
 // Missions are PER PAD from schemaVersion 1 (GDD/CLAUDE.md) — Pad B must not require a migration.

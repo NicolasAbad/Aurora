@@ -8,7 +8,7 @@
 2. `state/persistStore.ts`: localStorage save/load, `schemaVersion: 1`, migration registry, autosave 10 s + on close.
 3. `core/economy.ts`: `costAtLevel`, `productionPerSecond` + unit tests against ECONOMY_MODEL §4.
 4. `data/buildings.ts`: all **18** buildings + internal upgrades transcribed (stable ids: `finance`, `vab`, `launchRail`, `padB`…).
-5. **`sim/run.ts` — headless balance simulator (dev-only, env-gated):** runs the economy with a simple bot policy (build cheapest useful thing, keep salaries paid, fly when possible) at accelerated time; outputs a day-by-day CSV (resources, income/expense, salary ratio, research income split lab-vs-Flight-Data). This is the tool that verifies ECONOMY sanity rules (salaries 30–50% at 5 checkpoints; Flight Data ≥ 25% of Research income in flight eras). Re-run whenever ECONOMY values change.
+5. **`sim/run.ts` — headless balance simulator (dev-only, env-gated):** runs the economy with a simple bot policy (build cheapest useful thing, keep salaries paid, fly when possible) at accelerated time; outputs a day-by-day CSV (resources, income/expense, salary ratio, research income split lab-vs-Flight-Data). **Three profiles: `optimal` (upper bound), `human` (3×20 min sessions/day — the profile all targets are stated against), and `casual` (one ~30 min session/day — the realistic once-daily player who will hit the 16 h offline ceiling every day; instrumentation only, reports lost production).** This is the tool that verifies ECONOMY sanity rules (salaries 30–55% at 5 checkpoints; Flight Data 20–35% of Research income in flight eras; **pacing floor: human must not reach Aurora I before day 5; pacing CEILING: flag if human exceeds day 12** — too slow is as much a failure as too fast). Re-run whenever ECONOMY values change.
 6. UI shell: top ticker (4 resources + rates), complex tabs (Campus only active), number formatting (§12).
 **Acceptance:** app loads, persists across reload, shows Funding 0 and the pitch button; `sim/run.ts` produces a coherent 3-day CSV.
 
@@ -83,10 +83,10 @@
 2. Full contract cycle: accept → build payload → checklist → launch → pay/deadline fail (−15 Rep, floor 0). Tier-2 requires Titanium-tier Hardware via `minTier`.
 3. **Launch Pad B**: buildable after Aurora I success + Rep ≥ 40 (ECONOMY_MODEL §4). Adds `pads.padB` — **no schema migration needed** (per-pad state since Sprint 7). The scarcity phase (one pad) must be felt first; Pad B is the earned relief and the "program is growing" beat (narrative N-17).
 4. Random events (`core/events.ts` + NARRATIVE §3): 15% check per 10 min, always 2 options, never during countdown; E-04's salary premium implemented as a modifier.
-**Acceptance:** pad-queue tension works; deadlines penalize correctly; private-playtest feedback from Sprint 8 triaged into fixes or BACKLOG.
+**Acceptance:** pad-queue tension works; deadlines penalize correctly; private-playtest feedback from Sprint 8 triaged into fixes or BACKLOG. **Explicit tester question to ask (v1's known thin spot): after Aurora I, does the remaining arc — 2 contract tiers, Pad B, events, XP nodes — sustain interest, or does the game feel finished at the satellite?** A "feels finished" answer is a v1 scope signal, not a bug: the fix would be pulling one BACKLOG item forward, decided with data.
 
 ## Sprint 10 — XP trees & orbital mission (3 days)
-1. Flight Experience trees (§9) via modifier system; mechanic-changing nodes (Queues, Reusability, Parallel integration) with dedicated logic.
+1. Flight Experience trees (§9) via modifier system; mechanic-changing XP nodes (Partial reusability, Parallel integration — ECONOMY §9; NOT the research tree's "VAB queues" node, which shipped in Sprint 4) with dedicated logic.
 2. Tracking Station + XP multiplier; Orbital flight tech; Aurora II (probabilistic Orbital-1 cert, mission-2 requirements).
 3. v1 ending screen: orbital milestone + crewed-program teaser.
 **Acceptance:** full v1 arc playable; every XP node produces its measurable effect.
@@ -98,5 +98,5 @@ Rolling number animation, checklist transitions, minimal optional sound (countdo
 1. Deploy (itch.io + Vercel), feedback form.
 2. **Telemetry decision (default: minimal remote endpoint):** a single Vercel serverless function receiving anonymous batched funnel events (opt-in checkbox in Settings, disclosed plainly). Without a remote sink, D1/D7 retention CANNOT be measured — if the endpoint is cut, delete the retention benchmarks from this sprint and treat the playtest as qualitative-only. No third-party analytics SDKs in v1.
 3. **Distribution:** post to r/incremental_games (the genre's home community — feedback there is expert-level), itch.io devlog, incremental-games forums/Discords. One honest "solo dev, first playable, brutal feedback welcome" post outperforms any ad.
-4. Metrics vs benchmarks (D1 35–40%, D7 10–15%) + funnel review.
+4. Funnel review + retention read. NOTE on benchmarks: D1 35–40% / D7 10–15% are generic mobile-F2P figures and are the WRONG comparison for a web idle game reaching a self-selected enthusiast audience via itch.io and r/incremental_games. Treat them as directional only; the actionable signals are the funnel drop-off points, session length, and whether returning players come back on day 2–3 at all.
 Android + monetization are a SEPARATE post-launch phase, planned only after reading playtest data.

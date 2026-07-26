@@ -1,6 +1,10 @@
 # ECONOMY_MODEL.md — Aurora Program — Complete baseline numbers
 *Every value in the game. Claude Code does NOT invent numbers: if a value isn't here, ask and add it here first. Tick = 1 second (logical economy rate; the render loop is delta-based per CLAUDE.md rule 6). Baseline for the Sprint-0 headless simulator (`sim/run.ts`); adjust only via the simulator, updating this file.*
 
+**v3.1 changes (design review — scoped economy unlock, item-limited):** tier-0 contract Confidence clarified (sonda formula, 100% reachable); Clean Room naming collision resolved (tier renamed "constellation batches"; the VAB upgrade is a real tier-2 prerequisite); Reputation gates added to satellite tiers (tier 1 ≥ 20, tier 2 ≥ 50 — safety nets, sim-verified at Sprint 9); contract launch failure vs missed-deadline penalty disambiguated; Rush Order gate rationale confirmed. **This is a SCOPED unlock for these items only — the rest of the economy stays locked and no existing value changed.**
+
+**v3.0 changes (presentation):** player-facing display names & cost rendering defined (§12) — Funds shown as $, costs as icon+number, no resource nouns in price tags. Presentation only: no ResourceId, value, or balance change; economy lock unaffected.
+
 **v2.9 changes (Sprint 4 blocker):** Aluminum node disambiguated (§5) — renamed "Aluminum alloys", explicitly no production effect, explicitly NOT a gate on the Aluminum tier (which needs no tech, ratifying Sprint 3's `currentHardwareTier`); it exists as the Materials branch entry and Titanium's prerequisite.
 
 **v2.8 changes (owner manual-play findings + ratification):** multi-role staffRatio defined as bottleneck (min across roles) — ratifying the Sprint 3 implementation; staff slots exist only at building level ≥ 1 (assignment to unbuilt buildings was a bug); player-facing UI never shows single-letter resource abbreviations (UI_SPEC §4); pitch cooldown gets visible recharge feedback (UI_SPEC §4) — the 1 s cadence itself stays (economy lock); dev-only reset button added ahead of Sprint 8's real one.
@@ -27,7 +31,7 @@ Funding 0 · Materials 0 · Research 0 · Hardware 0 (Aluminum tier) · Propella
 | Funding Round I | 500 Funding | 10 min | Reputation ≥ 25 (replaces nothing; pitch stays) |
 | Funding Round II | 2,500 Funding | 30 min | Reputation ≥ 75 |
 | Gather materials | 5 Materials | 1 s | Supply Depot lv1 |
-| Rush Order | 100 Materials for 150 Funding | 5 min | Fabrication built |
+| Rush Order | 100 Materials for 150 Funding | 5 min | Fabrication built *(intentional: the verb evolves when Materials become a real bottleneck — i.e. when something consumes them — not when the Depot is built)* |
 
 Funding Round payouts are one-time payments: they **ignore the Funding cap** (GDD §1c).
 
@@ -157,20 +161,36 @@ Organization: Team culture (150: salaries −5%) → Recruiting (400: hiring −
 Prestige: Public relations (150: +20% Reputation) → Trusted brand (450: contracts pay +25%)
 
 ## 10. Contracts
-**Tier 0 — sounding payloads** (active from Launch Rail; no Payload Processing needed): 1 active offer, rotates 6 h. "Fly [client]'s instrument package on an S-1". **Total all-inclusive cost 10 H + 40 P** = the standard S-1 (8 H assembly + 30 P launch) **plus** client payload integration (2 H + 10 P). Deadline 12 h, pays 400 F + 3 Rep. Research payloads fund the space attempt.
+**Tier 0 — sounding payloads** (active from Launch Rail; no Payload Processing needed): 1 active offer, rotates 6 h. "Fly [client]'s instrument package on an S-1". **Total all-inclusive cost 10 H + 40 P** = the standard S-1 (8 H assembly + 30 P launch) **plus** client payload integration (2 H + 10 P). Deadline 12 h, pays 400 F + 3 Rep. Research payloads fund the space attempt. **Confidence: tier-0 flies an S-1 and therefore uses the sonda formula (§7a) — 100% IS reachable with extended certification, exactly like a story sonda.** Tier-0 teaches the contract loop safely; it is not the gambling space.
 
 **Satellite tiers** (post-Aurora I; 2 active offers, rotate 8 h; require Payload Processing):
 | Tier | Client class | Requires | Deadline | Pays |
 |---|---|---|---|---|
-| 1 | Single satellites (comms, science, observation) | 40 H + 250 P + pad slot | 24 h | 3,000 F + 10 Rep |
-| 2 (Clean Room) | **Internet constellation batches** — recurring client, repeat offers | 80 H **Titanium tier** + 400 P | 36 h | 8,000 F + 25 Rep |
+| 1 | Single satellites (comms, science, observation) | 40 H + 250 P + pad slot + **Reputation ≥ 20** | 24 h | 3,000 F + 10 Rep |
+| 2 — constellation batches | **Internet constellation batches** — recurring client, repeat offers | 80 H **Titanium tier** + 400 P + **VAB Clean Room upgrade** (§4) + **Reputation ≥ 50** | 36 h | 8,000 F + 25 Rep |
 
-Missed deadline: −15 Reputation (floor 0). Declining: free (v1). Contracts use the full launch checklist with Confidence (no cheap 100% guarantee — that's the gamble; roll committed at checklist completion).
+*Reputation gates are safety nets, not pacing gates: clean play accumulates ~105 Rep by Aurora I, so they bind only for players who burned Reputation on missed deadlines or bad event choices. Same intent as Launch Pad B's Rep ≥ 40. Verify in the sim at Sprint 9 that they never block clean play.* The VAB "Clean Room" upgrade is a **real prerequisite** for tier 2 (it was already annotated as such in §4) — the tier is named "constellation batches", not "Clean Room", to end the naming collision.
+
+Missed deadline: −15 Reputation (floor 0). Declining: free (v1). **A contract launch that FAILS its Confidence roll costs no Reputation by itself (GDD §7b) and does NOT cancel the contract — it stays active until its deadline, so the player may rebuild and retry. The −15 applies only if the deadline actually passes unfulfilled.** Satellite-tier contracts use the full launch checklist with Confidence (no cheap 100% guarantee — that's the gamble; roll committed at checklist completion).
 
 ## 11. Offline, events, weather
 Offline: 60% of active rates **including salaries**, 10 h cap (16 h with Remote Ops); process timers run at 100%; insolvency resolved with the same rule as online (GDD §1b) and reported in the summary. **No paid skips in v1.**
 Random events: 15% check every 10 active min; ≥30 min between events; pool in NARRATIVE_EVENTS §3.
 Weather window: uniform 2–5 min (fixed 2 min with Weather Station); a pending window at close resolves by timestamp on reopen.
 
-## 12. Number formatting
+## 12. Number formatting & player-facing names
 Suffixes from 10,000, always **3 significant figures**: 10.0K, 125K, 1.25M, 3.10B. Rates 1 decimal. Percentages integers.
+
+**Display names (presentation layer only — `ResourceId` values are unchanged, saves and sim unaffected):**
+
+| ResourceId | Player-facing name | As a cost | In the ticker |
+|---|---|---|---|
+| funding | Funds | `$400`, `$1.25M` | `$1.25M` |
+| materials | Materials | icon + `200` | `Materials 200` |
+| hardware | Hardware | icon + `30` | `Hardware 30` (tier split on tap) |
+| propellant | Propellant | icon + `400` | `Propellant 400` |
+| research | Research | icon + `25` | `Research 25` |
+| reputation | Reputation | — (rarely spent) | `Reputation 12` |
+| flightxp | Flight Experience | icon + `250` | `Flight XP 250` |
+
+Rendering rules (icon-only in costs, `$` for Funds, names in ticker/tooltips): UI_SPEC §4. In-fiction wording stays as written: the player pitches investors and closes **funding rounds** to raise **funds** — the verb and the unit are deliberately different words.
