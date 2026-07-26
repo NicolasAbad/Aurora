@@ -74,10 +74,16 @@ interface MissionState {
 
 interface EconomyFlags { payrollUnpaid: boolean; } // GDD §1b insolvency state, drives UI banner
 
+// ECONOMY §4b (v2.7): starvedIndicator is hysteresis-smoothed (clears after fedStreakMs
+// crosses the clear threshold, not on the first fed tick) so per-building starvation
+// indicators don't flicker when supply hovers at the boundary. Present on every
+// building; unused for ones with no `consumes` requirement.
+interface BuildingState { level: number; upgrades: string[]; starvedIndicator: boolean; fedStreakMs: number; }
+
 interface GameState { schemaVersion: number; lastSeenAt: number;
   resources: Record<Exclude<ResourceId,'hardware'>, ResourceState> & { hardware: HardwareState };
   staff: StaffState;
-  buildings: Record<BuildingId, { level: number; upgrades: string[] }>;
+  buildings: Record<BuildingId, BuildingState>;
   research: { completed: string[]; inProgress: Process | null };
   processes: Process[]; modifiers: Modifier[]; mission: MissionState;
   economyFlags: EconomyFlags;

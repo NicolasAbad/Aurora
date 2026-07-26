@@ -599,3 +599,105 @@ actual production code path (not isolated unit calls):
 
 All three acceptance clauses hold through the integrated path. Sprint 2 is genuinely
 closed; proceeding to Sprint 3.
+
+## v2.7 — tick resolution order, starvation & contention (ECONOMY §4b, semantics only)
+
+SPRINTS.md's "input-starved buildings pause with indicator" and the Fabrication/Refinery
+Materials-contention case weren't specified anywhere — two genuine mechanic ambiguities,
+flagged before writing any Sprint 3 code rather than guessed at. Owner decisions, codified
+in ECONOMY_MODEL.md v2.7 §4b (no values touched, economy lock unaffected):
+
+- **Starvation: binary pause.** A consumer gets its full tick requirement or produces
+  zero that tick — never partial, never negative. Same pattern as payroll insolvency,
+  scoped per building. Self-recovers the instant inputs suffice.
+- **Contention: fixed order, not proportional.** Salaries first (insolvency check), then
+  pure producers (Finance, Supply Depot, R&D Lab), then consumers claiming in §4 table
+  order top to bottom (v1: Fabrication, then Refinery). Staffing is the priority lever by
+  design (an unstaffed consumer neither produces nor claims) — no priority UI in v1.
+  Offline resolution uses the identical functions (rule 6).
+- **UI hysteresis:** the starved indicator appears immediately, clears after 3000ms of
+  consecutive fed time — not 3 calls to the resolution function, since online (per-frame)
+  and offline (1-min chunks) call it at wildly different granularities. Tracked as
+  accumulated simulated ms (`fedStreakMs`), not a raw tick counter, so it means the same
+  thing regardless of caller.
+
+## Sprint 3 — Full production — COMPLETE (2026-07-25)
+
+All 5 tasks done; acceptance verified (see below).
+
+**Built:**
+- Schema (v1→v2 migration, in the same commit per rule 5): `BuildingState` gained
+  `starvedIndicator`/`fedStreakMs`. `CLAUDE.md`'s schema block updated to match.
+- `src/core/hardware.ts` (new) — `currentHardwareTier` (aluminum until the 'titanium'
+  tech id is completed, matching the established camelCase-tech-id-ahead-of-Sprint-4
+  convention), `creditHardware` (tier-aware grant, sum(byTier) === amount kept in sync),
+  `hardwareAtOrAboveTier`/`spendHardware` (the "cost checks support minTier" capability —
+  wired into `canAffordCost`/`payCost` in `core/actions.ts`, but no Sprint 0-3 building
+  actually sets `minHardwareTier` yet, so it's infra-ahead-of-content, same restraint as
+  Sprint 2's `ProcessProgress`: unit-tested directly, no live consumer to integrate
+  against until a later sprint's tier-gated cost exists).
+- `src/core/staff.ts` gained `buildingStaffRatio` — the overall ratio for a
+  possibly-multi-role building (Fabrication: 1 Eng + 1 Tech) as the MINIMUM across its
+  required roles (a bottleneck: needs every role staffed, not an average). Not specified
+  numerically anywhere in ECONOMY §4 — flagged as the only sensible reading of "requires
+  both" rather than re-asking, unlike the two starvation/contention questions that had
+  genuinely multiple plausible answers. Replaces `BuildingTile`'s old `roles[0]`
+  placeholder (silently wrong for any multi-role building, never exercised until now).
+- `src/core/economy.ts` — `resolveEconomyTick` rewritten to ECONOMY §4b's fixed order:
+  salaries → pure producers (Finance, Supply Depot, R&D Lab) → consumers in table order
+  (Fabrication, Refinery), each via `resolveConsumer` (binary claim-or-starve) and
+  `updateStarvation` (the hysteresis state machine). Returns `buildings` now, not just
+  `resources` — threaded through both `core/offlineResolution.ts` (`resolveOffline` gained
+  `completedTech`/kept `buildings` round-tripping through the chunk loop) and
+  `state/persistStore.ts` (`computeBootOffline`, `applyTick`).
+- `src/core/actions.ts` — `applyGatherMaterials` (free, one-time, Supply Depot lv1+) and
+  `applyRushOrder` (150 F → 100 M, Fabrication built) — cooldowns are UI-only, matching
+  Pitch's established pattern, not a core-level restriction.
+- UI: `ComplexTabs` is now store-driven (Production unlocks live at 300 lifetime Funding;
+  previously hardcoded `unlocked: false` regardless of state — Complex B was actually
+  unreachable in the UI before this sprint even though the data/unlock-condition existed).
+  `BuildingTile` shows a "— STARVED" indicator for consumer buildings and now uses
+  `buildingStaffRatio` for its rate display. New `ManualActionButton` (generalizes
+  PitchButton's cooldown+feedback shape) powers Gather Materials and Rush Order, rendered
+  conditionally on each tile once unlocked (progressive disclosure, per v2.6).
+
+**Verification:**
+- 117 unit/integration tests passing (up from 91 at the Sprint 2 addendum), including:
+  fixed-order + binary starvation + hysteresis (economy.test.ts), the owner-suggested
+  oscillation case (Fabrication runs full-rate consistently while Refinery starves
+  consistently across 5 ticks — not alternating/flickering, proving the fixed claim order
+  rather than assuming it), Hardware tier crediting with the sum(byTier)===amount
+  invariant, the owner-suggested offline/online starvation parity test (same oscillation
+  scenario resolved through `resolveOffline` at the 60% rate — every quantity scales
+  together so the fed/starved pattern is rate-invariant), and the v1→v2 migration.
+  Typecheck, ESLint, production build all clean; dev-only `TimeWarpControl` confirmed
+  still absent from the production bundle.
+- `sim/run.ts` re-run (human + optimal, seed 1, 10 days) — no regression: Complex B
+  unlocks and gets built via the sim's pre-existing (and already fixed-order-correct)
+  bot logic, day-5 pacing floor still passes, Flight Data shares (23.7%/27.9%
+  sonda/satellite) land within single-seed variance of the locked 23.7%/24.7% medians.
+  No ECONOMY_MODEL.md value touched this sprint — the lock holds.
+- Playwright, through the real store per the new CLAUDE.md step-5 rule: fresh load shows
+  Production locked; pitching to exactly 300 lifetime Funding unlocks it live; all 5
+  Complex B tiles render with correct names (screenshot-verified "Propellant Depot" as
+  the multi-word/edge-case label); built Supply Depot, hired and assigned a Technician
+  via the tile's own stepper, clicked Gather Materials and confirmed the Materials ticker
+  row appeared (progressive disclosure, v2.6) and read 5/200 with the "+5 M" feedback
+  captured mid-animation. Zero console errors.
+
+**Scope notes:**
+- Gather Materials/Rush Order aren't wired into the sim's bot policy — the sim already
+  reasonably approximates Complex B (buildings, fixed production order, generic
+  hiring/staffing) from earlier groundwork, and adding the two new manual verbs would
+  mean threading a new stat through the CSV reporting pipeline for a supplementary
+  realism enhancement, not something needed to validate §4b's mechanics. Left for if a
+  later balance pass finds Supply Depot's passive rate alone insufficient.
+- `minHardwareTier` cost-checking is real, tested machinery (`hardwareAtOrAboveTier`,
+  `spendHardware`, wired into `canAffordCost`/`payCost`) with no current building or
+  upgrade that sets it — same "infra now, content later" pattern as Sprint 2's
+  `ProcessProgress`, not a gap.
+- Hardware-costed purchases before this sprint (e.g. a future Test Stand build) will now
+  correctly deduct from `byTier` via `spendHardware` instead of the old flat-`amount`-only
+  `payCost` path — a latent invariant bug (`sum(byTier) !== amount` after any hardware
+  spend) that happened to never be exercised yet, closed as part of the same cost-check
+  wiring rather than left for whichever sprint first spends Hardware.

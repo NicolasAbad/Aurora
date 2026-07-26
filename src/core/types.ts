@@ -178,6 +178,19 @@ export interface EconomyFlags {
   payrollUnpaid: boolean; // GDD §1b insolvency state, drives UI banner
 }
 
+// ECONOMY §4b (v2.7): input-starved consumers pause per building, per tick, binary.
+// starvedIndicator is the DISPLAYED state (hysteresis-smoothed); fedStreakMs accumulates
+// while fed and resets to 0 on any starved tick — the indicator only clears once
+// fedStreakMs crosses STARVATION_CLEAR_MS (core/economy.ts), preventing flicker at the
+// supply boundary. Present on every building (not just consumers) for schema uniformity;
+// unused/always-false for buildings with no `consumes` requirement.
+export interface BuildingState {
+  level: number;
+  upgrades: string[];
+  starvedIndicator: boolean;
+  fedStreakMs: number;
+}
+
 // Contracts (full shape defined in Sprint 9 / core/contracts.ts). Placeholder kept
 // structurally consistent with GameState now so schemaVersion 1 needs no migration.
 export interface ContractOffer {
@@ -214,7 +227,7 @@ export interface GameState {
     hardware: HardwareState;
   };
   staff: StaffState;
-  buildings: Record<BuildingId, { level: number; upgrades: string[] }>;
+  buildings: Record<BuildingId, BuildingState>;
   research: { completed: string[]; inProgress: Process | null };
   processes: Process[];
   modifiers: Modifier[];

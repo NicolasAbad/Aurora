@@ -55,3 +55,18 @@ export function staffRatioForBuilding(
   if (slots === 0) return 0;
   return assignedToBuilding(staff, role, buildingId) / slots;
 }
+
+/**
+ * Overall staffRatio for a building that may require MULTIPLE roles (e.g. Fabrication:
+ * 1 Engineer + 1 Technician) — not specified in ECONOMY §4's formula text, so treated as
+ * a bottleneck: production needs every required role staffed, so the building's ratio is
+ * the MINIMUM across its required roles' individual ratios (an empty Engineer slot means
+ * 0 output even with a full Technician slot). Single-role buildings reduce to the same
+ * value staffRatioForBuilding would give; no-slot buildings (Warehouse, etc.) return 1
+ * (ratio is irrelevant — they have no `production` to scale).
+ */
+export function buildingStaffRatio(staff: StaffState, buildingId: BuildingId): number {
+  const roles = Object.keys(BUILDINGS[buildingId].slots ?? {}) as RoleId[];
+  if (roles.length === 0) return 1;
+  return Math.min(...roles.map((role) => staffRatioForBuilding(staff, buildingId, role)));
+}

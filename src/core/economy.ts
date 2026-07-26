@@ -1,6 +1,7 @@
 import { BUILDINGS } from '../data/buildings';
-import { staffRatioForBuilding, totalSalaryPerSecond } from './staff';
-import type { GameState, ResourceId, ResourceState, StaffState } from './types';
+import { buildingStaffRatio, totalSalaryPerSecond } from './staff';
+import { creditHardware, currentHardwareTier } from './hardware';
+import type { BuildingState, GameState, ResourceId, ResourceState, StaffState } from './types';
 
 /**
  * Cost to go from `level` to `level + 1`, per ECONOMY_MODEL §4 (`base × factor^level`).
@@ -63,27 +64,78 @@ export function applyGrant(resource: ResourceState, amount: number, oneTime: boo
 
 export interface EconomyTickResult {
   resources: GameState['resources'];
+  buildings: GameState['buildings'];
   payrollUnpaid: boolean;
 }
 
+// ECONOMY §4b (v2.7): the starved indicator clears once a building has been fed for
+// this many consecutive ms of simulated time (the doc's "3 consecutive [logical 1s]
+// ticks", decoupled from how often this function happens to be called — a real-frame
+// call and a 1-min offline chunk both just add their own deltaMs to the same streak).
+const STARVATION_CLEAR_MS = 3000;
+
+function updateStarvation(building: BuildingState, fed: boolean, deltaMs: number): BuildingState {
+  if (!fed) {
+    return { ...building, starvedIndicator: true, fedStreakMs: 0 };
+  }
+  const fedStreakMs = Math.min(building.fedStreakMs + deltaMs, STARVATION_CLEAR_MS);
+  const starvedIndicator = fedStreakMs >= STARVATION_CLEAR_MS ? false : building.starvedIndicator;
+  return { ...building, fedStreakMs, starvedIndicator };
+}
+
 /**
- * One tick's worth of economy resolution: salaries first, then passive production —
+ * Resolves a consumption-based producer (Fabrication, Refinery — ECONOMY §4b step 3):
+ * claims its full tick's Materials requirement or produces nothing this tick (binary
+ * starvation, "never negative production", same pattern as payroll insolvency but
+ * per-building instead of global). An unstaffed/level-0 building has zero desired
+ * output, which counts as trivially "fed" (not starved) — GDD's "staffing IS the
+ * priority lever" note: nobody assigned means it isn't trying to claim anything, so it
+ * shouldn't show as blocked.
+ */
+function resolveConsumer(
+  buildingId: 'fabrication' | 'refinery',
+  buildingState: BuildingState,
+  staff: StaffState,
+  materials: ResourceState,
+  deltaSec: number,
+  deltaMs: number,
+): { buildingState: BuildingState; materials: ResourceState; producedAmount: number } {
+  const def = BUILDINGS[buildingId];
+  const ratio = buildingStaffRatio(staff, buildingId);
+  const desiredOutput =
+    productionPerSecond(def.production!.basePerSec, buildingState.level, ratio) * deltaSec;
+  const consumePerUnit = def.production!.consumes!.materials!;
+  const desiredConsume = desiredOutput * consumePerUnit;
+  const fed = desiredOutput <= 0 || materials.amount >= desiredConsume;
+
+  return {
+    buildingState: updateStarvation(buildingState, fed, deltaMs),
+    materials:
+      fed && desiredConsume > 0
+        ? { ...materials, amount: materials.amount - desiredConsume }
+        : materials,
+    producedAmount: fed ? desiredOutput : 0,
+  };
+}
+
+/**
+ * One tick's worth of economy resolution, in ECONOMY §4b's fixed order: (1) salaries —
  * GDD §1b, insolvency pauses ALL staffed production until salaries can be paid again,
- * with no debt accumulating (an unaffordable tick simply doesn't deduct). Sprint-1 scope
- * covers Campus's two producers (Finance -> Funding, R&D Lab -> Research); Sprint 3 adds
- * Complex B's consumption-based producers (Fabrication/Refinery) as their own path since
- * "input-starved, never negative" is a materially different problem from these two.
+ * no debt accumulating; (2) pure producers (Finance, Supply Depot, R&D Lab), subject to
+ * caps; (3) consumers claim inputs in §4 table order (Fabrication, then Refinery),
+ * each getting its full tick requirement or nothing — binary per-building starvation.
  *
- * `rateMultiplier` (default 1, the online rate) scales BOTH salaries and production —
+ * `rateMultiplier` (default 1, the online rate) scales salaries and production —
  * ECONOMY §11: "resources and salaries at 60%" while offline. This is the one function
  * both the online game loop and core/offlineResolution.ts call, so offline genuinely
- * "reuses the exact same resolution logic as online" (CLAUDE.md rule 6) rather than
- * approximating it.
+ * "reuses the exact same resolution logic as online" (CLAUDE.md rule 6), starvation
+ * included (ECONOMY §4b: "offline resolution uses these exact same rules").
  */
 export function resolveEconomyTick(
   resources: GameState['resources'],
   buildings: GameState['buildings'],
   staff: StaffState,
+  completedTech: string[],
   deltaMs: number,
   rateMultiplier = 1,
 ): EconomyTickResult {
@@ -92,7 +144,7 @@ export function resolveEconomyTick(
   const canPaySalaries = resources.funding.amount >= salaryCost;
 
   if (!canPaySalaries) {
-    return { resources, payrollUnpaid: true };
+    return { resources, buildings, payrollUnpaid: true };
   }
 
   let funding = resources.funding;
@@ -100,24 +152,43 @@ export function resolveEconomyTick(
     funding = { ...funding, amount: funding.amount - salaryCost };
   }
 
+  // --- Pure producers (§4b step 2) ---
   const financeAmount =
     productionPerSecond(
       BUILDINGS.finance.production!.basePerSec,
       buildings.finance.level,
-      staffRatioForBuilding(staff, 'finance', 'technician'),
+      buildingStaffRatio(staff, 'finance'),
     ) * deltaSec;
   funding = applyGrant(funding, financeAmount, false);
+
+  const supplyDepotAmount =
+    productionPerSecond(
+      BUILDINGS.supplyDepot.production!.basePerSec,
+      buildings.supplyDepot.level,
+      buildingStaffRatio(staff, 'supplyDepot'),
+    ) * deltaSec;
+  let materials = applyGrant(resources.materials, supplyDepotAmount, false);
 
   const rndAmount =
     productionPerSecond(
       BUILDINGS.rndLab.production!.basePerSec,
       buildings.rndLab.level,
-      staffRatioForBuilding(staff, 'rndLab', 'scientist'),
+      buildingStaffRatio(staff, 'rndLab'),
     ) * deltaSec;
   const research = applyGrant(resources.research, rndAmount, false);
 
+  // --- Consumers (§4b step 3): fixed order, Fabrication then Refinery ---
+  const fab = resolveConsumer('fabrication', buildings.fabrication, staff, materials, deltaSec, deltaMs);
+  materials = fab.materials;
+  const hardware = creditHardware(resources.hardware, fab.producedAmount, currentHardwareTier(completedTech));
+
+  const ref = resolveConsumer('refinery', buildings.refinery, staff, materials, deltaSec, deltaMs);
+  materials = ref.materials;
+  const propellant = applyGrant(resources.propellant, ref.producedAmount, false);
+
   return {
-    resources: { ...resources, funding, research },
+    resources: { ...resources, funding, materials, research, hardware, propellant },
+    buildings: { ...buildings, fabrication: fab.buildingState, refinery: ref.buildingState },
     payrollUnpaid: false,
   };
 }

@@ -3,6 +3,7 @@ import { createInitialState } from '../data/initialState';
 import {
   assignedToBuilding,
   buildingSlotCount,
+  buildingStaffRatio,
   hiringCost,
   isRoleUnlocked,
   staffRatioForBuilding,
@@ -57,6 +58,29 @@ describe('buildingSlotCount / assignment helpers', () => {
     state.staff.pools.technician.hired = 2;
     state.staff.pools.technician.assigned.finance = 1;
     expect(staffRatioForBuilding(state.staff, 'finance', 'technician')).toBe(0.5);
+  });
+});
+
+describe('buildingStaffRatio', () => {
+  it('reduces to staffRatioForBuilding for a single-role building', () => {
+    const state = createInitialState();
+    state.staff.pools.technician.hired = 2;
+    state.staff.pools.technician.assigned.finance = 1;
+    expect(buildingStaffRatio(state.staff, 'finance')).toBe(0.5);
+  });
+
+  it('is the MINIMUM across roles for a multi-role building (Fabrication: 1 Eng + 1 Tech) — a bottleneck, not specified numerically in ECONOMY §4 but the only sensible reading of "requires both"', () => {
+    const state = createInitialState();
+    state.staff.pools.engineer.hired = 1;
+    state.staff.pools.technician.hired = 1;
+    state.staff.pools.engineer.assigned.fabrication = 1; // engineer slot full (ratio 1)
+    // technician slot left empty (ratio 0) — Fabrication needs BOTH, so overall ratio is 0.
+    expect(buildingStaffRatio(state.staff, 'fabrication')).toBe(0);
+  });
+
+  it('returns 1 for a building with no slots (ratio is irrelevant — nothing to scale)', () => {
+    const state = createInitialState();
+    expect(buildingStaffRatio(state.staff, 'warehouse')).toBe(1);
   });
 });
 

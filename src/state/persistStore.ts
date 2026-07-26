@@ -2,7 +2,14 @@ import { create } from 'zustand';
 import { createInitialState } from '../data/initialState';
 import type { BuildingId, GameState, RoleId } from '../core/types';
 import { CURRENT_SCHEMA_VERSION, migrate } from './migrations';
-import { adjustStaffAssignment, applyPitch, buyBuildingUpgrade, hireStaff } from '../core/actions';
+import {
+  adjustStaffAssignment,
+  applyGatherMaterials,
+  applyPitch,
+  applyRushOrder,
+  buyBuildingUpgrade,
+  hireStaff,
+} from '../core/actions';
 import { resolveEconomyTick } from '../core/economy';
 import { OFFLINE_CAP_MS, resolveOffline, type PayrollStoppage } from '../core/offlineResolution';
 import { resolveProcesses } from '../core/time';
@@ -62,6 +69,7 @@ function computeBootOffline(): { initialState: GameState; awaySummary: AwaySumma
     loaded.resources,
     loaded.buildings,
     loaded.staff,
+    loaded.research.completed,
     loaded.processes,
     loaded.lastSeenAt,
     now,
@@ -72,6 +80,7 @@ function computeBootOffline(): { initialState: GameState; awaySummary: AwaySumma
   const initialState: GameState = {
     ...loaded,
     resources: offline.resources,
+    buildings: offline.buildings,
     processes: offline.processes,
     economyFlags: { ...loaded.economyFlags, payrollUnpaid: offline.payrollUnpaid },
     lastSeenAt: now,
@@ -104,6 +113,10 @@ export interface GameActions {
   pitch: () => void;
   /** No-ops (via core/actions.ts) if unaffordable or already built (one-time buildings). */
   buyBuilding: (buildingId: BuildingId) => void;
+  /** ECONOMY §2 manual gather — free, one-time Materials grant. No-ops before Supply Depot lv1. */
+  gatherMaterials: () => void;
+  /** ECONOMY §2 Rush Order — instant Materials for Funding. No-ops before Fabrication is built or if unaffordable. */
+  rushOrder: () => void;
   /** No-ops if the role isn't tech-unlocked, is unaffordable, or the staff cap is full. */
   hire: (role: RoleId) => void;
   /** delta is typically +1/-1 from a UI stepper; no-ops if it would violate slots/hired. */
@@ -135,6 +148,18 @@ export const useGameStore = create<Store>()((set, get) => ({
     }
   },
 
+  gatherMaterials: () => {
+    const state = get();
+    const resources = applyGatherMaterials(state.resources, state.buildings.supplyDepot.level);
+    if (resources) set({ resources });
+  },
+
+  rushOrder: () => {
+    const state = get();
+    const resources = applyRushOrder(state.resources, state.buildings.fabrication.level);
+    if (resources) set({ resources });
+  },
+
   hire: (role) => {
     const state = get();
     const result = hireStaff(
@@ -157,10 +182,11 @@ export const useGameStore = create<Store>()((set, get) => ({
 
   applyTick: (deltaMs, warp = 1) => {
     const state = get();
-    const { resources, payrollUnpaid } = resolveEconomyTick(
+    const { resources, buildings, payrollUnpaid } = resolveEconomyTick(
       state.resources,
       state.buildings,
       state.staff,
+      state.research.completed,
       deltaMs * warp,
     );
 
@@ -179,7 +205,7 @@ export const useGameStore = create<Store>()((set, get) => ({
         : state.processes;
     const { remaining: processes } = resolveProcesses(shiftedProcesses, Date.now());
 
-    set({ resources, processes, economyFlags: { ...state.economyFlags, payrollUnpaid } });
+    set({ resources, buildings, processes, economyFlags: { ...state.economyFlags, payrollUnpaid } });
   },
 }));
 

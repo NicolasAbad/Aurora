@@ -21,7 +21,7 @@ const ROLE_IDS: RoleId[] = ['technician', 'engineer', 'scientist', 'controller']
 
 export function createInitialState(): GameState {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     lastSeenAt: Date.now(),
     resources: {
       funding: { amount: 0, cap: 500, lifetimeEarned: 0 },
@@ -44,7 +44,10 @@ export function createInitialState(): GameState {
       astronauts: [],
     },
     buildings: Object.fromEntries(
-      BUILDING_IDS.map((id) => [id, { level: id === 'offices' ? 1 : 0, upgrades: [] }]),
+      BUILDING_IDS.map((id) => [
+        id,
+        { level: id === 'offices' ? 1 : 0, upgrades: [], starvedIndicator: false, fedStreakMs: 0 },
+      ]),
     ) as unknown as GameState['buildings'],
     research: { completed: [], inProgress: null },
     processes: [],

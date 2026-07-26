@@ -7,7 +7,7 @@ import { formatAmount, formatRate } from '../core/format';
 import {
   assignedToBuilding,
   buildingSlotCount,
-  staffRatioForBuilding,
+  buildingStaffRatio,
   unassignedCount,
 } from '../core/staff';
 import type { BuildingId, ResourceId, RoleId } from '../core/types';
@@ -37,6 +37,7 @@ interface BuildingTileProps {
 export function BuildingTile({ buildingId, children }: BuildingTileProps) {
   const def = BUILDINGS[buildingId];
   const level = useGameStore((s) => s.buildings[buildingId].level);
+  const starvedIndicator = useGameStore((s) => s.buildings[buildingId].starvedIndicator);
   const resources = useGameStore(useShallow((s) => s.resources));
   const staff = useGameStore(useShallow((s) => s.staff));
   const buyBuilding = useGameStore((s) => s.buyBuilding);
@@ -63,13 +64,12 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
       {def.production && (
         <div className="building-tile__rate">
           {formatRate(
-            productionPerSecond(
-              def.production.basePerSec,
-              level,
-              roles.length > 0 ? staffRatioForBuilding(staff, buildingId, roles[0]) : 1,
-            ),
+            productionPerSecond(def.production.basePerSec, level, buildingStaffRatio(staff, buildingId)),
           )}
           /s {RESOURCE_ABBR[def.production.resource]}
+          {def.production.consumes && starvedIndicator && (
+            <span className="building-tile__starved"> — STARVED</span>
+          )}
         </div>
       )}
 

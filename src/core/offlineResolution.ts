@@ -13,6 +13,7 @@ export interface PayrollStoppage {
 
 export interface OfflineResolution {
   resources: GameState['resources'];
+  buildings: GameState['buildings']; // starvedIndicator/fedStreakMs resolved through the gap
   payrollUnpaid: boolean; // state at the END of the resolved window
   elapsedMs: number; // real elapsed time since lastSeenAt (uncapped)
   appliedMs: number; // portion actually resolved (capped at offlineCapMs)
@@ -35,6 +36,7 @@ export function resolveOffline(
   resources: GameState['resources'],
   buildings: GameState['buildings'],
   staff: StaffState,
+  completedTech: string[],
   processes: Process[],
   lastSeenAt: number,
   now: number,
@@ -45,6 +47,7 @@ export function resolveOffline(
   const appliedMs = Math.min(elapsedMs, offlineCapMs);
 
   let currentResources = resources;
+  let currentBuildings = buildings;
   let stoppageStartMs: number | null = null;
   let stoppageDurationMs = 0;
   // Carries forward the state at close when no chunk runs at all (appliedMs === 0, e.g.
@@ -56,8 +59,16 @@ export function resolveOffline(
 
   while (remaining > 0) {
     const chunk = Math.min(CHUNK_MS, remaining);
-    const result = resolveEconomyTick(currentResources, buildings, staff, chunk, OFFLINE_RATE);
+    const result = resolveEconomyTick(
+      currentResources,
+      currentBuildings,
+      staff,
+      completedTech,
+      chunk,
+      OFFLINE_RATE,
+    );
     currentResources = result.resources;
+    currentBuildings = result.buildings;
     payrollUnpaid = result.payrollUnpaid;
 
     if (payrollUnpaid) {
@@ -79,6 +90,7 @@ export function resolveOffline(
 
   return {
     resources: currentResources,
+    buildings: currentBuildings,
     payrollUnpaid,
     elapsedMs,
     appliedMs,

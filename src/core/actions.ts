@@ -11,28 +11,51 @@ import {
   unassignedCount,
 } from './staff';
 import { applyGrant, costAtLevel, pitchYield } from './economy';
-import type { BuildingId, GameState, ResourceId, ResourceState, RoleId, StaffState } from './types';
+import { hardwareAtOrAboveTier, spendHardware } from './hardware';
+import type {
+  BuildingId,
+  GameState,
+  HardwareTier,
+  ResourceId,
+  ResourceState,
+  RoleId,
+  StaffState,
+} from './types';
 
+// `minHardwareTier` (CLAUDE.md schema: "Costs may demand a minimum tier") gates the
+// `hardware` entry of a cost specifically — no current Sprint 0-3 building sets it, but
+// the check/deduction machinery exists now so a later sprint's tier-gated cost (e.g. a
+// tier-2 contract requiring Titanium) just works without touching this again.
 function canAffordCost(
   resources: GameState['resources'],
   cost: Partial<Record<ResourceId, number>>,
+  minHardwareTier?: HardwareTier,
 ): boolean {
-  return (Object.entries(cost) as [ResourceId, number][]).every(
-    ([id, amount]) => resources[id].amount >= amount,
-  );
+  return (Object.entries(cost) as [ResourceId, number][]).every(([id, amount]) => {
+    if (id === 'hardware' && minHardwareTier) {
+      return hardwareAtOrAboveTier(resources.hardware, minHardwareTier) >= amount;
+    }
+    return resources[id].amount >= amount;
+  });
 }
 
 // Typed as the common ResourceState base (not GameState['resources']) while mutating,
 // since TS can't prove a generic ResourceId key stays within HardwareState's extra
 // `byTier` requirement — safe here because these helpers only ever touch the fields
-// ResourceState and HardwareState share (amount/cap/lifetimeEarned), never byTier.
+// ResourceState and HardwareState share (amount/cap/lifetimeEarned), never byTier,
+// EXCEPT hardware, which goes through spendHardware to keep sum(byTier) === amount.
 function payCost(
   resources: GameState['resources'],
   cost: Partial<Record<ResourceId, number>>,
+  minHardwareTier?: HardwareTier,
 ): GameState['resources'] {
   const next: Record<ResourceId, ResourceState> = { ...resources };
   for (const [id, amount] of Object.entries(cost) as [ResourceId, number][]) {
-    next[id] = { ...next[id], amount: next[id].amount - amount };
+    if (id === 'hardware') {
+      next.hardware = spendHardware(resources.hardware, amount, minHardwareTier);
+    } else {
+      next[id] = { ...next[id], amount: next[id].amount - amount };
+    }
   }
   return next as GameState['resources'];
 }
@@ -43,6 +66,35 @@ export function applyPitch(
   officesLevel: number,
 ): GameState['resources'] {
   return { ...resources, funding: applyGrant(resources.funding, pitchYield(officesLevel), true) };
+}
+
+const GATHER_MATERIALS_YIELD = 5; // ECONOMY §2
+const RUSH_ORDER_MATERIALS = 100; // ECONOMY §2
+const RUSH_ORDER_COST_FUNDING = 150; // ECONOMY §2
+
+/** ECONOMY §2: manual gather — free, one-time Materials grant. Cooldown is UI-only
+ * (PitchButton's established pattern); unlocked once Supply Depot is built (lv1+). */
+export function applyGatherMaterials(
+  resources: GameState['resources'],
+  supplyDepotLevel: number,
+): GameState['resources'] | null {
+  if (supplyDepotLevel < 1) return null;
+  return { ...resources, materials: applyGrant(resources.materials, GATHER_MATERIALS_YIELD, true) };
+}
+
+/** ECONOMY §2 / GDD §3: Rush Order — pitch's Materials-side counterpart, an instant
+ * Funding-for-Materials trade for impatient moments. Unlocked once Fabrication is built. */
+export function applyRushOrder(
+  resources: GameState['resources'],
+  fabricationLevel: number,
+): GameState['resources'] | null {
+  if (fabricationLevel < 1) return null;
+  if (resources.funding.amount < RUSH_ORDER_COST_FUNDING) return null;
+  return {
+    ...resources,
+    funding: { ...resources.funding, amount: resources.funding.amount - RUSH_ORDER_COST_FUNDING },
+    materials: applyGrant(resources.materials, RUSH_ORDER_MATERIALS, true),
+  };
 }
 
 export interface BuyBuildingResult {
@@ -61,9 +113,9 @@ export function buyBuildingUpgrade(
   if (def.costFactor === null && current.level > 0) return null; // one-time, already built
 
   const cost = costAtLevel(def.baseCost, def.costFactor, current.level);
-  if (!canAffordCost(resources, cost)) return null;
+  if (!canAffordCost(resources, cost, def.minHardwareTier)) return null;
 
-  let nextResources: Record<ResourceId, ResourceState> = payCost(resources, cost);
+  let nextResources: Record<ResourceId, ResourceState> = payCost(resources, cost, def.minHardwareTier);
   if (def.capBonus) {
     for (const [id, amount] of Object.entries(def.capBonus) as [ResourceId, number][]) {
       const resource = nextResources[id];

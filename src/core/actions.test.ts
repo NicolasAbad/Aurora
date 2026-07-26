@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../data/initialState';
-import { adjustStaffAssignment, applyPitch, buyBuildingUpgrade, hireStaff } from './actions';
+import {
+  adjustStaffAssignment,
+  applyGatherMaterials,
+  applyPitch,
+  applyRushOrder,
+  buyBuildingUpgrade,
+  hireStaff,
+} from './actions';
 
 describe('applyPitch', () => {
   it('grants pitchYield(officesLevel) as a one-time Funding grant', () => {
@@ -15,6 +22,54 @@ describe('applyPitch', () => {
     state.resources.funding.cap = 500;
     const resources = applyPitch(state.resources, 3); // yield 20
     expect(resources.funding.amount).toBe(515);
+  });
+});
+
+describe('applyGatherMaterials', () => {
+  it('grants a free, one-time Materials yield once Supply Depot is built', () => {
+    const state = createInitialState();
+    state.buildings.supplyDepot.level = 1;
+    const resources = applyGatherMaterials(state.resources, state.buildings.supplyDepot.level);
+    expect(resources).not.toBeNull();
+    expect(resources!.materials.amount).toBe(5);
+  });
+
+  it('refuses before Supply Depot lv1 (ECONOMY §2 unlock)', () => {
+    const state = createInitialState();
+    expect(applyGatherMaterials(state.resources, state.buildings.supplyDepot.level)).toBeNull();
+  });
+
+  it('ignores the Materials cap, like Pitch ignores the Funding cap (GDD §1c)', () => {
+    const state = createInitialState();
+    state.resources.materials.amount = 198;
+    state.resources.materials.cap = 200;
+    const resources = applyGatherMaterials(state.resources, 1);
+    expect(resources!.materials.amount).toBe(203);
+  });
+});
+
+describe('applyRushOrder', () => {
+  it('trades 150 Funding for 100 Materials once Fabrication is built', () => {
+    const state = createInitialState();
+    state.buildings.fabrication.level = 1;
+    state.resources.funding.amount = 200;
+    const resources = applyRushOrder(state.resources, state.buildings.fabrication.level);
+    expect(resources).not.toBeNull();
+    expect(resources!.funding.amount).toBe(50);
+    expect(resources!.materials.amount).toBe(100);
+  });
+
+  it('refuses before Fabrication is built', () => {
+    const state = createInitialState();
+    state.resources.funding.amount = 1000;
+    expect(applyRushOrder(state.resources, state.buildings.fabrication.level)).toBeNull();
+  });
+
+  it('refuses when Funding cannot cover the 150 F cost', () => {
+    const state = createInitialState();
+    state.buildings.fabrication.level = 1;
+    state.resources.funding.amount = 100;
+    expect(applyRushOrder(state.resources, state.buildings.fabrication.level)).toBeNull();
   });
 });
 

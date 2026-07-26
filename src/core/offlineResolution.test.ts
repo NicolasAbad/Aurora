@@ -31,7 +31,7 @@ function makeProcess(overrides: Partial<Process> = {}): Process {
 describe('resolveOffline — 1h clock-manipulation test', () => {
   it('applies exactly 1h of production and salary at the 60% offline rate', () => {
     const state = staffedFinanceState();
-    const result = resolveOffline(state.resources, state.buildings, state.staff, [], 0, HOUR);
+    const result = resolveOffline(state.resources, state.buildings, state.staff, [], [], 0, HOUR);
 
     expect(result.elapsedMs).toBe(HOUR);
     expect(result.appliedMs).toBe(HOUR);
@@ -49,7 +49,7 @@ describe('resolveOffline — offline cap (10h)', () => {
   it('caps applied time at OFFLINE_CAP_MS even when the real gap is much longer', () => {
     const state = staffedFinanceState();
     const twentyHours = 20 * HOUR;
-    const result = resolveOffline(state.resources, state.buildings, state.staff, [], 0, twentyHours);
+    const result = resolveOffline(state.resources, state.buildings, state.staff, [], [], 0, twentyHours);
 
     expect(result.elapsedMs).toBe(twentyHours);
     expect(result.appliedMs).toBe(OFFLINE_CAP_MS);
@@ -63,6 +63,7 @@ describe('resolveOffline — offline cap (10h)', () => {
       state.resources,
       state.buildings,
       state.staff,
+      [],
       [],
       0,
       sixteenHours,
@@ -82,7 +83,7 @@ describe('resolveOffline — insolvency mid-window (GDD §1b applies identically
     state.resources.funding.cap = null;
 
     const oneHour = HOUR;
-    const result = resolveOffline(state.resources, state.buildings, state.staff, [], 0, oneHour);
+    const result = resolveOffline(state.resources, state.buildings, state.staff, [], [], 0, oneHour);
 
     expect(result.payrollUnpaid).toBe(true);
     expect(result.stoppage).not.toBeNull();
@@ -101,7 +102,7 @@ describe('resolveOffline — insolvency mid-window (GDD §1b applies identically
 
   it('never triggers a stoppage when funding comfortably covers the whole window', () => {
     const state = staffedFinanceState();
-    const result = resolveOffline(state.resources, state.buildings, state.staff, [], 0, HOUR);
+    const result = resolveOffline(state.resources, state.buildings, state.staff, [], [], 0, HOUR);
     expect(result.stoppage).toBeNull();
   });
 
@@ -115,7 +116,7 @@ describe('resolveOffline — insolvency mid-window (GDD §1b applies identically
     state.resources.funding.amount = 0; // can't even cover the first chunk
     state.resources.funding.cap = null;
 
-    const result = resolveOffline(state.resources, state.buildings, state.staff, [], 0, HOUR);
+    const result = resolveOffline(state.resources, state.buildings, state.staff, [], [], 0, HOUR);
 
     expect(result.payrollUnpaid).toBe(true);
     expect(result.stoppage).toEqual({ startedAtMs: 0, durationMs: result.appliedMs });
@@ -130,7 +131,7 @@ describe('resolveOffline — lastSeenAt in the future (clock moved backward)', (
     const state = staffedFinanceState();
     const p = makeProcess({ startedAt: 0, durationMs: 5 * MIN });
     // lastSeenAt (1h) is AFTER now (0) — e.g. the system clock was set backward.
-    const result = resolveOffline(state.resources, state.buildings, state.staff, [p], HOUR, 0);
+    const result = resolveOffline(state.resources, state.buildings, state.staff, [], [p], HOUR, 0);
 
     expect(result.elapsedMs).toBe(0);
     expect(result.appliedMs).toBe(0);
@@ -152,6 +153,7 @@ describe('resolveOffline — lastSeenAt in the future (clock moved backward)', (
       state.resources,
       state.buildings,
       state.staff,
+      [],
       [],
       HOUR,
       0,
@@ -177,6 +179,7 @@ describe('resolveOffline — process queue resolution', () => {
       state.resources,
       state.buildings,
       state.staff,
+      [],
       [finishing, stillRunning],
       0,
       HOUR, // 1h gap: `finishing` (30min) completes, `stillRunning` (2h) doesn't
@@ -195,6 +198,7 @@ describe('resolveOffline — process queue resolution', () => {
       state.resources,
       state.buildings,
       state.staff,
+      [],
       [longProcess],
       0,
       gap,
@@ -206,5 +210,37 @@ describe('resolveOffline — process queue resolution', () => {
     // Process: resolved against the full, uncapped 12h real gap — completes anyway.
     expect(result.completedProcesses).toEqual([longProcess]);
     expect(result.processes).toEqual([]);
+  });
+});
+
+// ECONOMY §4b: "offline resolution uses these exact same rules" — the oscillation
+// scenario (Supply Depot output tuned to exactly match Fabrication's demand, starving
+// Refinery every tick) resolves the SAME way offline, at the 60% rate and chunked in
+// 1-min steps, since every quantity involved scales by the same rateMultiplier and the
+// ratio between supply and demand is rate-invariant.
+describe('resolveOffline — starvation resolves identically offline (ECONOMY §4b)', () => {
+  it('Fabrication stays fed and Refinery stays starved across an offline gap', () => {
+    const state = createInitialState();
+    state.buildings.supplyDepot.level = 0.8; // see economy.test.ts's oscillation case for the math
+    state.staff.pools.technician.hired = 1;
+    state.staff.pools.technician.assigned.supplyDepot = 1;
+    state.buildings.fabrication.level = 1;
+    state.staff.pools.engineer.hired = 2;
+    state.staff.pools.technician.hired = 2;
+    state.staff.pools.engineer.assigned.fabrication = 1;
+    state.staff.pools.technician.assigned.fabrication = 1;
+    state.buildings.refinery.level = 1;
+    state.staff.pools.engineer.assigned.refinery = 1;
+    state.resources.materials.cap = null;
+    state.resources.funding.amount = 1_000_000;
+    state.resources.funding.cap = null;
+
+    const result = resolveOffline(state.resources, state.buildings, state.staff, [], [], 0, 5 * MIN);
+
+    expect(result.payrollUnpaid).toBe(false);
+    expect(result.buildings.fabrication.starvedIndicator).toBe(false);
+    expect(result.buildings.refinery.starvedIndicator).toBe(true);
+    expect(result.resources.hardware.amount).toBeGreaterThan(0); // Fabrication genuinely ran
+    expect(result.resources.propellant.amount).toBe(0); // Refinery never got fed
   });
 });

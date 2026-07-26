@@ -193,6 +193,11 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+.building-tile__starved {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .building-tile__staff-row {
   display: flex;
   justify-content: space-between;

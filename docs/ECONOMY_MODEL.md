@@ -1,6 +1,8 @@
 # ECONOMY_MODEL.md — Aurora Program — Complete baseline numbers
 *Every value in the game. Claude Code does NOT invent numbers: if a value isn't here, ask and add it here first. Tick = 1 second (logical economy rate; the render loop is delta-based per CLAUDE.md rule 6). Baseline for the Sprint-0 headless simulator (`sim/run.ts`); adjust only via the simulator, updating this file.*
 
+**v2.7 changes (semantics, NOT a balance unlock — no values touched):** tick resolution order and starvation/contention rules defined (§4b) — binary per-building starvation pause, fixed consumer claim order, salaries resolve first.
+
 **v2.5 changes (multi-seed sweep, seeds 1–10 × 45d):** Flight Data ×~1.7 across the board (median era shares were 14.7%/15.9% vs the 20–35% target — decision rule's "raise Flight Data, don't touch the lab" branch applied); salary sanity band widened to 30–55% (settling at ~53–55% is intended pressure — the insolvency mechanic exists to make it interactive — not a miss); day-1 `basicEngineering` stall accepted as bootstrap pacing with a contingent FTUE fix parked in BACKLOG and tooltip T-09 added.
 
 **v2.4 changes:** contract rewards specified per tier (the §8 range left tier assignment open to interpretation — surfaced when the sim had to pick a value); contract Reputation in §8 now defers to §10 (the old +10–25 range contradicted tier-0's 3 Rep).
@@ -79,6 +81,16 @@ Test Stand: Instrumentation 600 F+20 H (−25% certification time) · Cryogenic 
 Tracking: Radar (included) · Antenna Network 1,500 F+50 H (+25% Flight XP) · Weather Station 900 F+25 H (windows every 2 min)
 VAB: Heavy Crane 1,800 F+60 H (large stages, v2) · Clean Room 2,200 F+70 H (tier-2 contracts)
 Quarters: Classroom 400 F (promotions) · Cafeteria 700 F (−10% effective salaries)
+
+## 4b. Tick resolution order, starvation & contention
+Every economy tick resolves in this fixed order:
+1. **Salaries** deduct first (staff get paid before work happens). If Funding can't cover them → insolvency per GDD §1b: ALL staffed production pauses this tick, no salary deducted.
+2. **Pure producers** add output (Finance, Supply Depot, R&D Lab) — subject to caps (production halts at cap).
+3. **Consumers** claim inputs **in the order their buildings appear in the §4 tables, top to bottom** (v1: Fabrication, then Refinery). Each either receives its FULL tick requirement or is **starved: binary pause, zero production that tick** — never partial, never negative. Same pattern as the insolvency pause.
+
+Starvation is per building, per tick, and self-recovers the moment inputs suffice (no manual reset). UI: the paused indicator appears immediately on a starved tick and clears after 3 consecutive fed ticks (hysteresis prevents flicker when supply hovers at the boundary).
+
+**Player priority lever (by design, no priority UI in v1):** staffing IS the priority control — an unstaffed consumer neither produces nor claims inputs, so redirecting Materials (e.g. to stockpile Propellant before a launch) is done by unassigning Fabrication staff. Offline resolution uses these exact same rules (same functions, per CLAUDE.md rule 6).
 
 ## 5. Research tree v1 (cost in Research, real-time duration)
 Materials: Aluminum (25 R, 5 min) → Titanium (400 R, 3 h)
