@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../data/initialState';
+import { applyModifiers } from './modifiers';
 import { OFFLINE_CAP_MS, resolveOffline } from './offlineResolution';
 import type { Process } from './types';
 
@@ -244,5 +245,27 @@ describe('resolveOffline — starvation resolves identically offline (ECONOMY §
     expect(result.buildings.refinery.starvedIndicator).toBe(true);
     expect(result.resources.hardware.amount).toBeGreaterThan(0); // Fabrication genuinely ran
     expect(result.resources.propellant.amount).toBe(0); // Refinery never got fed
+  });
+});
+
+// Sprint 4 acceptance: "Remote Ops raises the offline cap via a modifier." resolveOffline
+// itself just takes whatever offlineCapMs the caller passes (computeBootOffline is what
+// queries applyModifiers before calling it) — this confirms passing the EXTENDED cap
+// actually changes behavior, i.e. the composition point genuinely matters.
+describe('resolveOffline — offline cap modifier (ECONOMY §5: Remote Ops)', () => {
+  it('a 12h gap caps at the base 10h without the modifier, but is fully applied at the extended 16h', () => {
+    const state = staffedFinanceState();
+    const twelveHours = 12 * HOUR;
+
+    const withoutRemoteOps = resolveOffline(state.resources, state.buildings, state.staff, [], [], 0, twelveHours, OFFLINE_CAP_MS);
+    expect(withoutRemoteOps.appliedMs).toBe(OFFLINE_CAP_MS);
+    expect(withoutRemoteOps.capped).toBe(true);
+
+    const extendedCapMs = applyModifiers(OFFLINE_CAP_MS, [
+      { id: 'research:remoteOps', source: 'remoteOps', target: 'offline.capMs', op: 'add', value: 6 * HOUR },
+    ], 'offline.capMs');
+    const withRemoteOps = resolveOffline(state.resources, state.buildings, state.staff, [], [], 0, twelveHours, extendedCapMs);
+    expect(withRemoteOps.appliedMs).toBe(twelveHours);
+    expect(withRemoteOps.capped).toBe(false);
   });
 });

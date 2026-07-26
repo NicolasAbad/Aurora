@@ -64,6 +64,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { costAtLevel, pitchYield, productionPerSecond } from '../src/core/economy';
 import { BUILDINGS } from '../src/data/buildings';
+import { RESEARCH_TREE, type ResearchNode } from '../src/data/researchTree';
 import type { BuildingId, ResourceId, RoleId, UnlockCondition } from '../src/core/types';
 
 // ---------------------------------------------------------------------------
@@ -105,32 +106,13 @@ const ROLES: Record<RoleId, { baseCost: number; salaryPerSec: number; unlockTech
   controller: { baseCost: 250, salaryPerSec: 0.35, unlockTech: 'flightOperations' },
 };
 
-interface ResearchNode {
-  id: string;
-  costR: number;
-  durationMs: number;
-  deps: string[];
-}
 const MIN = 60_000;
 const HOUR = 60 * MIN;
 const DAY_MS = 24 * HOUR;
-const RESEARCH: ResearchNode[] = [
-  { id: 'basicEngineering', costR: 15, durationMs: 3 * MIN, deps: [] },
-  { id: 'scientificMethod', costR: 80, durationMs: 20 * MIN, deps: ['basicEngineering'] },
-  { id: 'testStand', costR: 150, durationMs: 40 * MIN, deps: ['scientificMethod'] },
-  { id: 'flightOperations', costR: 250, durationMs: 1 * HOUR, deps: ['testStand'] },
-  { id: 'flightProgram', costR: 400, durationMs: 2 * HOUR, deps: ['flightOperations'] },
-  { id: 'orbitalFlight', costR: 700, durationMs: 6 * HOUR, deps: ['flightProgram'] },
-  { id: 'aluminum', costR: 25, durationMs: 5 * MIN, deps: [] },
-  { id: 'titanium', costR: 400, durationMs: 3 * HOUR, deps: ['aluminum'] },
-  { id: 'soundingRockets', costR: 20, durationMs: 4 * MIN, deps: [] },
-  { id: 'probe1Engine', costR: 40, durationMs: 10 * MIN, deps: ['soundingRockets'] },
-  { id: 'orbital1Engine', costR: 500, durationMs: 4 * HOUR, deps: ['probe1Engine'] },
-  { id: 'basicLogistics', costR: 60, durationMs: 15 * MIN, deps: [] },
-  { id: 'remoteOps', costR: 120, durationMs: 45 * MIN, deps: ['basicLogistics'] },
-  { id: 'vabQueues', costR: 350, durationMs: 2 * HOUR, deps: ['remoteOps'] },
-  { id: 'autoRefuel', costR: 600, durationMs: 5 * HOUR, deps: ['vabQueues'] },
-];
+// Sprint 4: was this file's own hardcoded copy (built ahead of data/researchTree.ts
+// existing); now imports the real tree so the two can't drift. Extra fields the real
+// tree carries (name/branch/effect/description) are simply unused here.
+const RESEARCH = RESEARCH_TREE;
 const RESEARCH_BY_ID = new Map(RESEARCH.map((n) => [n.id, n]));
 const RESEARCH_PRIORITY = [
   'basicEngineering',
@@ -763,7 +745,9 @@ function updateResearchStallTracking(state: SimState): void {
   if (state.researchStallTracking?.nodeId !== node.id) {
     state.researchStallTracking = { nodeId: node.id, sinceMs: state.nowMs, logged: false };
   }
-  const tracking = state.researchStallTracking;
+  // Non-null: either just assigned above, or the ?. comparison above was false, which
+  // only happens when researchStallTracking was already non-null with a matching nodeId.
+  const tracking = state.researchStallTracking!;
   if (!tracking.logged && state.nowMs - tracking.sinceMs > RESEARCH_STALL_THRESHOLD_MS) {
     tracking.logged = true;
     state.researchStalls.push({ nodeId: node.id, day: Math.floor(state.nowMs / DAY_MS) + 1 });

@@ -777,3 +777,109 @@ reloads to a genuinely fresh 0 Funding state. Zero console errors throughout.
 **Deferred, no action:** SPRINTS.md's Sprint 11 gained "contextual job titles" (per-
 building flavor titles on staff slots, presentation-only, roles/data untouched). Noted for
 when that sprint starts.
+
+## v2.9 — Aluminum research node disambiguated (ECONOMY §5, Sprint 4 blocker)
+
+ECONOMY §5 listed "Aluminum (25 R, 5 min)" as a research node, but §1's starting state
+already gives Hardware "0 (Aluminum tier)" with no tech required — flagged rather than
+guessed at, since either reading (stale doc row vs. a real node with an undocumented
+effect) would materially change `data/researchTree.ts`. Owner ruling: Aluminum is NOT a
+tier gate (Sprint 3's `currentHardwareTier` assumption ratified, unchanged); the node
+stays, renamed "Aluminum alloys," with an explicit `effects: []` — its only functions are
+Titanium's prerequisite and the Materials branch's entry node (without it the branch
+would show a single unreachable 400 R node all era one, hidden by UI_SPEC §2b's
+progressive disclosure). A contingent future effect (small Fabrication bonus) is parked
+in BACKLOG.md, not implemented — it needs an explicit economy unlock.
+
+## Sprint 4 — Research — COMPLETE (2026-07-26)
+
+All 5 tasks done; acceptance verified (see below).
+
+**Built:**
+- `src/data/researchTree.ts` (new) — all 15 nodes across 4 branches (Materials,
+  Propulsion, Operations, Program), ids/costs/durations/deps matching `sim/run.ts`'s
+  pre-existing model exactly (built ahead of this sprint) — the sim now imports this
+  file instead of keeping its own parallel copy. Only Basic logistics and Remote Ops
+  declare a numeric `effect`; a `description` field is populated ONLY where directly
+  verified against real code/data (a modifier, a `ROLES.unlockTech` match, or a
+  `BuildingDef.unlockCondition` match) — e.g. `soundingRockets`/`probe1Engine`/
+  `vabQueues`/`autoRefuel`/`orbitalFlight` have none, since nothing in the current
+  codebase concretely defines what they unlock yet (that's Sprint 5+ certification/VAB
+  content) and inventing a plausible-sounding claim would violate rule 1. (Caught one
+  near-miss here: Launch Rail is actually gated by `testStand` tech, not
+  `soundingRockets` as first assumed — verified against `data/buildings.ts` before
+  writing any description text, not from memory.)
+- `src/core/modifiers.ts` (new) — `applyModifiers`/`registerModifier`, the central
+  system CLAUDE.md rule 4 has required since day one. v1 only ever registers one
+  modifier per target; composition order for multiple simultaneous modifiers on the same
+  target is explicitly left undecided (documented in the module comment), deferred to
+  whichever future sprint actually needs it — not designed ahead of that need.
+- `src/core/research.ts` (new) — `isNodeAvailable`/`isNodeVisible` (UI_SPEC §2b: visible
+  if available/done, or if every dep is itself completed-or-available — the reveal front
+  extends exactly one ring past the completed frontier) and `resolveResearch` (timestamp-
+  based, same pattern as every other timed thing in this codebase; "one node at a time"
+  means it never auto-starts the next node even if an offline gap runs well past the
+  current one's duration).
+- `src/core/actions.ts` gained `startResearch`, `startPromotion`, `buyInternalUpgrade`
+  (a real gap closed in passing — `BuildingDef.internalUpgrades`, e.g. Crew Quarters'
+  Classroom, had no purchase path in the UI at all before this sprint, since nothing had
+  needed one yet), and `applyCompletedProcesses` — the process-completion dispatcher
+  Sprint 2/3 deliberately left unbuilt ("no process kind has a defined payload yet").
+  Sprint 4 gives `'training'` (promotion) its first real effect; other kinds remain
+  unhandled until whichever sprint defines their payload.
+- Promotion (`data/roles.ts`'s new `PROMOTIONS` table: Tech→Eng 100 F/15 min, Eng→Sci
+  300 F/45 min) is gated ONLY by the Classroom upgrade, never by the target role's
+  direct-hire tech — ECONOMY §3's explicit bootstrap rule (zero Scientists, zero tech:
+  hire Technicians, promote your way to the first Scientist). The promoted unit leaves
+  its `from` pool immediately (paid, "in training") and only joins `to` on completion.
+- Wired into both paths per rule 6: `applyTick` resolves research (with the same
+  warp-shift trick processes already use) and applies completed-process effects every
+  frame; `computeBootOffline` does the same for an offline gap, plus queries
+  `applyModifiers` for the Remote Ops offline-cap bonus before calling `resolveOffline`.
+- UI: `ResearchPanel` (4 branch columns, node cards, locked/available/in-progress/done
+  states, a progress ring via `conic-gradient`), `PromotionPanel` (hidden entirely until
+  the Classroom exists), and generic internal-upgrade rendering added to `BuildingTile`.
+  Extracted a `useNow()` hook so the live countdown re-renders only the specific active
+  node/header — not the whole panel (rule 10) — and consolidated three separate
+  `ROLE_LABELS` copies (BuildingTile, StaffHiring, and the new PromotionPanel) into one
+  `data/roles.ts` export, catching a real abbreviation leak in the process (see below).
+
+**Verification:**
+- 150 tests passing (up from 120), typecheck/lint/build clean. `sim/run.ts` re-run
+  (human + optimal, seed 1) after consolidating its research tree onto the shared file —
+  byte-identical output to before (23.7%/27.9% Flight Data shares, day-5 pacing floor
+  PASS), confirming zero behavioral drift from the refactor. Also fixed a pre-existing
+  (not something this sprint introduced — confirmed via `git log`, untouched since the
+  very first commit) TypeScript null-narrowing gap in `sim/run.ts` that only surfaced
+  once this sprint's edits forced a full recheck of that file.
+- Playwright, through the real store, end to end: fresh load shows all 4 branches' entry
+  nodes available and their immediate dependents visible-but-locked ("Requires: X"),
+  everything two-or-more steps out fully hidden. Bootstrapped from zero — pitched,
+  built Crew Quarters + Classroom, hired 2 Technicians, promoted Technician→Engineer→
+  Scientist (using ×600 time-warp only for the pure-wait windows, switched back to ×1
+  before any further clicking — see the methodology note below), built R&D Lab, assigned
+  the Scientist, waited for Research to accumulate, started and completed "Aluminum
+  alloys," and confirmed Titanium correctly flipped from locked to available with its
+  real effect text showing. Zero abbreviation leaks in a full-page text scan, zero
+  console errors.
+- **Playwright methodology, not a product bug (third time this project has hit this
+  category — Sprint 2's away-modal race, Sprint 3.5's reset-button race, now this):**
+  the first combined verification attempt used ×600 warp continuously through paced,
+  human-speed clicking (pitching at ~1s intervals). Salary drains at the warp multiplier
+  for as long as warp is engaged, not just for a process's own duration — 0.75 F/s
+  (Technician + Scientist) × 600 = 450 F/s, which a 10 F pitch every ~1s real time
+  cannot outrun. This produced an apparent insolvency-adjacent freeze that looked exactly
+  like a production bug (Research barely accumulating) until root-caused: fixed by
+  switching warp to ×1 for all paced clicking, engaging ×600 only for pure wait-on-a-
+  timer windows, then immediately reverting — the same "verification must exercise the
+  real path, and the real path includes real timing interactions" lesson as the prior
+  two, just with time-warp as the new variable in the mix.
+
+**Scope notes:**
+- The Aluminum-tier ambiguity (v2.9, above) is the second time in two sprints an
+  undefined-or-ambiguous case was correctly flagged before writing code, following the
+  process-gap lesson from Sprint 3's staffRatio (see feedback memory).
+- Contingent Aluminum-alloys effect and the "VAB queues"/"Auto-refuel"/propulsion-branch
+  nodes' concrete effects remain undefined by design — infra (the tree, the resolution
+  logic, the modifier system) is ready for whichever sprint defines them, matching the
+  established "build the mechanism, not speculative content" restraint from Sprints 2-3.

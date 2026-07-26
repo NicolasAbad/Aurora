@@ -3,6 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../state/persistStore';
 import { BUILDINGS } from '../data/buildings';
 import { RESOURCE_NAME } from '../data/resourceNames';
+import { ROLE_LABEL } from '../data/roles';
 import { costAtLevel, productionPerSecond } from '../core/economy';
 import { formatAmount, formatRate } from '../core/format';
 import {
@@ -13,13 +14,6 @@ import {
 } from '../core/staff';
 import type { BuildingId, ResourceId, RoleId } from '../core/types';
 
-const ROLE_LABELS: Record<RoleId, string> = {
-  technician: 'Technician',
-  engineer: 'Engineer',
-  scientist: 'Scientist',
-  controller: 'Controller',
-};
-
 interface BuildingTileProps {
   buildingId: BuildingId;
   children?: ReactNode;
@@ -29,9 +23,11 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
   const def = BUILDINGS[buildingId];
   const level = useGameStore((s) => s.buildings[buildingId].level);
   const starvedIndicator = useGameStore((s) => s.buildings[buildingId].starvedIndicator);
+  const ownedUpgrades = useGameStore((s) => s.buildings[buildingId].upgrades);
   const resources = useGameStore(useShallow((s) => s.resources));
   const staff = useGameStore(useShallow((s) => s.staff));
   const buyBuilding = useGameStore((s) => s.buyBuilding);
+  const buyInternalUpgrade = useGameStore((s) => s.buyInternalUpgrade);
   const assign = useGameStore((s) => s.assign);
 
   const isOneTime = def.costFactor === null;
@@ -76,7 +72,7 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
         const canAssign = assigned < slots && unassignedCount(staff, role) > 0;
         return (
           <div key={role} className="building-tile__staff-row">
-            <span>{ROLE_LABELS[role]}</span>
+            <span>{ROLE_LABEL[role]}</span>
             <div className="stepper">
               <button
                 type="button"
@@ -92,6 +88,32 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
                 +
               </button>
             </div>
+          </div>
+        );
+      })}
+
+      {level >= 1 && def.internalUpgrades?.map((upgrade) => {
+        const owned = ownedUpgrades.includes(upgrade.id);
+        const upgradeCostEntries = Object.entries(upgrade.cost) as [ResourceId, number][];
+        const canAffordUpgrade = upgradeCostEntries.every(([id, amount]) => resources[id].amount >= amount);
+        const upgradeCostLabel = upgradeCostEntries
+          .map(([id, amount]) => `${formatAmount(amount)} ${RESOURCE_NAME[id]}`)
+          .join(' + ');
+        return (
+          <div key={upgrade.id} className="building-tile__internal-upgrade">
+            <span>{upgrade.name}</span>
+            {owned ? (
+              <span className="research-node__done">Owned</span>
+            ) : (
+              <button
+                type="button"
+                className="upgrade-button"
+                disabled={!canAffordUpgrade}
+                onClick={() => buyInternalUpgrade(buildingId, upgrade.id)}
+              >
+                Buy ({upgradeCostLabel})
+              </button>
+            )}
           </div>
         );
       })}

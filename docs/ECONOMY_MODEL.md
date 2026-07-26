@@ -1,6 +1,8 @@
 # ECONOMY_MODEL.md — Aurora Program — Complete baseline numbers
 *Every value in the game. Claude Code does NOT invent numbers: if a value isn't here, ask and add it here first. Tick = 1 second (logical economy rate; the render loop is delta-based per CLAUDE.md rule 6). Baseline for the Sprint-0 headless simulator (`sim/run.ts`); adjust only via the simulator, updating this file.*
 
+**v2.9 changes (Sprint 4 blocker):** Aluminum node disambiguated (§5) — renamed "Aluminum alloys", explicitly no production effect, explicitly NOT a gate on the Aluminum tier (which needs no tech, ratifying Sprint 3's `currentHardwareTier`); it exists as the Materials branch entry and Titanium's prerequisite.
+
 **v2.8 changes (owner manual-play findings + ratification):** multi-role staffRatio defined as bottleneck (min across roles) — ratifying the Sprint 3 implementation; staff slots exist only at building level ≥ 1 (assignment to unbuilt buildings was a bug); player-facing UI never shows single-letter resource abbreviations (UI_SPEC §4); pitch cooldown gets visible recharge feedback (UI_SPEC §4) — the 1 s cadence itself stays (economy lock); dev-only reset button added ahead of Sprint 8's real one.
 
 **v2.7 changes (semantics, NOT a balance unlock — no values touched):** tick resolution order and starvation/contention rules defined (§4b) — binary per-building starvation pause, fixed consumer claim order, salaries resolve first.
@@ -96,7 +98,7 @@ Starvation is per building, per tick, and self-recovers the moment inputs suffic
 **Player priority lever (by design, no priority UI in v1):** staffing IS the priority control — an unstaffed consumer neither produces nor claims inputs, so redirecting Materials (e.g. to stockpile Propellant before a launch) is done by unassigning Fabrication staff. Offline resolution uses these exact same rules (same functions, per CLAUDE.md rule 6).
 
 ## 5. Research tree v1 (cost in Research, real-time duration)
-Materials: Aluminum (25 R, 5 min) → Titanium (400 R, 3 h)
+Materials: **Aluminum alloys** (25 R, 5 min — *branch entry node: no production effect in v1; the Aluminum Hardware tier is available from the start with NO tech required. Its function is to gate Titanium and to be an early, affordable teaching node. Flavor: certifying aluminum stock for flight hardware*) → Titanium (400 R, 3 h)
 Propulsion: **Sounding rockets (20 R, 4 min)** → Probe-1 engine (40 R, 10 min) → Orbital-1 engine (500 R, 4 h)
 Operations: Basic logistics (60 R, 15 min: transfer −25%) → **Remote Ops (120 R, 45 min: offline cap 10 h → 16 h)** → VAB queues (350 R, 2 h: auto-queue stages) → Auto-refuel (600 R, 5 h)
 Program: Basic engineering (15 R, 3 min) → Scientific method (80 R, 20 min) → Test stand (150 R, 40 min) → Flight operations (250 R, 1 h) → Flight program (400 R, 2 h) → Orbital flight (700 R, 6 h)

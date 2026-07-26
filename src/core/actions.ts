@@ -2,6 +2,8 @@
 // per-frame resolution). Each returns the updated state slice on success, or `null` if
 // the action isn't currently valid — callers (the store) simply no-op on `null`.
 import { BUILDINGS } from '../data/buildings';
+import { PROMOTIONS } from '../data/roles';
+import { RESEARCH_BY_ID } from '../data/researchTree';
 import {
   buildingSlotCount,
   hiringCost,
@@ -12,10 +14,12 @@ import {
 } from './staff';
 import { applyGrant, costAtLevel, pitchYield } from './economy';
 import { hardwareAtOrAboveTier, spendHardware } from './hardware';
+import { isNodeAvailable, type ResearchState } from './research';
 import type {
   BuildingId,
   GameState,
   HardwareTier,
+  Process,
   ResourceId,
   ResourceState,
   RoleId,
@@ -135,6 +139,30 @@ export function buyBuildingUpgrade(
   };
 }
 
+/** Buys a one-time internal upgrade (e.g. Crew Quarters' Classroom/Cafeteria) if not
+ * already owned and affordable. Generic across every BuildingDef.internalUpgrades
+ * entry — not special-cased per building (rule 3: systems are generic, content is data). */
+export function buyInternalUpgrade(
+  resources: GameState['resources'],
+  buildings: GameState['buildings'],
+  buildingId: BuildingId,
+  upgradeId: string,
+): BuyBuildingResult | null {
+  const current = buildings[buildingId];
+  if (current.upgrades.includes(upgradeId)) return null;
+  const upgrade = BUILDINGS[buildingId].internalUpgrades?.find((u) => u.id === upgradeId);
+  if (!upgrade) return null;
+  if (!canAffordCost(resources, upgrade.cost, upgrade.minHardwareTier)) return null;
+
+  return {
+    resources: payCost(resources, upgrade.cost, upgrade.minHardwareTier),
+    buildings: {
+      ...buildings,
+      [buildingId]: { ...current, upgrades: [...current.upgrades, upgradeId] },
+    },
+  };
+}
+
 export interface HireStaffResult {
   resources: GameState['resources'];
   staff: StaffState;
@@ -198,4 +226,113 @@ export function adjustStaffAssignment(
       [role]: { ...pool, assigned: { ...pool.assigned, [buildingId]: nextAssigned } },
     },
   };
+}
+
+export interface StartResearchResult {
+  resources: GameState['resources'];
+  research: ResearchState;
+}
+
+/** Starts `nodeId` if it's available (deps met, not already done), nothing else is
+ * already in progress ("one node at a time in v1"), and Research covers its cost —
+ * paid upfront, same pattern as every other timed process in this codebase. */
+export function startResearch(
+  resources: GameState['resources'],
+  research: ResearchState,
+  nodeId: string,
+  now: number,
+): StartResearchResult | null {
+  if (research.inProgress) return null;
+  const node = RESEARCH_BY_ID.get(nodeId);
+  if (!node || !isNodeAvailable(node, research.completed)) return null;
+  if (resources.research.amount < node.costR) return null;
+
+  return {
+    resources: {
+      ...resources,
+      research: { ...resources.research, amount: resources.research.amount - node.costR },
+    },
+    research: {
+      ...research,
+      inProgress: {
+        id: `research-${nodeId}`,
+        kind: 'research',
+        startedAt: now,
+        durationMs: node.durationMs,
+        payload: { nodeId },
+      },
+    },
+  };
+}
+
+export interface StartPromotionResult {
+  resources: GameState['resources'];
+  staff: StaffState;
+  processes: Process[];
+}
+
+/**
+ * ECONOMY §3: promotion is gated ONLY by the Classroom being built, never by the
+ * target role's direct-hire tech (the intended zero-Scientist bootstrap path — do not
+ * add a tech gate here). Requires an UNASSIGNED unit of `from` (never touches
+ * assignment records to free one up itself). The promoted unit leaves the `from` pool
+ * immediately (paid, "in training") and only joins `to` on completion — see the
+ * process-completion dispatcher in persistStore.ts, the analogous pay-now/grant-later
+ * pattern every other timed process here already uses.
+ */
+export function startPromotion(
+  resources: GameState['resources'],
+  staff: StaffState,
+  processes: Process[],
+  classroomBuilt: boolean,
+  from: RoleId,
+  to: RoleId,
+  now: number,
+): StartPromotionResult | null {
+  if (!classroomBuilt) return null;
+  const def = PROMOTIONS.find((p) => p.from === from && p.to === to);
+  if (!def) return null;
+  if (unassignedCount(staff, from) < 1) return null;
+  if (resources.funding.amount < def.costFunding) return null;
+
+  return {
+    resources: payCost(resources, { funding: def.costFunding }),
+    staff: {
+      ...staff,
+      pools: {
+        ...staff.pools,
+        [from]: { ...staff.pools[from], hired: staff.pools[from].hired - 1 },
+      },
+    },
+    processes: [
+      ...processes,
+      {
+        id: `promotion-${from}-${to}-${now}`,
+        kind: 'training',
+        startedAt: now,
+        durationMs: def.durationMs,
+        payload: { from, to },
+      },
+    ],
+  };
+}
+
+/**
+ * Applies whatever effect a just-finished generic process (`Process[]`, as opposed to
+ * research's own dedicated slot) grants — the dispatcher Sprint 2/3 deliberately left
+ * unbuilt ("no process kind has a defined payload yet"). Sprint 4 gives 'training'
+ * (promotion) its real effect: the promoted unit joins `to`'s pool, unassigned, exactly
+ * like a fresh hire. Other kinds (certification, integration, transfer, contract_build,
+ * weather_window) have no defined payload yet and are ignored here — each is this
+ * dispatcher's job to extend once whichever sprint defines its payload/effect.
+ */
+export function applyCompletedProcesses(staff: StaffState, completed: Process[]): StaffState {
+  return completed.reduce((nextStaff, process) => {
+    if (process.kind !== 'training') return nextStaff;
+    const { to } = process.payload as { from: RoleId; to: RoleId };
+    return {
+      ...nextStaff,
+      pools: { ...nextStaff.pools, [to]: { ...nextStaff.pools[to], hired: nextStaff.pools[to].hired + 1 } },
+    };
+  }, staff);
 }

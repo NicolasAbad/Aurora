@@ -5,6 +5,8 @@ import { BuildingTile } from './ui/BuildingTile';
 import { PitchButton } from './ui/PitchButton';
 import { ManualActionButton } from './ui/ManualActionButton';
 import { StaffHiring } from './ui/StaffHiring';
+import { PromotionPanel } from './ui/PromotionPanel';
+import { ResearchPanel } from './ui/ResearchPanel';
 import { PayrollBanner } from './ui/PayrollBanner';
 import { AwayModal } from './ui/AwayModal';
 import { TimeWarpControl } from './ui/TimeWarpControl';
@@ -67,15 +69,19 @@ export function App() {
       <ComplexTabs active={activeComplex} onSelect={setActiveComplex} />
       <main className="complex-panel">
         {activeComplex === 'campus' && (
-          <div className="campus-grid">
-            <BuildingTile buildingId="offices">
-              <PitchButton />
-            </BuildingTile>
-            <BuildingTile buildingId="finance" />
-            <BuildingTile buildingId="rndLab" />
-            <BuildingTile buildingId="crewQuarters" />
-            <StaffHiring />
-          </div>
+          <>
+            <div className="campus-grid">
+              <BuildingTile buildingId="offices">
+                <PitchButton />
+              </BuildingTile>
+              <BuildingTile buildingId="finance" />
+              <BuildingTile buildingId="rndLab" />
+              <BuildingTile buildingId="crewQuarters" />
+              <StaffHiring />
+              <PromotionPanel />
+            </div>
+            <ResearchPanel />
+          </>
         )}
         {activeComplex === 'production' && <ProductionPanel />}
       </main>

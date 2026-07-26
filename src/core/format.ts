@@ -27,3 +27,15 @@ export function formatRate(value: number): string {
 export function formatPercent(value: number): string {
   return `${Math.round(value)}%`;
 }
+
+// UI_SPEC §4: "Every timer shows remaining time in human units (2h 14m, 45s)." Shared
+// by ProcessProgress (remaining time) and ResearchPanel (a node's total duration).
+export function formatDuration(ms: number): string {
+  const totalSeconds = Math.ceil(ms / 1000);
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  if (minutes > 0) return `${minutes}m ${seconds}s`;
+  return `${seconds}s`;
+}

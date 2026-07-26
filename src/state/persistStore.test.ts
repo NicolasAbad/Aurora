@@ -25,6 +25,22 @@ describe('loadGame', () => {
     expect(loaded.resources.funding.amount).toBe(250);
   });
 
+  // Sprint 4 acceptance: "save/load preserves in-progress research."
+  it('round-trips in-progress research', () => {
+    const state = createInitialState();
+    state.research.inProgress = {
+      id: 'research-aluminum',
+      kind: 'research',
+      startedAt: 12345,
+      durationMs: 5 * 60_000,
+      payload: { nodeId: 'aluminum' },
+    };
+    saveGame(state);
+
+    const loaded = loadGame();
+    expect(loaded.research.inProgress).toEqual(state.research.inProgress);
+  });
+
   it('falls back to initial state on corrupt JSON instead of throwing', () => {
     localStorage.setItem(SAVE_KEY, '{not valid json');
     expect(() => loadGame()).not.toThrow();

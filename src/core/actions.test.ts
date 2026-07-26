@@ -2,12 +2,16 @@ import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../data/initialState';
 import {
   adjustStaffAssignment,
+  applyCompletedProcesses,
   applyGatherMaterials,
   applyPitch,
   applyRushOrder,
   buyBuildingUpgrade,
   hireStaff,
+  startPromotion,
+  startResearch,
 } from './actions';
+import type { Process } from './types';
 
 describe('applyPitch', () => {
   it('grants pitchYield(officesLevel) as a one-time Funding grant', () => {
@@ -176,5 +180,119 @@ describe('adjustStaffAssignment', () => {
     const state = createInitialState();
     state.staff.pools.technician.hired = 1; // finance.level stays 0 (default, unbuilt)
     expect(adjustStaffAssignment(state.staff, 'technician', 'finance', 1, 0)).toBeNull();
+  });
+});
+
+describe('startResearch', () => {
+  it('starts an available, affordable node, deducting Research and setting inProgress', () => {
+    const state = createInitialState();
+    state.resources.research.amount = 30;
+    const now = Date.now();
+    const result = startResearch(state.resources, state.research, 'aluminum', now);
+    expect(result).not.toBeNull();
+    expect(result!.resources.research.amount).toBe(5); // 30 - 25
+    expect(result!.research.inProgress).toEqual({
+      id: 'research-aluminum',
+      kind: 'research',
+      startedAt: now,
+      durationMs: 5 * 60_000,
+      payload: { nodeId: 'aluminum' },
+    });
+  });
+
+  it('refuses when something is already in progress (one node at a time)', () => {
+    const state = createInitialState();
+    state.resources.research.amount = 1000;
+    state.research.inProgress = {
+      id: 'x',
+      kind: 'research',
+      startedAt: Date.now(),
+      durationMs: 1000,
+      payload: { nodeId: 'soundingRockets' },
+    };
+    expect(startResearch(state.resources, state.research, 'aluminum', Date.now())).toBeNull();
+  });
+
+  it('refuses an unavailable node (deps not met)', () => {
+    const state = createInitialState();
+    state.resources.research.amount = 1000;
+    expect(startResearch(state.resources, state.research, 'titanium', Date.now())).toBeNull();
+  });
+
+  it('refuses when Research cannot cover the cost', () => {
+    const state = createInitialState();
+    state.resources.research.amount = 10; // aluminum costs 25
+    expect(startResearch(state.resources, state.research, 'aluminum', Date.now())).toBeNull();
+  });
+});
+
+describe('startPromotion', () => {
+  it('pays Funding, removes one unassigned unit from `from`, and queues a training process', () => {
+    const state = createInitialState();
+    state.resources.funding.amount = 200;
+    state.staff.pools.technician.hired = 1;
+    const now = Date.now();
+    const result = startPromotion(state.resources, state.staff, state.processes, true, 'technician', 'engineer', now);
+    expect(result).not.toBeNull();
+    expect(result!.resources.funding.amount).toBe(100); // 200 - 100
+    expect(result!.staff.pools.technician.hired).toBe(0);
+    expect(result!.processes).toEqual([
+      { id: `promotion-technician-engineer-${now}`, kind: 'training', startedAt: now, durationMs: 15 * 60_000, payload: { from: 'technician', to: 'engineer' } },
+    ]);
+  });
+
+  it('refuses without the Classroom built (ECONOMY §3: gated only by Classroom, never by the target role\'s tech)', () => {
+    const state = createInitialState();
+    state.resources.funding.amount = 200;
+    state.staff.pools.technician.hired = 1;
+    expect(startPromotion(state.resources, state.staff, state.processes, false, 'technician', 'engineer', Date.now())).toBeNull();
+  });
+
+  it('refuses without an unassigned unit of `from`', () => {
+    const state = createInitialState();
+    state.resources.funding.amount = 200;
+    state.staff.pools.technician.hired = 1;
+    state.staff.pools.technician.assigned.finance = 1; // the only one is already assigned
+    expect(startPromotion(state.resources, state.staff, state.processes, true, 'technician', 'engineer', Date.now())).toBeNull();
+  });
+
+  it('refuses when Funding cannot cover the cost', () => {
+    const state = createInitialState();
+    state.resources.funding.amount = 50; // needs 100
+    state.staff.pools.technician.hired = 1;
+    expect(startPromotion(state.resources, state.staff, state.processes, true, 'technician', 'engineer', Date.now())).toBeNull();
+  });
+});
+
+describe('applyCompletedProcesses', () => {
+  it('grants the promoted role its unit on training completion', () => {
+    const state = createInitialState();
+    const process: Process = {
+      id: 'p1',
+      kind: 'training',
+      startedAt: 0,
+      durationMs: 1000,
+      payload: { from: 'technician', to: 'engineer' },
+    };
+    const staff = applyCompletedProcesses(state.staff, [process]);
+    expect(staff.pools.engineer.hired).toBe(1);
+  });
+
+  it('ignores process kinds with no defined completion effect yet', () => {
+    const state = createInitialState();
+    const process: Process = { id: 'p1', kind: 'certification', startedAt: 0, durationMs: 1000, payload: {} };
+    const staff = applyCompletedProcesses(state.staff, [process]);
+    expect(staff).toBe(state.staff); // unchanged (reduce's identity short-circuit)
+  });
+
+  it('folds multiple completions in the same pass', () => {
+    const state = createInitialState();
+    const processes: Process[] = [
+      { id: 'p1', kind: 'training', startedAt: 0, durationMs: 1000, payload: { from: 'technician', to: 'engineer' } },
+      { id: 'p2', kind: 'training', startedAt: 0, durationMs: 1000, payload: { from: 'engineer', to: 'scientist' } },
+    ];
+    const staff = applyCompletedProcesses(state.staff, processes);
+    expect(staff.pools.engineer.hired).toBe(1);
+    expect(staff.pools.scientist.hired).toBe(1);
   });
 });

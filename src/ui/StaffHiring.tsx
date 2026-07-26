@@ -1,6 +1,6 @@
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../state/persistStore';
-import { ROLES } from '../data/roles';
+import { ROLE_LABEL, ROLES } from '../data/roles';
 import { RESOURCE_NAME } from '../data/resourceNames';
 import {
   hiringCost,
@@ -11,13 +11,6 @@ import {
 } from '../core/staff';
 import { formatAmount, formatRate } from '../core/format';
 import type { RoleId } from '../core/types';
-
-const ROLE_LABELS: Record<RoleId, string> = {
-  technician: 'Technician',
-  engineer: 'Engineer',
-  scientist: 'Scientist',
-  controller: 'Controller',
-};
 
 export function StaffHiring() {
   const staff = useGameStore(useShallow((s) => s.staff));
@@ -38,7 +31,7 @@ export function StaffHiring() {
         </span>
       </div>
       <div className="staff-panel__salary">
-        Salary burn: −{formatRate(totalSalaryPerSecond(staff))} F/s
+        Salary burn: −{formatRate(totalSalaryPerSecond(staff))} {RESOURCE_NAME.funding}/s
       </div>
       {(Object.keys(ROLES) as RoleId[]).map((role) => {
         const unlocked = isRoleUnlocked(role, completedTech);
@@ -47,7 +40,7 @@ export function StaffHiring() {
         return (
           <div key={role} className="staff-panel__row">
             <span>
-              {ROLE_LABELS[role]} ({staff.pools[role].hired})
+              {ROLE_LABEL[role]} ({staff.pools[role].hired})
             </span>
             {unlocked ? (
               <button type="button" disabled={!canHire} onClick={() => hire(role)}>

@@ -4,14 +4,20 @@ import type { BuildingId, GameState, RoleId } from '../core/types';
 import { CURRENT_SCHEMA_VERSION, migrate } from './migrations';
 import {
   adjustStaffAssignment,
+  applyCompletedProcesses,
   applyGatherMaterials,
   applyPitch,
   applyRushOrder,
   buyBuildingUpgrade,
+  buyInternalUpgrade,
   hireStaff,
+  startPromotion,
+  startResearch,
 } from '../core/actions';
 import { resolveEconomyTick } from '../core/economy';
+import { applyModifiers } from '../core/modifiers';
 import { OFFLINE_CAP_MS, resolveOffline, type PayrollStoppage } from '../core/offlineResolution';
+import { resolveResearch } from '../core/research';
 import { resolveProcesses } from '../core/time';
 import { trackFirstOccurrence } from './telemetry';
 
@@ -82,6 +88,11 @@ interface AwaySummaryStore {
 function computeBootOffline(): { initialState: GameState; awaySummary: AwaySummary | null } {
   const loaded = loadGame();
   const now = Date.now();
+  // ECONOMY §5 / SPRINTS Sprint 4 acceptance: Remote Ops raises the offline cap via a
+  // registered modifier ('offline.capMs', +6h) — queried against modifiers as they stood
+  // at close, not anything this same gap's research might complete (matches the online
+  // tick's "a modifier only takes effect the moment it's registered" behavior).
+  const offlineCapMs = applyModifiers(OFFLINE_CAP_MS, loaded.modifiers, 'offline.capMs');
   const offline = resolveOffline(
     loaded.resources,
     loaded.buildings,
@@ -90,15 +101,26 @@ function computeBootOffline(): { initialState: GameState; awaySummary: AwaySumma
     loaded.processes,
     loaded.lastSeenAt,
     now,
-    OFFLINE_CAP_MS,
+    offlineCapMs,
     loaded.economyFlags.payrollUnpaid,
   );
+
+  // Research has its own dedicated slot (not the generic processes array) — resolved
+  // separately, same resolveResearch call the online tick makes (rule 6). Promotions
+  // (kind: 'training') DO live in the generic array, so the offline resolution above
+  // already advanced them; applying their effect here is the same dispatcher the online
+  // tick uses on its own completedProcesses.
+  const researchResolution = resolveResearch(loaded.research, loaded.modifiers, now);
+  const staffAfterCompletions = applyCompletedProcesses(loaded.staff, offline.completedProcesses);
 
   const initialState: GameState = {
     ...loaded,
     resources: offline.resources,
     buildings: offline.buildings,
     processes: offline.processes,
+    staff: staffAfterCompletions,
+    research: researchResolution.research,
+    modifiers: researchResolution.modifiers,
     economyFlags: { ...loaded.economyFlags, payrollUnpaid: offline.payrollUnpaid },
     lastSeenAt: now,
   };
@@ -130,6 +152,8 @@ export interface GameActions {
   pitch: () => void;
   /** No-ops (via core/actions.ts) if unaffordable or already built (one-time buildings). */
   buyBuilding: (buildingId: BuildingId) => void;
+  /** No-ops if already owned, no such upgrade on this building, or unaffordable. */
+  buyInternalUpgrade: (buildingId: BuildingId, upgradeId: string) => void;
   /** ECONOMY §2 manual gather — free, one-time Materials grant. No-ops before Supply Depot lv1. */
   gatherMaterials: () => void;
   /** ECONOMY §2 Rush Order — instant Materials for Funding. No-ops before Fabrication is built or if unaffordable. */
@@ -138,6 +162,10 @@ export interface GameActions {
   hire: (role: RoleId) => void;
   /** delta is typically +1/-1 from a UI stepper; no-ops if it would violate slots/hired. */
   assign: (role: RoleId, buildingId: BuildingId, delta: number) => void;
+  /** No-ops if the node isn't available, something else is already researching, or Research is short. */
+  startResearchNode: (nodeId: string) => void;
+  /** No-ops if the Classroom isn't built, no unassigned unit of `from`, or Funding is short. */
+  startPromotion: (from: RoleId, to: RoleId) => void;
   /** Called once per animation frame by the game loop (see core/tick.ts + main.tsx).
    * `warp` (dev builds only, default 1) is the real caller passing a possibly-warped
    * multiplier — see `applyTick`'s implementation for why processes need it separately
@@ -163,6 +191,12 @@ export const useGameStore = create<Store>()((set, get) => ({
     if (result) {
       set({ ...result, telemetry: trackFirstOccurrence(state.telemetry, 'first_building_upgrade', { buildingId }) });
     }
+  },
+
+  buyInternalUpgrade: (buildingId, upgradeId) => {
+    const state = get();
+    const result = buyInternalUpgrade(state.resources, state.buildings, buildingId, upgradeId);
+    if (result) set(result);
   },
 
   gatherMaterials: () => {
@@ -197,6 +231,21 @@ export const useGameStore = create<Store>()((set, get) => ({
     if (staff) set({ staff });
   },
 
+  startResearchNode: (nodeId) => {
+    const state = get();
+    const result = startResearch(state.resources, state.research, nodeId, Date.now());
+    if (result) {
+      set({ ...result, telemetry: trackFirstOccurrence(state.telemetry, 'first_research_started', { nodeId }) });
+    }
+  },
+
+  startPromotion: (from, to) => {
+    const state = get();
+    const classroomBuilt = state.buildings.crewQuarters.upgrades.includes('classroom');
+    const result = startPromotion(state.resources, state.staff, state.processes, classroomBuilt, from, to, Date.now());
+    if (result) set(result);
+  },
+
   applyTick: (deltaMs, warp = 1) => {
     const state = get();
     const { resources, buildings, payrollUnpaid } = resolveEconomyTick(
@@ -220,9 +269,33 @@ export const useGameStore = create<Store>()((set, get) => ({
       warpBonusMs > 0
         ? state.processes.map((p) => ({ ...p, startedAt: p.startedAt - warpBonusMs }))
         : state.processes;
-    const { remaining: processes } = resolveProcesses(shiftedProcesses, Date.now());
+    const { completed: completedProcesses, remaining: processes } = resolveProcesses(
+      shiftedProcesses,
+      Date.now(),
+    );
+    const staffAfterCompletions = applyCompletedProcesses(state.staff, completedProcesses);
 
-    set({ resources, buildings, processes, economyFlags: { ...state.economyFlags, payrollUnpaid } });
+    // Research has its own dedicated slot, not the generic processes array, but is
+    // otherwise timestamp-based the same way — the same warp-shift, the same
+    // resolveResearch call offline resolution makes.
+    const shiftedResearch =
+      warpBonusMs > 0 && state.research.inProgress
+        ? {
+            ...state.research,
+            inProgress: { ...state.research.inProgress, startedAt: state.research.inProgress.startedAt - warpBonusMs },
+          }
+        : state.research;
+    const researchResolution = resolveResearch(shiftedResearch, state.modifiers, Date.now());
+
+    set({
+      resources,
+      buildings,
+      processes,
+      staff: staffAfterCompletions,
+      research: researchResolution.research,
+      modifiers: researchResolution.modifiers,
+      economyFlags: { ...state.economyFlags, payrollUnpaid },
+    });
   },
 }));
 
