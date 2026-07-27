@@ -3,6 +3,7 @@ import type { ComplexId } from '../core/types';
 
 const PRODUCTION_UNLOCK_FUNDING = 300; // ECONOMY §4: Complex B unlock, lifetime Funding
 const TESTING_UNLOCK_TECH = 'testStand'; // ECONOMY §4: Complex C unlock, tech "Test stand"
+const LAUNCH_UNLOCK_TECH = 'flightProgram'; // ECONOMY §4: Complex D unlock, tech "Flight program"
 
 interface ComplexTabsProps {
   active: ComplexId;
@@ -12,6 +13,7 @@ interface ComplexTabsProps {
 export function ComplexTabs({ active, onSelect }: ComplexTabsProps) {
   const lifetimeFunding = useGameStore((s) => s.resources.funding.lifetimeEarned);
   const testingUnlocked = useGameStore((s) => s.research.completed.includes(TESTING_UNLOCK_TECH));
+  const launchUnlocked = useGameStore((s) => s.research.completed.includes(LAUNCH_UNLOCK_TECH));
 
   const complexes = [
     { id: 'campus' as const, label: 'Campus', unlocked: true, condition: '' },
@@ -27,12 +29,9 @@ export function ComplexTabs({ active, onSelect }: ComplexTabsProps) {
       unlocked: testingUnlocked,
       condition: 'Unlocks with tech: Test stand',
     },
-    // Launch (Complex D) stays hardcoded-locked: its tech gate (Flight program) is
-    // technically reachable already (the Program branch is complete since Sprint 4),
-    // but Complex D has no panel content until Sprint 7 builds VAB/Pad/Launch Control/
-    // Tracking Station — unlocking the tab now would open onto a blank screen. Sprint 7
-    // is where this becomes state-driven like Testing just did.
-    { id: 'launch' as const, label: 'Launch', unlocked: false, condition: 'Unlocks with tech: Flight program' },
+    // Sprint 7: state-driven like Testing (VAB/Pad/Launch Control/Tracking Station now
+    // have real panel content to unlock onto).
+    { id: 'launch' as const, label: 'Launch', unlocked: launchUnlocked, condition: 'Unlocks with tech: Flight program' },
   ];
 
   return (

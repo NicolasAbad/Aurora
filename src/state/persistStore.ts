@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createInitialState } from '../data/initialState';
-import type { BuildingId, GameState, RoleId, SoundingRocketId } from '../core/types';
+import type { BuildingId, GameState, PadId, RoleId, SoundingRocketId } from '../core/types';
 import { CURRENT_SCHEMA_VERSION, migrate } from './migrations';
 import {
   adjustStaffAssignment,
@@ -15,6 +15,12 @@ import {
   startPromotion,
   startResearch,
 } from '../core/actions';
+import {
+  launchAuroraMission,
+  resolveAuroraTick,
+  startAuroraWeatherCheck,
+  startNextAuroraStage,
+} from '../core/auroraMission';
 import { resolveCertification } from '../core/certification';
 import { acceptContract, maybeGenerateTierZeroOffer, resolveContractDeadlines } from '../core/contracts';
 import { resolveEconomyTick } from '../core/economy';
@@ -92,42 +98,63 @@ export function hardResetSave(): void {
 
 /**
  * Shared by computeBootOffline (offline gap) and applyTick (online frame): advances the
- * sounding mission's process-backed checklist items, live-recomputes/commits its roll,
+ * sounding mission's process-backed checklist items, advances every Aurora-I-class pad
+ * (stage/weather completions, VAB-queue auto-progress, checklist+roll resolution),
  * rotates the tier-0 contract offer, penalizes any missed deadline, and grants any
- * newly-earned Program Record — the same four-step composition either way, just fed a
- * different `now`/`completedProcesses` (rule 6: offline reuses the exact same resolution
- * logic as online).
+ * newly-earned Program Record — the same composition either way, just fed a different
+ * `now`/`completedProcesses` (rule 6: offline reuses the exact same resolution logic as
+ * online). Threads `processes` through (not just returns it) because Aurora's VAB-queue
+ * auto-start can add a new one, same as any other process-creating action.
  */
-function resolveSoundingContractsAndRecords(
+function resolveMissionsContractsAndRecords(
   mission: GameState['mission'],
   resources: GameState['resources'],
+  processes: GameState['processes'],
   contracts: GameState['contracts'],
   records: string[],
   certifications: GameState['certifications'],
+  buildings: GameState['buildings'],
+  staff: GameState['staff'],
+  completedTech: string[],
   completedProcesses: GameState['processes'],
   launchRailBuilt: boolean,
   now: number,
 ): {
   mission: GameState['mission'];
   resources: GameState['resources'];
+  processes: GameState['processes'];
   contracts: GameState['contracts'];
   records: string[];
 } {
-  const missionAfterProcesses = applyCompletedSoundingProcesses(mission, completedProcesses);
-  const missionResolved = resolveSoundingChecklist(missionAfterProcesses, resources, certifications.engines.probe1);
+  const missionAfterSoundingProcesses = applyCompletedSoundingProcesses(mission, completedProcesses);
+  const missionAfterSounding = resolveSoundingChecklist(missionAfterSoundingProcesses, resources, certifications.engines.probe1);
+
+  const auroraTick = resolveAuroraTick(
+    resources,
+    missionAfterSounding,
+    buildings,
+    staff,
+    certifications.engines.orbital1,
+    resources.flightxp.amount,
+    completedTech,
+    processes,
+    completedProcesses,
+    now,
+  );
 
   const contractsWithOffer = maybeGenerateTierZeroOffer(contracts, launchRailBuilt, now);
-  const deadlineResolution = resolveContractDeadlines(contractsWithOffer, resources, now);
+  const deadlineResolution = resolveContractDeadlines(contractsWithOffer, auroraTick.resources, now);
 
   const recordsResolution = resolveRecords(
     records,
     deadlineResolution.resources,
-    contextFromState({ certifications, mission: missionResolved, contracts: deadlineResolution.contracts }),
+    contextFromState({ certifications, mission: auroraTick.mission, contracts: deadlineResolution.contracts }),
   );
 
   return {
-    mission: missionResolved,
+    mission: auroraTick.mission,
     resources: recordsResolution.resources,
+    processes: auroraTick.processes,
     contracts: deadlineResolution.contracts,
     records: recordsResolution.records,
   };
@@ -190,14 +217,19 @@ function computeBootOffline(): { initialState: GameState; awaySummary: AwaySumma
     now,
   );
 
-  // Sounding missions/contracts/records: same tick-composition helper the online loop
-  // uses, fed the offline gap's completed processes and the post-gap `now` (rule 6).
-  const soundingResolution = resolveSoundingContractsAndRecords(
+  // Missions (sounding + every Aurora-I-class pad)/contracts/records: same
+  // tick-composition helper the online loop uses, fed the offline gap's completed
+  // processes and the post-gap `now` (rule 6).
+  const missionsResolution = resolveMissionsContractsAndRecords(
     loaded.mission,
     certificationResolution.resources,
+    offline.processes,
     loaded.contracts,
     loaded.records,
     certificationResolution.certifications,
+    offline.buildings,
+    loaded.staff,
+    loaded.research.completed,
     offline.completedProcesses,
     offline.buildings.launchRail.level >= 1,
     now,
@@ -205,15 +237,15 @@ function computeBootOffline(): { initialState: GameState; awaySummary: AwaySumma
 
   const initialState: GameState = {
     ...loaded,
-    resources: soundingResolution.resources,
+    resources: missionsResolution.resources,
     buildings: offline.buildings,
-    processes: offline.processes,
+    processes: missionsResolution.processes,
     staff: staffAfterCompletions,
     research: researchResolution.research,
     certifications: certificationResolution.certifications,
-    mission: soundingResolution.mission,
-    contracts: soundingResolution.contracts,
-    records: soundingResolution.records,
+    mission: missionsResolution.mission,
+    contracts: missionsResolution.contracts,
+    records: missionsResolution.records,
     narrative: { ...loaded.narrative, seen: certificationResolution.narrativeSeen },
     // Modifier.expiresAt contract: pruned again here (not just at load) against the
     // POST-GAP `now` — a modifier that expired partway through an offline gap must not
@@ -229,13 +261,13 @@ function computeBootOffline(): { initialState: GameState; awaySummary: AwaySumma
           elapsedMs: offline.elapsedMs,
           appliedMs: offline.appliedMs,
           capped: offline.capped,
-          // Uses soundingResolution.resources, not offline.resources, for both: a
+          // Uses missionsResolution.resources, not offline.resources, for both: a
           // certification resolving during the gap credits Flight Data into Research
           // (ECONOMY §8), and a newly-earned Program Record can credit Funding during the
           // gap too (e.g. "First ignition" backfilling the instant that certification
           // resolves) — omitting either would silently under-report the summary.
-          fundingGained: soundingResolution.resources.funding.amount - loaded.resources.funding.amount,
-          researchGained: soundingResolution.resources.research.amount - loaded.resources.research.amount,
+          fundingGained: missionsResolution.resources.funding.amount - loaded.resources.funding.amount,
+          researchGained: missionsResolution.resources.research.amount - loaded.resources.research.amount,
           stoppage: offline.stoppage,
         }
       : null;
@@ -286,6 +318,15 @@ export interface GameActions {
   launchSounding: () => void;
   /** No-ops if the offer doesn't exist, has expired, or is already accepted. */
   acceptContractOffer: (offerId: string) => void;
+  /** Starts (or, for the instant Flight Review, resolves) the next of Aurora I's 8
+   * sequential stages on `padId`. No-ops if a stage is already running on this pad, the
+   * next stage is "Engines" and Orbital-1 isn't certified yet, or the cost is short. */
+  startAuroraStage: (padId: PadId) => void;
+  /** No-ops if the pad's weather item is already done or a check is already running. */
+  startAuroraWeather: (padId: PadId) => void;
+  /** No-ops until the pad's checklist has committed a roll (rule 12). Resolves the
+   * already-decided outcome and resets the pad either way. */
+  launchAurora: (padId: PadId) => void;
   /** Called once per animation frame by the game loop (see core/tick.ts + main.tsx).
    * `warp` (dev builds only, default 1) is the real caller passing a possibly-warped
    * multiplier — see `applyTick`'s implementation for why processes need it separately
@@ -450,6 +491,51 @@ export const useGameStore = create<Store>()((set, get) => ({
     }
   },
 
+  startAuroraStage: (padId) => {
+    const state = get();
+    const result = startNextAuroraStage(
+      state.resources,
+      state.mission,
+      padId,
+      state.processes,
+      state.certifications.engines.orbital1,
+      Date.now(),
+    );
+    if (result) {
+      set({ ...result, telemetry: trackFirstOccurrence(state.telemetry, 'first_aurora_stage_started', { padId }) });
+    }
+  },
+
+  startAuroraWeather: (padId) => {
+    const state = get();
+    const result = startAuroraWeatherCheck(state.mission, padId, state.processes, Date.now());
+    if (result) set(result);
+  },
+
+  launchAurora: (padId) => {
+    const state = get();
+    // N-10 (Countdown, mission 1): fires the moment the player presses the dominant
+    // countdown button, before the already-committed outcome (rule 12) is revealed —
+    // matches the live 10->0 countdown beat's place in the sequence (GDD §7).
+    const seenBeforeResolution = markSeen(state.narrative.seen, 'N-10');
+    const result = launchAuroraMission(
+      state.resources,
+      state.mission,
+      padId,
+      state.research.completed,
+      seenBeforeResolution,
+      Date.now(),
+    );
+    if (result) {
+      set({
+        resources: result.resources,
+        mission: result.mission,
+        narrative: { ...state.narrative, seen: result.narrativeSeen },
+        telemetry: trackFirstOccurrence(state.telemetry, 'first_aurora_launch', { padId }),
+      });
+    }
+  },
+
   applyTick: (deltaMs, warp = 1) => {
     const state = get();
     const { resources, buildings, payrollUnpaid } = resolveEconomyTick(
@@ -520,30 +606,44 @@ export const useGameStore = create<Store>()((set, get) => ({
       seen = markSeen(seen, 'N-05'); // First Hardware fabricated
     }
 
-    // Sounding mission/contracts/records: same composition computeBootOffline uses,
-    // fed this frame's completedProcesses (assembly/weather-window entries in the
-    // generic array above, already warp-shifted alongside everything else in it) and
-    // the real clock.
-    const soundingResolution = resolveSoundingContractsAndRecords(
+    // Missions (sounding + every Aurora-I-class pad)/contracts/records: same
+    // composition computeBootOffline uses, fed this frame's completedProcesses
+    // (assembly/weather-window entries in the generic array above, already
+    // warp-shifted alongside everything else in it) and the real clock.
+    const missionsResolution = resolveMissionsContractsAndRecords(
       state.mission,
       certificationResolution.resources,
+      processes,
       state.contracts,
       state.records,
       certificationResolution.certifications,
+      buildings,
+      state.staff,
+      state.research.completed,
       completedProcesses,
       buildings.launchRail.level >= 1,
       Date.now(),
     );
 
+    // N-09/N-15: passive/threshold beats, same pattern as N-04/N-05 above — no discrete
+    // action to hook (a pad's checklist item flips via tick resolution, not a click; a
+    // research node can complete mid-tick same as any other).
+    if (Object.values(missionsResolution.mission.pads).some((pad) => pad?.checklist.rocketIntegrated)) {
+      seen = markSeen(seen, 'N-09'); // Aurora I integrated
+    }
+    if (researchResolution.justCompleted === 'orbitalFlight') {
+      seen = markSeen(seen, 'N-15'); // Orbital flight tech
+    }
+
     set({
-      resources: soundingResolution.resources,
+      resources: missionsResolution.resources,
       buildings,
-      processes,
+      processes: missionsResolution.processes,
       staff: staffAfterCompletions,
       research: researchResolution.research,
-      mission: soundingResolution.mission,
-      contracts: soundingResolution.contracts,
-      records: soundingResolution.records,
+      mission: missionsResolution.mission,
+      contracts: missionsResolution.contracts,
+      records: missionsResolution.records,
       certifications: certificationResolution.certifications,
       narrative: { ...state.narrative, seen },
       modifiers: researchResolution.modifiers,

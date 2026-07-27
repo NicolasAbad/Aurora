@@ -32,7 +32,7 @@ import type {
 // `hardware` entry of a cost specifically — no current Sprint 0-3 building sets it, but
 // the check/deduction machinery exists now so a later sprint's tier-gated cost (e.g. a
 // tier-2 contract requiring Titanium) just works without touching this again.
-function canAffordCost(
+export function canAffordCost(
   resources: GameState['resources'],
   cost: Partial<Record<ResourceId, number>>,
   minHardwareTier?: HardwareTier,
@@ -50,7 +50,7 @@ function canAffordCost(
 // `byTier` requirement — safe here because these helpers only ever touch the fields
 // ResourceState and HardwareState share (amount/cap/lifetimeEarned), never byTier,
 // EXCEPT hardware, which goes through spendHardware to keep sum(byTier) === amount.
-function payCost(
+export function payCost(
   resources: GameState['resources'],
   cost: Partial<Record<ResourceId, number>>,
   minHardwareTier?: HardwareTier,
@@ -281,12 +281,20 @@ export function startCertification(
   certifications: CertificationState,
   testId: string,
   now: number,
+  randomFn: () => number = Math.random,
 ): StartCertificationResult | null {
   if (certifications.inProgress) return null;
   const test = CERTIFICATION_TESTS_BY_ID.get(testId);
   if (!test) return null;
   if (!isCertificationTestAvailable(test, certifications.engines[test.engineId])) return null;
   if (!canAffordCost(resources, test.consumes)) return null;
+
+  const payload: Record<string, unknown> = { testId };
+  if (test.successRate !== undefined) {
+    // Rule 12: drawn once, here, at START — never redrawn at resolution
+    // (core/certification.ts reads this same stored value).
+    payload.committedRoll = randomFn();
+  }
 
   return {
     resources: payCost(resources, test.consumes),
@@ -297,7 +305,7 @@ export function startCertification(
         kind: 'certification',
         startedAt: now,
         durationMs: test.durationMs,
-        payload: { testId },
+        payload,
       },
     },
   };

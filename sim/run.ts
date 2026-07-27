@@ -65,9 +65,16 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import {
+  ORBITAL1_FAILURE_FLIGHT_XP,
+  SCRIPTED_FAILURE_REWARD as CERT_SCRIPTED_FAILURE_REWARD,
+  STATIC_FIRE_SUCCESS_REWARD as CERT_STATIC_FIRE_SUCCESS_REWARD,
+} from '../src/core/certification';
 import { costAtLevel, pitchYield, productionPerSecond } from '../src/core/economy';
 import { RECORD_DEFS } from '../src/core/records';
+import { AURORA_I_REWARD, AURORA_I_STAGES as REAL_AURORA_I_STAGES } from '../src/data/auroraI';
 import { BUILDINGS } from '../src/data/buildings';
+import { CERTIFICATION_TESTS_BY_ID } from '../src/data/certifications';
 import { CONTRACT_TIERS, TIER0_PAYLOAD_EXTRA_HARDWARE, TIER0_PAYLOAD_EXTRA_PROPELLANT } from '../src/data/contracts';
 import { RESEARCH_TREE, type ResearchNode } from '../src/data/researchTree';
 import { SOUNDING_ROCKETS, WEATHER_WINDOW_MAX_MS, WEATHER_WINDOW_MIN_MS } from '../src/data/soundingRockets';
@@ -161,19 +168,28 @@ const BUILD_PRIORITY: BuildingId[] = [
   'launchPadB',
 ];
 
-const CERT_PROBE1_TEST1 = { hardware: 10, propellant: 50 };
-const CERT_PROBE1_TEST2 = { hardware: 8, propellant: 50 };
-const CERT_PROBE1_EXT = { hardware: 8, propellant: 50 };
-const CERT_ORBITAL1_BASE = { hardware: 25, propellant: 150 };
-const CERT_ORBITAL1_EXT = { hardware: 20, propellant: 120 };
-const CERT_DURATION = 25 * MIN;
-const ORBITAL1_BASE_DURATION = 3 * HOUR;
-const ORBITAL1_EXT_DURATION = 2 * HOUR;
-// ECONOMY §8's "Static fire success" row (Probe-1 test 2 completing) wasn't wired into
-// the sim before — only the scripted failure (test 1) granted anything. Added now: v2.5
-// values, not one of the reconciliation's actual numeric changes.
-const STATIC_FIRE_SUCCESS_REWARD = { flightxp: 15, reputation: 2, researchFlightData: 150 };
-const SCRIPTED_FAILURE_REWARD = { flightxp: 30, researchFlightData: 250 }; // ECONOMY §6 v2.5
+// Sprint 7: was this file's own hardcoded copy; now imports src/data/certifications.ts
+// and src/core/certification.ts's exported reward constants (same pattern as Sprint 4's
+// RESEARCH_TREE / Sprint 6's SOUNDING_ROCKETS imports).
+const CERT_PROBE1_TEST1 = CERTIFICATION_TESTS_BY_ID.get('probe1Test1')!.consumes;
+const CERT_PROBE1_TEST2 = CERTIFICATION_TESTS_BY_ID.get('probe1Test2')!.consumes;
+const CERT_PROBE1_EXT = CERTIFICATION_TESTS_BY_ID.get('probe1Extended')!.consumes;
+const CERT_ORBITAL1_BASE = CERTIFICATION_TESTS_BY_ID.get('orbital1Base')!.consumes;
+const CERT_ORBITAL1_EXT = CERTIFICATION_TESTS_BY_ID.get('orbital1Extended')!.consumes;
+const CERT_DURATION = CERTIFICATION_TESTS_BY_ID.get('probe1Test1')!.durationMs; // same for all 3 Probe-1 tests
+const ORBITAL1_BASE_DURATION = CERTIFICATION_TESTS_BY_ID.get('orbital1Base')!.durationMs;
+const ORBITAL1_RETRY_DURATION = CERTIFICATION_TESTS_BY_ID.get('orbital1Retry')!.durationMs;
+const ORBITAL1_EXT_DURATION = CERTIFICATION_TESTS_BY_ID.get('orbital1Extended')!.durationMs;
+const ORBITAL1_SUCCESS_RATE = CERTIFICATION_TESTS_BY_ID.get('orbital1Base')!.successRate!;
+const STATIC_FIRE_SUCCESS_REWARD = {
+  flightxp: CERT_STATIC_FIRE_SUCCESS_REWARD.flightxp,
+  reputation: CERT_STATIC_FIRE_SUCCESS_REWARD.reputation,
+  researchFlightData: CERT_STATIC_FIRE_SUCCESS_REWARD.flightData,
+};
+const SCRIPTED_FAILURE_REWARD = {
+  flightxp: CERT_SCRIPTED_FAILURE_REWARD.flightxp,
+  researchFlightData: CERT_SCRIPTED_FAILURE_REWARD.flightData,
+};
 
 // Sprint 6: was this file's own hardcoded copy; now imports src/data/soundingRockets.ts
 // so the two can't drift (same pattern as Sprint 4's RESEARCH_TREE import above).
@@ -234,23 +250,13 @@ const CONTRACT_REWARDS = {
 const FUNDING_ROUND_I = { yieldAmount: 500, cooldownMs: 10 * MIN, reputationGate: 25 };
 const FUNDING_ROUND_II = { yieldAmount: 2500, cooldownMs: 30 * MIN, reputationGate: 75 };
 
-// Aurora I stages: [resource cost, duration]. "Satellite payload" and "Flight review"
-// have no documented duration (ECONOMY §7) — assumed 15 min and 0 min, see header note.
-const AURORA_I_STAGES: {
-  id: string;
-  cost: Partial<Record<ResourceId, number>>;
-  durationMs: number;
-}[] = [
-  { id: 'structure', cost: { hardware: 30 }, durationMs: 20 * MIN },
-  { id: 'engines', cost: { hardware: 20 }, durationMs: 15 * MIN },
-  { id: 'guidance', cost: { hardware: 15, research: 30 }, durationMs: 15 * MIN },
-  { id: 'satellitePayload', cost: { hardware: 15 }, durationMs: 15 * MIN },
-  { id: 'finalIntegration', cost: { hardware: 10 }, durationMs: 10 * MIN },
-  { id: 'padTransfer', cost: {}, durationMs: 5 * MIN },
-  { id: 'propellantLoad', cost: { propellant: 400 }, durationMs: 3 * MIN },
-  { id: 'flightReview', cost: { research: 50 }, durationMs: 0 },
-];
-const AURORA_I_REWARD = { flightxp: 250, researchFlightData: 2000, reputation: 60 }; // ECONOMY §8 v2.5
+// Sprint 7: was this file's own hardcoded copy; now imports src/data/auroraI.ts.
+const AURORA_I_STAGES = REAL_AURORA_I_STAGES;
+const AURORA_I_SIM_REWARD = {
+  flightxp: AURORA_I_REWARD.flightxp,
+  researchFlightData: AURORA_I_REWARD.flightData,
+  reputation: AURORA_I_REWARD.reputation,
+};
 
 // Sprint 6: now imports src/core/records.ts's RECORD_DEFS instead of a local copy.
 const RECORDS = {
@@ -849,19 +855,28 @@ function startCertification(state: SimState): void {
       kind: 'orbital1Base',
       remainingMs: ORBITAL1_BASE_DURATION,
       onComplete: () => {
-        if (rng() < 0.8) {
+        if (rng() < ORBITAL1_SUCCESS_RATE) {
           state.orbital1BaseDone = true;
+          grant(state, 'flightxp', STATIC_FIRE_SUCCESS_REWARD.flightxp, true);
+          grantFlightData(state, STATIC_FIRE_SUCCESS_REWARD.researchFlightData);
+          grant(state, 'reputation', STATIC_FIRE_SUCCESS_REWARD.reputation, true);
           state.day.notes.push('orbital1 certified');
         } else {
-          grant(state, 'flightxp', 60, true);
+          grant(state, 'flightxp', ORBITAL1_FAILURE_FLIGHT_XP, true);
           state.day.notes.push('orbital1 cert failed (retry at half duration)');
           // Retry immediately at half duration (ECONOMY §6), no extra resource cost
-          // modeled for the retry attempt itself.
+          // modeled for the retry attempt itself. The sim simplifies the retry to a
+          // deterministic success (a second real 80% roll would rarely change the
+          // pacing outcome and isn't worth the extra state) — real code
+          // (core/certification.ts) keeps rolling every retry for real.
           state.certTimer = {
             kind: 'orbital1Base',
-            remainingMs: ORBITAL1_BASE_DURATION / 2,
+            remainingMs: ORBITAL1_RETRY_DURATION,
             onComplete: () => {
               state.orbital1BaseDone = true; // retry succeeds deterministically in-sim
+              grant(state, 'flightxp', STATIC_FIRE_SUCCESS_REWARD.flightxp, true);
+              grantFlightData(state, STATIC_FIRE_SUCCESS_REWARD.researchFlightData);
+              grant(state, 'reputation', STATIC_FIRE_SUCCESS_REWARD.reputation, true);
               state.day.notes.push('orbital1 certified (retry)');
             },
           };
@@ -1024,9 +1039,9 @@ function tickAurora(state: SimState, deltaMs: number): void {
   if (state.auroraStageIndex >= AURORA_I_STAGES.length) {
     state.auroraILaunched = true;
     state.auroraILaunchedDay = Math.floor(state.nowMs / DAY_MS) + 1;
-    grant(state, 'flightxp', AURORA_I_REWARD.flightxp, true);
-    grantFlightData(state, AURORA_I_REWARD.researchFlightData);
-    grant(state, 'reputation', AURORA_I_REWARD.reputation, true);
+    grant(state, 'flightxp', AURORA_I_SIM_REWARD.flightxp, true);
+    grantFlightData(state, AURORA_I_SIM_REWARD.researchFlightData);
+    grant(state, 'reputation', AURORA_I_SIM_REWARD.reputation, true);
     maybeAwardRecord(state, 'firstOrbit'); // Aurora I success, ECONOMY §8b
     state.day.notes.push('AURORA I LAUNCHED — first satellite in orbit');
   }

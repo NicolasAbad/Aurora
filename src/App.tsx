@@ -14,6 +14,7 @@ import { StaffAvailabilityChip } from './ui/StaffAvailabilityChip';
 import { CertificationPanel } from './ui/CertificationPanel';
 import { SoundingMissionPanel } from './ui/SoundingMissionPanel';
 import { ContractsPanel } from './ui/ContractsPanel';
+import { LaunchSequencePanel } from './ui/LaunchSequencePanel';
 import { MissionLog } from './ui/MissionLog';
 import { TimeWarpControl } from './ui/TimeWarpControl';
 import { DevResetButton } from './ui/DevResetButton';
@@ -114,6 +115,26 @@ function TestingPanel({ onSelectComplex }: ComplexPanelProps) {
   );
 }
 
+// GDD §7 / UI_SPEC §3.4: v1 only ever has padA (Pad B is Sprint 9, gated on Aurora I
+// success + Reputation >= 40) — the Launch Sequence panel is still parameterized by
+// PadId (core/auroraMission.ts iterates every pad that exists), just rendered once here.
+function LaunchPanel({ onSelectComplex }: ComplexPanelProps) {
+  const vabLevel = useGameStore((s) => s.buildings.vab.level);
+
+  return (
+    <>
+      <StaffAvailabilityChip onTap={() => onSelectComplex('campus')} />
+      <div className="campus-grid">
+        <BuildingTile buildingId="vab" />
+        <BuildingTile buildingId="launchPad" />
+        <BuildingTile buildingId="launchControl" />
+        <BuildingTile buildingId="trackingStation" />
+      </div>
+      {vabLevel >= 1 && <LaunchSequencePanel padId="padA" />}
+    </>
+  );
+}
+
 export function App() {
   const [activeComplex, setActiveComplex] = useState<ComplexId>('campus');
 
@@ -134,6 +155,7 @@ export function App() {
         {activeComplex === 'campus' && <CampusPanel onSelectComplex={setActiveComplex} />}
         {activeComplex === 'production' && <ProductionPanel onSelectComplex={setActiveComplex} />}
         {activeComplex === 'testing' && <TestingPanel onSelectComplex={setActiveComplex} />}
+        {activeComplex === 'launch' && <LaunchPanel onSelectComplex={setActiveComplex} />}
       </main>
       <MissionLog />
     </div>

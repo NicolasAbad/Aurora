@@ -330,6 +330,22 @@ describe('startCertification', () => {
     const state = fundedState();
     expect(startCertification(state.resources, state.certifications, 'notARealTest', Date.now())).toBeNull();
   });
+
+  it('draws and stores a committedRoll for a probabilistic test (Orbital-1), never redrawn later — rule 12', () => {
+    const state = fundedState();
+    state.resources.hardware.amount = 25;
+    state.resources.propellant.amount = 150;
+    const now = Date.now();
+    const result = startCertification(state.resources, state.certifications, 'orbital1Base', now, () => 0.37);
+    expect(result).not.toBeNull();
+    expect(result!.certifications.inProgress?.payload).toEqual({ testId: 'orbital1Base', committedRoll: 0.37 });
+  });
+
+  it('does NOT draw a committedRoll for a deterministic test (Probe-1)', () => {
+    const state = fundedState();
+    const result = startCertification(state.resources, state.certifications, 'probe1Test1', Date.now(), () => 0.99);
+    expect(result!.certifications.inProgress?.payload).toEqual({ testId: 'probe1Test1' });
+  });
 });
 
 describe('applyCompletedProcesses', () => {

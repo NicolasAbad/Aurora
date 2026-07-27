@@ -883,3 +883,67 @@ body {
   opacity: 1;
   font-weight: 600;
 }
+
+/* GDD §7 / UI_SPEC §3.4: the full Launch Sequence — Confidence tap-to-expand
+ * breakdown, the 8-item checklist (reusing .checklist-row from Sprint 6), the
+ * next-stage widget, and the countdown button (.countdown-button, also Sprint 6). */
+.launch-sequence {
+  gap: 14px;
+}
+
+.launch-sequence__checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.confidence-breakdown__toggle {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  padding: 8px 12px;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+
+.confidence-breakdown__terms {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  font-size: 0.85em;
+  color: var(--text-dim);
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+}
+
+.launch-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+}
+
+.launch-result--success {
+  border-color: var(--accent);
+}
+
+.launch-result--failure {
+  border-color: var(--amber);
+}
+
+.launch-result__headline {
+  font-weight: 700;
+  font-size: 1.1em;
+}
+
+.launch-result__detail {
+  color: var(--text-dim);
+  font-size: 0.9em;
+}

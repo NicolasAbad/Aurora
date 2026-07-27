@@ -72,6 +72,7 @@ export function createInitialState(): GameState {
       launches: [],
       sounding: null,
       soundingHalfDurationNext: {},
+      auroraHalfDurationNext: {},
     },
     economyFlags: { payrollUnpaid: false },
     contracts: { offers: [], active: [] },

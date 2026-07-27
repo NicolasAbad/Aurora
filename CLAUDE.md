@@ -87,6 +87,7 @@ interface MissionState {
   launches: LaunchRecord[];
   sounding: SoundingMissionState | null; // current sounding-rocket attempt; null = none in progress
   soundingHalfDurationNext: Partial<Record<SoundingRocketId, boolean>>; // GDD §7b re-integration bonus
+  auroraHalfDurationNext?: Partial<Record<PadId, boolean>>; // same, per pad, for Aurora-I-class launches (additive optional, rule 5)
 }
 
 interface EconomyFlags { payrollUnpaid: boolean; } // GDD §1b insolvency state, drives UI banner

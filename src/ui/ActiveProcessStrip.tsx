@@ -5,6 +5,7 @@ import { RESEARCH_BY_ID } from '../data/researchTree';
 import { CERTIFICATION_TESTS_BY_ID } from '../data/certifications';
 import { ROLE_LABEL } from '../data/roles';
 import { SOUNDING_ROCKETS } from '../data/soundingRockets';
+import { AURORA_I_STAGES_BY_ID } from '../data/auroraI';
 import { remainingMs } from '../core/time';
 import { useNow } from './useNow';
 import { ProcessProgress } from './ProcessProgress';
@@ -69,6 +70,13 @@ function useActiveChips(): Chip[] {
     }
     if (p.kind === 'weather_window' && p.payload.missionKind === 'sounding') {
       chips.push({ id: p.id, label: 'Weather window', process: p, complex: 'testing' });
+    }
+    if (p.kind === 'integration' && p.payload.missionKind === 'auroraI') {
+      const stage = AURORA_I_STAGES_BY_ID.get(p.payload.stageId as never);
+      chips.push({ id: p.id, label: `Aurora I: ${stage?.name ?? p.payload.stageId}`, process: p, complex: 'launch' });
+    }
+    if (p.kind === 'weather_window' && p.payload.missionKind === 'auroraI') {
+      chips.push({ id: p.id, label: 'Aurora I: Weather window', process: p, complex: 'launch' });
     }
     // Remaining kinds (transfer, contract_build) have no current UI consumer — added
     // here the same sprint that gives them a real payload, same "infra only where

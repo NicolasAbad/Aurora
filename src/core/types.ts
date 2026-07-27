@@ -221,6 +221,11 @@ export interface MissionState {
   // resolution (`sounding` above goes back to null); consumed the next time that rocket
   // type starts a fresh assembly (core/soundingMission.ts).
   soundingHalfDurationNext: Partial<Record<SoundingRocketId, boolean>>;
+  // GDD §7b: same re-integration bonus as soundingHalfDurationNext above, but for a
+  // failed Aurora-I-class launch on a given pad (Sprint 7). Additive optional field
+  // (CLAUDE.md rule 5) — absent means no pad has ever failed, no migration needed;
+  // read as `mission.auroraHalfDurationNext?.[padId] ?? false`.
+  auroraHalfDurationNext?: Partial<Record<PadId, boolean>>;
 }
 
 export interface EconomyFlags {

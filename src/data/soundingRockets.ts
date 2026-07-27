@@ -2,6 +2,25 @@
 // (CLAUDE.md rule 1). Weather window duration is uniform 2-5 min per §11 — drawn at
 // random in core/soundingMission.ts, not a fixed value here.
 import type { SoundingRocketId } from '../core/types';
+import {
+  FAILURE_FLIGHT_DATA_RATE,
+  FAILURE_HARDWARE_RECOVERY_RATE,
+  FAILURE_REINTEGRATION_DURATION_RATE,
+  FAILURE_XP_RATE,
+  WEATHER_WINDOW_MAX_MS,
+  WEATHER_WINDOW_MIN_MS,
+} from './launch';
+
+// Re-exported for existing consumers (core/soundingMission.ts) — the values now live in
+// data/launch.ts since Aurora I (Sprint 7) needs the exact same program-wide constants.
+export {
+  FAILURE_FLIGHT_DATA_RATE,
+  FAILURE_HARDWARE_RECOVERY_RATE,
+  FAILURE_REINTEGRATION_DURATION_RATE,
+  FAILURE_XP_RATE,
+  WEATHER_WINDOW_MAX_MS,
+  WEATHER_WINDOW_MIN_MS,
+};
 
 const MIN = 60_000;
 
@@ -40,19 +59,6 @@ export const SOUNDING_ROCKETS: Record<SoundingRocketId, SoundingRocketDef> = {
     narrativeIdOnSuccess: 'N-08c',
   },
 };
-
-// ECONOMY §11: uniform 2-5 min (fixed 2 min with Weather Station — Tracking Station
-// upgrade, Sprint 7+; not reachable in Sprint 6, so always the uniform range for now).
-export const WEATHER_WINDOW_MIN_MS = 2 * MIN;
-export const WEATHER_WINDOW_MAX_MS = 5 * MIN;
-
-// GDD §7b failure resolution (general rule, reused here — ECONOMY §6's scripted-failure
-// numbers for Probe-1 test 1 match this exactly: 6 of 10 H recovered = 60%, confirming
-// the same rule applies program-wide, not just to Aurora I).
-export const FAILURE_HARDWARE_RECOVERY_RATE = 0.6;
-export const FAILURE_XP_RATE = 0.8;
-export const FAILURE_FLIGHT_DATA_RATE = 0.6;
-export const FAILURE_REINTEGRATION_DURATION_RATE = 0.5;
 
 // ECONOMY §7a simplified Sonda Confidence: base 65 + certification (+20 / +30 extended)
 // + optimal weather (+5, unconditional — v1 has no variable weather quality, BACKLOG.md's

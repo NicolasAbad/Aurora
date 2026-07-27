@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createInitialState } from '../data/initialState';
+import { launchAuroraMission, resolveAuroraChecklist } from '../core/auroraMission';
 import { hardResetSave, loadGame, saveGame, SAVE_KEY, useGameStore } from './persistStore';
 import { CURRENT_SCHEMA_VERSION } from './migrations';
 import type { Process } from '../core/types';
@@ -325,6 +326,128 @@ describe('Mission Log narrative triggers (Sprint 5)', () => {
     useGameStore.setState((s) => ({ resources: { ...s.resources, hardware: { ...s.resources.hardware, lifetimeEarned: 1 } } }));
     useGameStore.getState().applyTick(0);
     expect(useGameStore.getState().narrative.seen).toContain('N-05');
+  });
+
+  it('N-09 fires via applyTick once any pad\'s "Rocket integrated" checklist item is true (Sprint 7)', () => {
+    useGameStore.setState((s) => ({
+      mission: {
+        ...s.mission,
+        pads: {
+          padA: {
+            rocketStatus: 'in_vab',
+            stagesDone: ['structure', 'engines', 'guidance', 'satellitePayload', 'finalIntegration'],
+            checklist: { ...s.mission.pads.padA!.checklist, rocketIntegrated: true },
+            confidence: 0,
+            committedRoll: null,
+          },
+        },
+      },
+    }));
+    useGameStore.getState().applyTick(0);
+    expect(useGameStore.getState().narrative.seen).toContain('N-09');
+  });
+
+  it('N-15 fires the moment Orbital flight research completes', () => {
+    useGameStore.setState((s) => ({
+      research: {
+        completed: ['flightProgram'],
+        inProgress: { id: 'r1', kind: 'research', startedAt: 0, durationMs: 1000, payload: { nodeId: 'orbitalFlight' } },
+      },
+      resources: { ...s.resources, research: { ...s.resources.research, amount: 0 } },
+    }));
+    useGameStore.getState().applyTick(10_000); // well past the process's 1s duration
+    expect(useGameStore.getState().narrative.seen).toContain('N-15');
+    expect(useGameStore.getState().research.completed).toContain('orbitalFlight');
+  });
+
+  it('N-10 fires the moment launchAurora is called (the countdown press), before the outcome is known', () => {
+    useGameStore.setState((s) => ({
+      mission: {
+        ...s.mission,
+        pads: {
+          padA: {
+            rocketStatus: 'on_pad',
+            stagesDone: [],
+            checklist: s.mission.pads.padA!.checklist,
+            confidence: 100,
+            committedRoll: 0.5,
+          },
+        },
+      },
+    }));
+    useGameStore.getState().launchAurora('padA');
+    expect(useGameStore.getState().narrative.seen).toContain('N-10');
+  });
+
+  it('N-11 fires on a successful Aurora I launch', () => {
+    useGameStore.setState((s) => ({
+      mission: {
+        ...s.mission,
+        pads: { padA: { rocketStatus: 'on_pad', stagesDone: [], checklist: s.mission.pads.padA!.checklist, confidence: 100, committedRoll: 0.1 } },
+      },
+    }));
+    useGameStore.getState().launchAurora('padA');
+    expect(useGameStore.getState().narrative.seen).toContain('N-11');
+    expect(useGameStore.getState().mission.launches[0].success).toBe(true);
+  });
+
+  it('N-12 fires on a failed Aurora I launch', () => {
+    useGameStore.setState((s) => ({
+      mission: {
+        ...s.mission,
+        pads: { padA: { rocketStatus: 'on_pad', stagesDone: [], checklist: s.mission.pads.padA!.checklist, confidence: 10, committedRoll: 0.99 } },
+      },
+    }));
+    useGameStore.getState().launchAurora('padA');
+    expect(useGameStore.getState().narrative.seen).toContain('N-12');
+    expect(useGameStore.getState().mission.launches[0].success).toBe(false);
+  });
+});
+
+// SPRINTS.md Sprint 7 task 4: "committedRoll drawn and persisted at checklist
+// completion; countdown resolves it deterministically (export/import cannot re-roll —
+// regression test)." A save-scummer's whole strategy is: get to checklist completion,
+// export (or just let autosave write), keep re-importing/reloading hoping for a
+// different outcome. This proves that doesn't work — the committedRoll surviving a real
+// JSON round-trip is what makes the outcome already decided, not just "not re-rolled in
+// the same session."
+describe('roll commitment survives export/import (Sprint 7 regression test, rule 12)', () => {
+  it('a committedRoll drawn before saving resolves identically after a save/load round-trip, never redrawn', () => {
+    const state = createInitialState();
+    state.buildings.trackingStation.level = 1;
+    state.buildings.launchControl.level = 1;
+    state.staff.pools.controller.hired = 3;
+    state.staff.pools.controller.assigned.launchControl = 3;
+    state.certifications.engines.orbital1 = { attempted: true, certified: true, extendedCertified: true };
+    state.mission.pads.padA = {
+      rocketStatus: 'on_pad',
+      stagesDone: ['structure', 'engines', 'guidance', 'satellitePayload', 'finalIntegration', 'padTransfer', 'propellantLoad', 'flightReview'],
+      checklist: {
+        rocketIntegrated: true, enginesCertified: true, transferToPad: true, propellantLoaded: true,
+        flightReview: true, controllersOnStation: true, trackingActive: true, weatherWindow: true,
+      },
+      confidence: 100,
+      committedRoll: 0.6789, // already committed — confidence 100 means this is a guaranteed success either way,
+      // but the EXACT value must still survive the round-trip unchanged (checked below).
+    };
+
+    saveGame(state);
+    const reloaded = loadGame();
+
+    expect(reloaded.mission.pads.padA?.committedRoll).toBe(0.6789);
+
+    // Calling the tick-time resolver again post-reload (as the next real frame would)
+    // must be a true no-op — never redraw just because the process went through a
+    // save/load boundary.
+    const reResolved = resolveAuroraChecklist(
+      reloaded.mission, 'padA', reloaded.buildings, reloaded.staff,
+      reloaded.certifications.engines.orbital1, reloaded.resources.flightxp.amount,
+      () => { throw new Error('must not draw a fresh roll — committedRoll is already set'); },
+    );
+    expect(reResolved.pads.padA?.committedRoll).toBe(0.6789);
+
+    const result = launchAuroraMission(reloaded.resources, reloaded.mission, 'padA', reloaded.research.completed, reloaded.narrative.seen, Date.now());
+    expect(result!.mission.launches[0].success).toBe(true); // 0.6789 < 1.0 (100% confidence)
   });
 });
 

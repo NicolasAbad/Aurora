@@ -12,11 +12,23 @@ export interface CertificationState {
 // ECONOMY §6/§8 (v2.5). Scripted failure (Probe-1 test 1) is deterministic by design —
 // GDD §7: "the FIRST static fire ALWAYS fails" — not a roll, so rule 12's committed-
 // randomness concern doesn't apply here.
-const SCRIPTED_FAILURE_HARDWARE_RECOVERY = 6;
-const SCRIPTED_FAILURE_REWARD = { flightxp: 30, flightData: 250 };
-const STATIC_FIRE_SUCCESS_REWARD = { flightxp: 15, reputation: 2, flightData: 150 };
+// Exported so sim/run.ts can import these instead of keeping a second hardcoded copy
+// (same "point the simulator at the real data" pattern as everywhere else).
+export const SCRIPTED_FAILURE_HARDWARE_RECOVERY = 6;
+export const SCRIPTED_FAILURE_REWARD = { flightxp: 30, flightData: 250 };
+export const STATIC_FIRE_SUCCESS_REWARD = { flightxp: 15, reputation: 2, flightData: 150 };
 const SCRIPTED_FAILURE_NARRATIVE_ID = 'N-07'; // First static fire failure
+// NARRATIVE_EVENTS §1's trigger for N-08 is worded generically ("Certification
+// success"), not "Probe-1 certification success" — reused as-is for Orbital-1's
+// success too (ECONOMY §6), rather than inventing a second string (rule 9). If Orbital-1
+// certifies after Probe-1 already has, markSeen is idempotent, so no second Mission Log
+// entry appears — an accepted consequence of the generic trigger match, not a bug.
 const CERTIFICATION_SUCCESS_NARRATIVE_ID = 'N-08'; // Certification success
+// ECONOMY §6: Orbital-1's failure reward is narrower than Probe-1's scripted one — only
+// Flight XP is specified (no Hardware recovery, no Flight Data, no Reputation), and it's
+// not a "first" moment in the narrative sense (repeatable, not scripted), so no
+// NARRATIVE_EVENTS id applies — no beat fires for it.
+export const ORBITAL1_FAILURE_FLIGHT_XP = 60;
 
 /** Mirrors core/research.ts's isNodeAvailable shape: given the test's definition and its
  * engine's current progress, is this test startable right now? */
@@ -33,18 +45,16 @@ export interface CertificationResolution {
   certifications: CertificationState;
   resources: GameState['resources'];
   narrativeSeen: string[];
-  justCompleted: { testId: string; outcome: 'scriptedFailure' | 'success' } | null;
+  justCompleted: { testId: string; outcome: 'scriptedFailure' | 'success' | 'failure' } | null;
 }
 
 /**
  * Timestamp-based (CLAUDE.md rule 6), same pattern as core/research.ts's
  * resolveResearch: one test in progress at a time, resolved once `startedAt +
- * durationMs <= now`. Outcome is decided directly here by `stage` — Probe-1's three
- * tests are all deterministic (rule: "SCRIPTED FAILURE" / "guaranteed success" / always-
- * succeeds extended), so there's no probabilistic branch to build yet. Orbital-1's base
- * cert (Sprint 7) genuinely IS probabilistic (ECONOMY §6: "80% success") — that's a
- * different resolution shape (a committed roll, rule 12), deliberately not generalized
- * for here since Probe-1 alone doesn't need it.
+ * durationMs <= now`. Deterministic tests (Probe-1's three) are dispatched by `stage`
+ * alone. A probabilistic test (Orbital-1's 'first'/'retry', ECONOMY §6: "80% success")
+ * is dispatched by `test.successRate` instead, reading the roll committed at process
+ * START (rule 12) rather than drawing a fresh one here.
  */
 export function resolveCertification(
   certifications: CertificationState,
@@ -82,6 +92,41 @@ export function resolveCertification(
       resources,
       narrativeSeen,
       justCompleted: { testId, outcome: 'success' },
+    };
+  }
+
+  if (test.successRate !== undefined) {
+    // Orbital-1-style probabilistic cert (ECONOMY §6). committedRoll was drawn and
+    // stored at process START (core/actions.ts's startCertification) — read, never
+    // redrawn, here.
+    const committedRoll = process.payload.committedRoll as number;
+    const success = committedRoll < test.successRate;
+
+    if (success) {
+      return {
+        certifications: {
+          engines: { ...certifications.engines, [test.engineId]: { ...engineState, attempted: true, certified: true } },
+          inProgress: null,
+        },
+        resources: {
+          ...resources,
+          flightxp: applyGrant(resources.flightxp, STATIC_FIRE_SUCCESS_REWARD.flightxp, true),
+          reputation: applyGrant(resources.reputation, STATIC_FIRE_SUCCESS_REWARD.reputation, true),
+          research: applyGrant(resources.research, STATIC_FIRE_SUCCESS_REWARD.flightData, true),
+        },
+        narrativeSeen: markSeen(narrativeSeen, CERTIFICATION_SUCCESS_NARRATIVE_ID),
+        justCompleted: { testId, outcome: 'success' },
+      };
+    }
+
+    return {
+      certifications: {
+        engines: { ...certifications.engines, [test.engineId]: { ...engineState, attempted: true } },
+        inProgress: null,
+      },
+      resources: { ...resources, flightxp: applyGrant(resources.flightxp, ORBITAL1_FAILURE_FLIGHT_XP, true) },
+      narrativeSeen,
+      justCompleted: { testId, outcome: 'failure' },
     };
   }
 

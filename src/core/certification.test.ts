@@ -130,4 +130,49 @@ describe('resolveCertification', () => {
     const result = resolveCertification(makeState({ inProgress: process }), state.resources, [], [], 3 * 60 * MIN);
     expect(result.justCompleted).not.toBeNull();
   });
+
+  describe('orbital1Base (ECONOMY §6: 80% success, probabilistic)', () => {
+    const HOUR = 60 * MIN;
+
+    it('success (roll under 0.8): grants the static-fire-success reward, certifies, narrates N-08', () => {
+      const state = createInitialState();
+      const process: Process = { id: 'c1', kind: 'certification', startedAt: 0, durationMs: 3 * HOUR, payload: { testId: 'orbital1Base', committedRoll: 0.5 } };
+      const result = resolveCertification(makeState({ inProgress: process }), state.resources, [], [], 3 * HOUR);
+
+      expect(result.justCompleted).toEqual({ testId: 'orbital1Base', outcome: 'success' });
+      expect(result.certifications.engines.orbital1).toEqual({ attempted: true, certified: true, extendedCertified: false });
+      expect(result.resources.flightxp.amount).toBe(15);
+      expect(result.resources.reputation.amount).toBe(2);
+      expect(result.resources.research.amount).toBe(150);
+      expect(result.narrativeSeen).toEqual(['N-08']);
+    });
+
+    it('failure (roll at/over 0.8): +60 Flight XP only, attempted but not certified, no narrative beat', () => {
+      const state = createInitialState();
+      const process: Process = { id: 'c1', kind: 'certification', startedAt: 0, durationMs: 3 * HOUR, payload: { testId: 'orbital1Base', committedRoll: 0.85 } };
+      const result = resolveCertification(makeState({ inProgress: process }), state.resources, [], [], 3 * HOUR);
+
+      expect(result.justCompleted).toEqual({ testId: 'orbital1Base', outcome: 'failure' });
+      expect(result.certifications.engines.orbital1).toEqual({ attempted: true, certified: false, extendedCertified: false });
+      expect(result.resources.flightxp.amount).toBe(60);
+      expect(result.resources.reputation.amount).toBe(0);
+      expect(result.resources.research.amount).toBe(0);
+      expect(result.narrativeSeen).toEqual([]);
+    });
+
+    it('the committedRoll drawn at start is what resolves the outcome, never a fresh draw at resolution', () => {
+      const state = createInitialState();
+      // Exactly at the 0.8 boundary counts as failure (roll < successRate is the success test).
+      const process: Process = { id: 'c1', kind: 'certification', startedAt: 0, durationMs: 3 * HOUR, payload: { testId: 'orbital1Base', committedRoll: 0.8 } };
+      const result = resolveCertification(makeState({ inProgress: process }), state.resources, [], [], 3 * HOUR);
+      expect(result.justCompleted?.outcome).toBe('failure');
+    });
+
+    it('orbital1Retry becomes available after a failed base attempt, at half duration', () => {
+      const engines = { ...createInitialState().certifications.engines, orbital1: { attempted: true, certified: false, extendedCertified: false } };
+      expect(isCertificationTestAvailable(test('orbital1Retry'), engines.orbital1)).toBe(true);
+      expect(test('orbital1Retry').durationMs).toBe(1.5 * HOUR);
+      expect(test('orbital1Base').durationMs).toBe(3 * HOUR);
+    });
+  });
 });

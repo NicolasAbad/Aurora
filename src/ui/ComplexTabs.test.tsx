@@ -49,17 +49,18 @@ describe('ComplexTabs — every unlock is state-driven (regression: 2 prior sile
     expect(isLocked('Testing')).toBe(false);
   });
 
-  // INTENTIONAL, not a bug: Complex D has no panel content until Sprint 7 builds VAB/
-  // Pad/Launch Control/Tracking Station, so its tab stays hardcoded-locked even though
-  // its tech gate (flightProgram) is already reachable (the Program branch is complete
-  // since Sprint 4) — unlocking the tab now would open onto a blank screen. Sprint 7 is
-  // expected to make this state-driven like Testing above; when it does, this specific
-  // assertion should be replaced with a state-driven version, not just deleted.
-  it('Launch stays locked even once its tech (flightProgram) is researched — pending Sprint 7', () => {
-    useGameStore.setState((s) => ({
-      research: { ...s.research, completed: [...s.research.completed, 'flightProgram'] },
-    }));
-    render(<ComplexTabs active="campus" onSelect={() => {}} />);
+  // Sprint 7: state-driven like Testing above, now that Complex D (VAB/Pad/Launch
+  // Control/Tracking Station) has real panel content to unlock onto.
+  it('Launch locks/unlocks with the "flightProgram" tech (ECONOMY §4)', () => {
+    const { rerender } = render(<ComplexTabs active="campus" onSelect={() => {}} />);
     expect(isLocked('Launch')).toBe(true);
+
+    act(() => {
+      useGameStore.setState((s) => ({
+        research: { ...s.research, completed: [...s.research.completed, 'flightProgram'] },
+      }));
+    });
+    rerender(<ComplexTabs active="campus" onSelect={() => {}} />);
+    expect(isLocked('Launch')).toBe(false);
   });
 });

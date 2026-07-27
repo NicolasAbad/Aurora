@@ -1483,3 +1483,153 @@ Confidence; S-2 crosses Kármán and awards its record." All four original tasks
 Rail + sonda assembly workshop, S-1 mini-checklist + simplified Confidence + roll
 commitment + countdown + results, tier-0 contracts, S-2 + Kármán record + N-08b/N-08c)
 are complete. Sprint 6 is closed. Next: Sprint 7 (VAB, Aurora I & full Launch Sequence).
+
+Between sprints: **ECONOMY_MODEL v3.4** ratified all three Sprint 6 judgment calls
+(propellant as a live check, GDD §7b's failure package applying program-wide, records
+gating on success except "First ignition") — no values changed, purely a changelog
+confirming the shipped reading was correct.
+
+## Sprint 7 — CLOSED (2026-07-27)
+
+VAB, Aurora I & the full Launch Sequence — the sonda loop's "full-size" counterpart.
+One genuine ambiguity was raised and ruled on **before** any resolution code was
+written, because it was schema-shaping and expensive to get wrong: does every one of
+the 8 checklist items (including "controllers fully staffed" and "optimal weather
+window," whose GDD §7b wording implies a partial/early state — "proportional," "0 if
+launched early") need its FULL state to check off, or is a genuinely partial/skippable
+checklist real content? **Ruled: Option A, mandatory-for-all-8**, mirroring the sonda
+checklist exactly — the "proportional"/"launched early" wording describes only the live
+Confidence preview shown mid-checklist, never a reachable end state at countdown. Option
+B (a real "launch early" skip mechanic) is parked in BACKLOG, contingent on Sprint 9's
+contract deadlines actually creating time pressure. Codified in **GDD v2.10**.
+
+**Schema:** almost entirely additive — `PadMissionState`/`ChecklistItemId`/`PadId`/
+`EngineId('orbital1')` were all already scaffolded since Sprint 0 specifically to avoid
+this. The only real additions: `CertificationTestDef.successRate?` (probabilistic vs.
+deterministic dispatch) and `MissionState.auroraHalfDurationNext?` (GDD §7b's
+re-integration bonus, per pad — additive optional, rule 5, no migration).
+
+**Judgment calls resolved from the text (not invented — flagged so Sprint 9 doesn't
+re-litigate):**
+1. **Stage-to-checklist mapping:** the 8 sequential `AURORA_I_STAGES` (ECONOMY §7) don't
+   map 1:1 to the 8 checklist items — the first 5 (structure/engines/guidance/satellite
+   payload/finalIntegration) collectively satisfy ONE item ("Rocket integrated"); the
+   remaining 3 (padTransfer/propellantLoad/flightReview) map 1:1; "Engines certified,"
+   "Controllers on station" and "Tracking active" aren't stages at all — they're live
+   reads of the certification/staffing/building state.
+2. **The "Engines" integration stage requires Orbital-1 already certified** — ECONOMY
+   §7's stage name is literally "Engines (Orbital-1 certified)," a real sequencing gate,
+   not just a label.
+3. **Orbital-1's cert reuses the `stage: 'first'/'retry'` split** (not a wholly separate
+   shape) — a `successRate` field on `CertificationTestDef` generalizes the resolver for
+   a genuinely probabilistic test (80% every attempt, GDD's own "at half duration"
+   phrasing giving 'retry' its own halved `durationMs` directly, no dynamic flag needed)
+   while every deterministic Probe-1 test keeps its exact existing behavior unchanged.
+4. **Orbital-1's certification success reuses §8's generically-worded "Static fire
+   success" reward** (+15 XP/+2 Rep/+150 Flight Data) — its own ECONOMY §6 row only
+   restates the FAILURE reward explicitly (+60 XP), but Probe-1's success reward is
+   ALSO only sourced from §8's row, by the same generic (not "Probe-1-specific") wording.
+5. **Roll commitment for a probabilistic certification is drawn at process START, not
+   resolution** (`core/actions.ts`'s `startCertification` now draws+stores it in the
+   process payload when `successRate` is set) — the certification-specific analogue of
+   rule 12's "checklist completion, not button press": the decisive moment is the
+   player's commit (clicking Start), not whichever later tick happens to notice the
+   timer ran out.
+
+**Two real gaps caught before/during Playwright verification, not after:**
+- **Cross-checking `sim/run.ts`'s own Orbital-1 modeling** (per the Sprint 6-ratified
+  habit) found it granted the scripted `+60 XP` on failure but **nothing at all on
+  success** — an oversight, not a deliberate reading (the sim's own header note frames
+  it as an approximation, and omitting a reward that's dwarfed by Aurora I's own payout
+  moments later has near-zero effect on the pacing metrics being measured, which is
+  probably why it went unnoticed). Fixed in the sim alongside pointing it at the real
+  `data/certifications.ts`/`data/auroraI.ts` tables instead of a fourth hardcoded copy.
+- **`ui/ActiveProcessStrip.tsx` was never extended for `missionKind: 'auroraI'`** —
+  Sprint 6 added the sounding-rocket branch but not this sprint's, so Aurora I's stage
+  and weather-window processes were silently invisible in the strip, a direct UI_SPEC
+  §2c violation ("No process may exist without a chip"). Caught by the Playwright
+  script's own coexistence check (a `false` where `true` was expected), not by
+  inspection — fixed, then re-verified.
+
+**Built:**
+- `data/auroraI.ts` (new): the 8 sequential `AURORA_I_STAGES` (cost/duration/name),
+  `VAB_STAGE_IDS` (the 5 that fold into one checklist item), `AURORA_I_REWARD`.
+  `data/launch.ts` (new): the failure-resolution rates and weather-window range,
+  factored out of `data/soundingRockets.ts` (which now re-exports them) since Aurora I
+  needed the exact same program-wide constants — one source of truth instead of a
+  second copy.
+- `data/certifications.ts` + `core/certification.ts`: Orbital-1's three tests
+  (`orbital1Base`/`orbital1Retry`/`orbital1Extended`); `resolveCertification` gained a
+  `successRate`-gated probabilistic branch alongside the existing deterministic one,
+  fully backward-compatible with every Probe-1 test.
+- `core/confidence.ts` (new): `computeConfidenceBreakdown` — the full 7-term GDD §7b
+  formula, returning every term individually (UI_SPEC's "tap-to-expand breakdown").
+  Verified: with extended certification, the deterministic terms alone reach exactly
+  100 — zero XP, no Service Tower needed.
+- `core/auroraMission.ts` (new, the sprint's core module): `nextAuroraStageId` (the
+  strict 8-stage sequence), `startNextAuroraStage` (pays cost, starts a process — or,
+  for the 0-duration Flight Review, resolves instantly, no process at all — mirrors the
+  sonda's own instant-spend pattern), `maybeAutoQueueAuroraStage` (the `vabQueues` tech's
+  auto-progression, scoped to the 5 VAB stages only — transfer/propellant/flight review
+  stay deliberate manual decisions even with the tech), `applyCompletedAuroraStages` /
+  `applyCompletedAuroraWeather` (process-completion dispatchers), `resolveAuroraChecklist`
+  (tick-time: live Controllers/Tracking checks, Confidence, roll commitment per the
+  ratified Option A), `launchAuroraMission` (resolves the committed roll, GDD §7b's
+  general failure package on a miss, resets the pad for a future mission — Sprint 9
+  reuses this same pad), `resolveAuroraTick` (the per-tick composition, iterating every
+  pad that exists rather than hardcoding padA).
+- `state/persistStore.ts`: `resolveMissionsContractsAndRecords` (renamed and extended
+  from Sprint 6's `resolveSoundingContractsAndRecords`) now threads Aurora resolution
+  through both `applyTick` and `computeBootOffline` alongside sounding/contracts/records.
+  New actions: `startAuroraStage`, `startAuroraWeather`, `launchAurora`. Narrative:
+  N-09 (Aurora I integrated) and N-15 (Orbital flight tech) as threshold checks
+  (mirrors N-04/N-05); N-10 (countdown) set imperatively in `launchAurora` BEFORE
+  resolution, matching its place in the sequence; N-11/N-12 (success/failure) set
+  directly inside `launchAuroraMission`, mirroring N-08's pattern.
+- `ui/LaunchSequencePanel.tsx` (new): the 8-item checklist, Confidence with tap-to-expand
+  breakdown, a unified "next stage" widget (drives all 5 VAB stages + transfer +
+  propellant + flight review through one consistent affordance), the dominant countdown
+  button (the `<100%` confirm-to-gamble gate mirrors the sonda's exact pattern), and an
+  inline result card. **Scope note:** the doc's "own full screen... 10→0 countdown"
+  animation is deliberately not built — pressing the button resolves the
+  already-committed roll (rule 12) immediately, same restraint Sprint 6 used for sondas;
+  real animation is Sprint 11 polish territory.
+- `ui/ComplexTabs.tsx`: Launch tab unlock is now state-driven (`flightProgram` tech) —
+  the regression test this was explicitly pending on (`ComplexTabs.test.tsx`, written in
+  Sprint 4.5) was updated per its own instruction, not deleted.
+- `ui/ActiveProcessStrip.tsx`: extended for Aurora's own `integration`/`weather_window`
+  processes (see gaps above).
+
+**Verification:**
+- 306 tests passing (up from 264), including the SPRINTS-mandated roll-commitment
+  regression test: a committed roll is written to a save, the save round-trips through
+  real `saveGame`/`loadGame` (actual JSON serialization, not just an in-memory check),
+  and the reloaded state resolves to the identical outcome — with the resolver's
+  `randomFn` wired to throw if it's ever called post-reload, proving redraw is
+  structurally impossible, not just empirically absent this run.
+- `sim/run.ts --days=45` re-run: human-profile figures essentially unchanged (salary
+  55%, sonda Flight Data 23.7%, satellite share 24.7% → 24.8% — the tiny shift being the
+  expected, correct result of fixing the missing Orbital-1 success-reward gap above,
+  not a regression). Pacing floor still passes (Aurora I not before day 5).
+- Playwright, through a real browser, driving the actual mechanic live (injection only
+  for genuinely repetitive grind — 3 of 5 identical-code-path VAB stages, and the
+  unrelated Campus-through-Testing build-up already covered by prior sprints):
+  Confidence breakdown showed the live 80% mid-checklist value and its full term-by-term
+  math; live-exercised 2 more VAB stages, pad transfer, propellant load, and the instant
+  Flight Review; confirmed a sounding-rocket assembly and an Aurora I stage coexist as
+  simultaneous chips in the same process strip; reached **exactly 100% Confidence with 0
+  Flight XP and no Service Tower purchased** — the acceptance criterion's specific claim,
+  proven live, not just in the formula; countdown resolved, result card showed the
+  correct reward breakdown, Mission Log narrated N-11 verbatim, "First orbit" earned
+  (alongside "First ignition" correctly backfilling), and Payload Processing became
+  visible in the Testing tab the instant `auroraISuccess` went true — confirming the
+  Sprint 0-era `unlockCondition` wiring finally has a real trigger behind it. Zero
+  console errors. Screenshots `35`–`38` under `sprint7-*.png`.
+
+**Sprint 7 acceptance, verified end to end through the integrated path:** "end-to-end
+first satellite launch; confidence matches formula and 100% is reachable without XP;
+sonda loop and full loop coexist." All five original tasks (Complex D build/slots/
+unlock, Aurora I stage integration incl. satellite payload, full 8-item Launch Sequence
++ `core/confidence.ts` + Orbital-1 probabilistic certification, roll commitment, countdown
+→ resolution → results with rewards + Records) are complete. Sprint 7 is closed. Next:
+Sprint 8 (FTUE & Phase 1 close).
