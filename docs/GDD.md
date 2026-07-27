@@ -1,6 +1,8 @@
 # GDD — Aurora Program
 *Final design document for Claude Code development — v2.1 (English base language)*
 
+**v2.10 changelog:** checklist-vs-Confidence relationship clarified (§7b) — all 8 items mandatory to full state (Option A); "proportional"/"launched early" wording describes the live preview during the checklist, never a reachable end state. A genuinely partial/skippable checklist is deferred to BACKLOG, contingent on Sprint 9's deadline pressure.
+
 **v2.6 changelog:** progressive-disclosure rules made explicit (UI_SPEC §2b): default is hidden-until-relevant — building tiles, research nodes, ticker rows, verbs and panels appear as the player earns them; the only deliberate teasers are the locked complex tabs, the Training Center, and unnamed record placeholders.
 
 **v2.2 changelog:** "Launch 1 / 1st launch" wording retired everywhere — all unlocks and records are defined by named event (Payload Processing and Launch Pad B unlock on **Aurora I success**; record triggers per ECONOMY §8b).
@@ -142,6 +144,8 @@ Real-time checklist, own dominant screen: 1 Rocket integrated (VAB) · 2 Engines
 ## 7b. Launch Confidence (success probability with agency)
 
 Visible percentage on the checklist. Golden rule: **risk is always chosen, never imposed** — 100% is always reachable by investing more; launching below it is a deliberate gamble.
+
+**Checklist-vs-Confidence relationship (v1): all 8 checklist items are mandatory to their FULL state** — the countdown button stays disabled until every item (including controllers fully staffed and the optimal weather window) is complete, mirroring the sonda checklist. The "proportional" and "0 if launched early" phrasing below describes the LIVE PREVIEW shown while the checklist is still in progress — informative, motivating, never a reachable end state at countdown. A genuinely skippable/partial checklist (e.g. an explicit "launch without waiting for weather" action) is deliberately deferred — real payoff only appears once Sprint 9's contract deadlines create time pressure; if built, it is new strategic content requiring its own design pass and an economy unlock, not a byproduct of this clarification. Tracked in BACKLOG.
 
 ```
 Confidence = 40 (base)
