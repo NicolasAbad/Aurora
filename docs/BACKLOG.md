@@ -8,6 +8,21 @@
 - **Detailed historical statistics:** per-launch archive (payload, confidence, outcome, date), program graphs over time. Pairs beautifully with the Mission Log.
 - **Additional launch pads (3rd+):** the program keeps growing — each new pad raises parallel mission capacity. (The 2nd pad is already in v1; the schema is per-pad, so a 3rd pad is a data addition, not a migration.)
 
+## Parked for the Sprint 8 economy unlock (specified, NOT implemented before then)
+**Campus & Production internal upgrades.** Rationale: Testing and Launch have 9 internal upgrades between them; Campus has 2 and Production has 0 — the complexes the player lives in for the first hours are the emptiest. Slot-adding upgrades additionally solve the idle-staff problem (see below) by making headcount growth a bought, priced decision instead of an automatic one. Every item must pass the depth rule: it should change a decision, not just a number. **Values below are provisional — Sprint 8 must price them and re-run the sim sweep (salary band 30–55%, Flight Data 20–35%, pacing floor day 5 / ceiling day 12).**
+
+| Building | Upgrade | Effect |
+|---|---|---|
+| Finance | Grants desk | +1 Technician slot |
+| R&D Lab | Technical archive | +1 Scientist slot |
+| R&D Lab | Second research track | **Two research nodes run in parallel** (mechanic change — the depth item of this set) |
+| Supply Depot | Bulk contracts | +1 Technician slot |
+| Refinery | Recovery loop | −10% Materials consumed per Propellant |
+| Fabrication | QA station | −15% Materials consumed per Hardware |
+| Warehouse | Inventory system | +25% to the cap bonus each Warehouse level grants |
+
+**Slots-per-level (considered, REJECTED):** growing slots automatically with building level was rejected — it converts every level-up into mandatory extra headcount, and salaries already sit at the top of the band (53–55%). Bought slot upgrades give the same relief with full balance control. Also rejected: blocking hires at the slot ceiling (kills agency, breaks hiring ahead of construction, and idle staff are legitimate promotion feedstock) and giving idle staff a passive bonus (would make the assignment decision meaningless).
+
 ## Other parked ideas
 - **Give "Aluminum alloys" a real effect (contingent):** in v1 it is a pure gate/teaching node with no production effect. If Sprint 8's balance pass unlocks the economy and the early Materials branch feels hollow, the natural fix is a small Fabrication bonus (e.g. −10% Materials per Hardware). Requires an explicit economy unlock + a sim re-run; do NOT add it while the economy is locked.
 - **Contingent FTUE fix — manual Research verb ("Field observations"):** a small manual action granting trickle Research before the R&D Lab is staffable, to soften the day-1 bootstrap gap the simulator flagged (Research sits at 0 for most of day 1 while the promotion chain runs; ~12h stall on `basicEngineering`, all seeds). Activate ONLY if Sprint 8 testers report day 1 feeling dead — the stall is currently accepted as intended Kittens-style pacing, and day 1 is otherwise full (building, pitching, hiring). If activated, it follows the evolving-verb pattern of pitch/gather.

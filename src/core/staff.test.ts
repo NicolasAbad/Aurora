@@ -7,7 +7,9 @@ import {
   hiringCost,
   isRoleUnlocked,
   staffRatioForBuilding,
+  openSlotsForRole,
   totalHired,
+  totalOpenSlots,
   totalSalaryPerSecond,
   totalStaffCap,
   unassignedCount,
@@ -87,6 +89,45 @@ describe('buildingStaffRatio', () => {
   it('returns 1 for a building with no slots (ratio is irrelevant — nothing to scale)', () => {
     const state = createInitialState();
     expect(buildingStaffRatio(state.staff, 'warehouse', 1)).toBe(1);
+  });
+});
+
+// NARRATIVE §7 (T-11): a Technician hire can't fill an Engineer slot even if the
+// program has open Engineer slots elsewhere — the gate has to be role-specific.
+describe('openSlotsForRole', () => {
+  it('only counts slots the given role can actually fill', () => {
+    const state = createInitialState();
+    state.buildings.fabrication.level = 1; // 1 Engineer + 1 Technician slot, both empty
+    expect(openSlotsForRole(state.staff, state.buildings, 'engineer')).toBe(1);
+    expect(openSlotsForRole(state.staff, state.buildings, 'technician')).toBe(1);
+    expect(openSlotsForRole(state.staff, state.buildings, 'scientist')).toBe(0);
+  });
+});
+
+// UI_SPEC §4 / NARRATIVE §7: T-10's "Open slots across the program: [N]" line.
+describe('totalOpenSlots', () => {
+  it('is 0 when nothing is built (no slots exist below building level 1)', () => {
+    const state = createInitialState();
+    expect(totalOpenSlots(state.staff, state.buildings)).toBe(0);
+  });
+
+  it('counts every unfilled slot across every built building/role', () => {
+    const state = createInitialState();
+    state.buildings.finance.level = 1; // 2 Technician slots
+    state.buildings.fabrication.level = 1; // 1 Engineer + 1 Technician slot
+    // Finance: 1/2 Technician filled. Fabrication: fully empty.
+    state.staff.pools.technician.hired = 1;
+    state.staff.pools.technician.assigned.finance = 1;
+    // open: Finance 1 Tech + Fabrication 1 Eng + Fabrication 1 Tech = 3
+    expect(totalOpenSlots(state.staff, state.buildings)).toBe(3);
+  });
+
+  it('is 0 once every built slot is filled', () => {
+    const state = createInitialState();
+    state.buildings.finance.level = 1;
+    state.staff.pools.technician.hired = 2;
+    state.staff.pools.technician.assigned.finance = 2;
+    expect(totalOpenSlots(state.staff, state.buildings)).toBe(0);
   });
 });
 

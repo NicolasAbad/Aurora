@@ -87,7 +87,9 @@ export interface InternalUpgradeDef {
   name: string;
   cost: Partial<Record<ResourceId, number>>;
   minHardwareTier?: HardwareTier;
-  description: string; // rule 9: label only — narrative copy still lives in NARRATIVE_EVENTS.md
+  // rule 9: the actual player-facing text lives in NARRATIVE_EVENTS.md §6 (U-01..U-09),
+  // resolved via data/narrative.ts's NARRATIVE_TEXT — this is the ID, never the string.
+  narrativeId: string;
 }
 
 export interface BuildingDef {
@@ -96,6 +98,12 @@ export interface BuildingDef {
   complex: ComplexId;
   baseCost: Partial<Record<ResourceId, number>>;
   costFactor: number | null; // null => one-time (non-leveled) building
+  // UI_SPEC §4: "nothing purchasable... may be offered without plain-language copy
+  // stating its effect." Plain mechanical fact transcribed from ECONOMY §4's Effect
+  // column (same "plain data field, not narrative-ID-routed" pattern as
+  // ResearchNode.description) — buildings that also have `production` show a live
+  // computed rate line instead/as well; this covers the ones that don't.
+  description: string;
   minHardwareTier?: HardwareTier;
   production?: {
     resource: ResourceId;

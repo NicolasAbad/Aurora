@@ -1,5 +1,8 @@
 // All values transcribed from ECONOMY_MODEL.md §4. Do not edit numbers here without
-// editing them there first (CLAUDE.md rule 1).
+// editing them there first (CLAUDE.md rule 1). `description` text is transcribed from
+// §4's own Effect column (plain mechanical fact, not narrative-ID-routed — same
+// treatment as ResearchNode.description); internal-upgrade copy is real narrative
+// content (NARRATIVE_EVENTS §6) and is referenced by `narrativeId`, never inlined here.
 import type { BuildingDef, BuildingId } from '../core/types';
 
 export const BUILDINGS: Record<BuildingId, BuildingDef> = {
@@ -10,6 +13,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     complex: 'campus',
     baseCost: { funding: 100 },
     costFactor: 1.12,
+    description: 'Raises your pitch yield: +5 Funding per pitch for each level above 1.',
     unlockCondition: { kind: 'start' },
     // Effect: pitch yield = core/economy.ts's pitchYield(officesLevel), ECONOMY §2 —
     // read by the manual-pitch action, not `production`.
@@ -20,6 +24,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     complex: 'campus',
     baseCost: { funding: 150 },
     costFactor: 1.14,
+    description: 'Chases investors on your behalf. Produces Funding passively, even while you’re away.',
     production: { resource: 'funding', basePerSec: 2 },
     slots: { technician: 2 },
     unlockCondition: { kind: 'start' },
@@ -30,6 +35,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     complex: 'campus',
     baseCost: { funding: 250 },
     costFactor: 1.14,
+    description: 'Produces Research passively. Staffed by Scientists.',
     production: { resource: 'research', basePerSec: 0.03 }, // ECONOMY §4 v2.3
     slots: { scientist: 2 },
     unlockCondition: { kind: 'start' },
@@ -40,21 +46,12 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     complex: 'campus',
     baseCost: { funding: 120 },
     costFactor: 1.08,
+    description: '+3 staff cap per level.',
     staffCapBonus: 3,
     unlockCondition: { kind: 'start' },
     internalUpgrades: [
-      {
-        id: 'classroom',
-        name: 'Classroom',
-        cost: { funding: 400 },
-        description: 'Enables role promotions (Technician→Engineer, Engineer→Scientist).',
-      },
-      {
-        id: 'cafeteria',
-        name: 'Cafeteria',
-        cost: { funding: 700 },
-        description: '-10% effective salaries.',
-      },
+      { id: 'classroom', name: 'Classroom', cost: { funding: 400 }, narrativeId: 'U-01' },
+      { id: 'cafeteria', name: 'Cafeteria', cost: { funding: 700 }, narrativeId: 'U-02' },
     ],
   },
   trainingCenter: {
@@ -63,6 +60,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     complex: 'campus',
     baseCost: {},
     costFactor: null,
+    description: 'The future home of the individual astronaut program. Locked in v1.',
     teaser: true, // UI_SPEC §2b: the only v1 teaser — the deliberate era-2 tease
     unlockCondition: { kind: 'locked' },
     // LOCKED v1 (visible-but-locked); astronaut system is era 2.
@@ -75,6 +73,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     complex: 'production',
     baseCost: { funding: 200 },
     costFactor: 1.13,
+    description: 'Produces Materials passively.',
     production: { resource: 'materials', basePerSec: 1.5 },
     slots: { technician: 2 },
     unlockCondition: { kind: 'lifetimeFunding', amount: 300 },
@@ -85,6 +84,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     complex: 'production',
     baseCost: { funding: 350, materials: 100 },
     costFactor: 1.15,
+    description: 'Converts Materials into Hardware, at the program’s current tier.',
     production: { resource: 'hardware', basePerSec: 0.3, consumes: { materials: 2 } },
     slots: { engineer: 1, technician: 1 },
     unlockCondition: { kind: 'lifetimeFunding', amount: 300 },
@@ -95,6 +95,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     complex: 'production',
     baseCost: { funding: 300, materials: 80 },
     costFactor: 1.14,
+    description: 'Converts Materials into Propellant.',
     production: { resource: 'propellant', basePerSec: 0.5, consumes: { materials: 1 } },
     slots: { engineer: 1 },
     unlockCondition: { kind: 'lifetimeFunding', amount: 300 },
@@ -105,6 +106,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     complex: 'production',
     baseCost: { funding: 250, materials: 50 },
     costFactor: 1.07,
+    description: '+500 Funding / +300 Materials / +75 Hardware storage cap per level.',
     capBonus: { funding: 500, materials: 300, hardware: 75 },
     unlockCondition: { kind: 'lifetimeFunding', amount: 300 },
   },
@@ -114,6 +116,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     complex: 'production',
     baseCost: { funding: 400, materials: 120 },
     costFactor: 1.07,
+    description: '+250 Propellant storage cap per level.',
     capBonus: { propellant: 250 },
     unlockCondition: { kind: 'lifetimeFunding', amount: 300 },
   },
@@ -125,21 +128,11 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     complex: 'testing',
     baseCost: { funding: 800, materials: 300, hardware: 40 },
     costFactor: 1.2,
+    description: 'Enables engine certifications and hosts the sounding-rocket assembly workshop.',
     slots: { engineer: 2, technician: 1 },
     unlockCondition: { kind: 'tech', id: 'testStand' },
     internalUpgrades: [
-      {
-        id: 'instrumentation',
-        name: 'Instrumentation',
-        cost: { funding: 600, hardware: 20 },
-        description: '-25% certification time.',
-      },
-      {
-        id: 'cryogenicStand',
-        name: 'Cryogenic Stand',
-        cost: { funding: 2000, hardware: 80 },
-        description: 'Tier-2 engines (v2).',
-      },
+      { id: 'instrumentation', name: 'Instrumentation', cost: { funding: 600, hardware: 20 }, narrativeId: 'U-04' },
     ],
   },
   launchRail: {
@@ -148,15 +141,11 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     complex: 'testing',
     baseCost: { funding: 300, materials: 100 },
     costFactor: null, // one-time
+    description: 'Launches sounding rockets.',
     slots: { technician: 1 },
     unlockCondition: { kind: 'tech', id: 'testStand' },
     internalUpgrades: [
-      {
-        id: 'extendedRail',
-        name: 'Extended Rail',
-        cost: { funding: 400, materials: 100 },
-        description: 'Enables S-2 high-altitude sondas.',
-      },
+      { id: 'extendedRail', name: 'Extended Rail', cost: { funding: 400, materials: 100 }, narrativeId: 'U-03' },
     ],
   },
   payloadProcessing: {
@@ -165,6 +154,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     complex: 'testing',
     baseCost: { funding: 1500, hardware: 200 },
     costFactor: 1.2,
+    description: 'Enables satellite contracts.',
     slots: { engineer: 1, scientist: 1 },
     unlockCondition: { kind: 'auroraISuccess' },
     // GDD §3: "unlocks after Aurora I success; required by satellite contracts" —
@@ -178,21 +168,11 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     complex: 'launch',
     baseCost: { funding: 2000, materials: 500 },
     costFactor: 1.25,
+    description: 'Integrates rocket stages for a full launch.',
     slots: { engineer: 2, technician: 2 },
     unlockCondition: { kind: 'tech', id: 'flightProgram' },
     internalUpgrades: [
-      {
-        id: 'heavyCrane',
-        name: 'Heavy Crane',
-        cost: { funding: 1800, hardware: 60 },
-        description: 'Large stages (v2).',
-      },
-      {
-        id: 'cleanRoom',
-        name: 'Clean Room',
-        cost: { funding: 2200, hardware: 70 },
-        description: 'Enables tier-2 contracts.',
-      },
+      { id: 'cleanRoom', name: 'Clean Room', cost: { funding: 2200, hardware: 70 }, narrativeId: 'U-09' },
     ],
   },
   launchPad: {
@@ -201,27 +181,12 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     complex: 'launch',
     baseCost: { funding: 1500, materials: 400 },
     costFactor: 1.25,
+    description: 'Transfers the integrated rocket and hosts the launch itself.',
     slots: { technician: 1 },
     unlockCondition: { kind: 'tech', id: 'flightProgram' },
     internalUpgrades: [
-      {
-        id: 'serviceTower',
-        name: 'Service Tower',
-        cost: { funding: 800, materials: 150 },
-        description: '+5 Confidence.',
-      },
-      {
-        id: 'flameTrench',
-        name: 'Flame Trench',
-        cost: { funding: 1200, materials: 300 },
-        description: '-30% pad turnaround.',
-      },
-      {
-        id: 'soundSuppression',
-        name: 'Sound Suppression',
-        cost: { funding: 2500, materials: 500 },
-        description: 'Heavy launch class (v2).',
-      },
+      { id: 'serviceTower', name: 'Service Tower', cost: { funding: 800, materials: 150 }, narrativeId: 'U-05' },
+      { id: 'flameTrench', name: 'Flame Trench', cost: { funding: 1200, materials: 300 }, narrativeId: 'U-06' },
     ],
   },
   launchControl: {
@@ -230,6 +195,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     complex: 'launch',
     baseCost: { funding: 1000, materials: 200 },
     costFactor: 1.2,
+    description: 'Runs the countdown. Staffed by Controllers.',
     slots: { controller: 3 },
     unlockCondition: { kind: 'tech', id: 'flightProgram' },
   },
@@ -239,22 +205,13 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     complex: 'launch',
     baseCost: { funding: 1200, materials: 250, hardware: 30 },
     costFactor: 1.2,
+    description: '+25% Flight Experience per level from every flight. Required for orbital missions.',
     slots: { scientist: 1 },
     unlockCondition: { kind: 'tech', id: 'flightProgram' },
-    // Radar is included with the base building (no separate purchase).
+    // Radar is included with the base building (not a purchasable upgrade).
     internalUpgrades: [
-      {
-        id: 'antennaNetwork',
-        name: 'Antenna Network',
-        cost: { funding: 1500, hardware: 50 },
-        description: '+25% Flight XP.',
-      },
-      {
-        id: 'weatherStation',
-        name: 'Weather Station',
-        cost: { funding: 900, hardware: 25 },
-        description: 'Weather windows every 2 min (fixed).',
-      },
+      { id: 'antennaNetwork', name: 'Antenna Network', cost: { funding: 1500, hardware: 50 }, narrativeId: 'U-07' },
+      { id: 'weatherStation', name: 'Weather Station', cost: { funding: 900, hardware: 25 }, narrativeId: 'U-08' },
     ],
   },
   launchPadB: {
@@ -263,6 +220,7 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     complex: 'launch',
     baseCost: { funding: 6000, materials: 1500, hardware: 100 },
     costFactor: null, // one-time
+    description: 'A second, independent launch pad, so contracts and story missions can stage in parallel.',
     slots: { technician: 1 },
     unlockCondition: {
       kind: 'all',

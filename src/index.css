@@ -251,11 +251,45 @@ body {
   align-items: center;
 }
 
+.building-tile__description {
+  color: var(--text-dim);
+  font-size: 0.85em;
+}
+
+.building-tile__slot-note {
+  color: var(--text-dim);
+  font-size: 0.8em;
+  margin-top: -8px;
+}
+
+.building-tile__locked-badge {
+  align-self: flex-start;
+  color: var(--text-dim);
+  font-size: 0.85em;
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+}
+
 .building-tile__internal-upgrade {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.9em;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.building-tile__internal-upgrade-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   gap: 8px;
+  font-weight: 600;
+}
+
+.building-tile__internal-upgrade-description {
+  color: var(--text-dim);
   font-size: 0.9em;
 }
 
@@ -350,6 +384,34 @@ body {
 .staff-panel__locked {
   color: var(--text-dim);
   font-size: 0.85em;
+}
+
+/* NARRATIVE §7 / UI_SPEC §4 (T-10, the idle-staff trap): always-visible, not a warning
+ * state — informational, styled like the salary-burn line right above it. */
+.staff-panel__open-slots {
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85em;
+}
+
+/* UI_SPEC §2c: staff chip in every complex tab's panel header. */
+.staff-availability-chip {
+  align-self: flex-start;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 0.8em;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+
+.staff-availability-chip:hover {
+  border-color: var(--accent);
+  color: var(--text);
 }
 
 .payroll-banner {
@@ -459,6 +521,55 @@ body {
 .time-warp-control__option--active {
   background: var(--accent);
   color: #1a1200;
+}
+
+/* UI_SPEC §2c: persistent strip directly under the ticker; every running process gets
+ * a chip (no process may exist without one — the promotion timer being untrackable is
+ * the bug this exists to fix). Collapses to zero height when the strip itself isn't
+ * rendered (ActiveProcessStrip returns null when there's nothing running). */
+.process-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.process-strip__chip {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  min-width: 160px;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.process-strip__chip:hover {
+  border-color: var(--accent);
+}
+
+.process-strip__label {
+  font-size: 0.8em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.process-strip__overflow {
+  background: var(--bg);
+  border: 1px dashed var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  color: var(--text-dim);
+  font: inherit;
+  cursor: pointer;
 }
 
 .process-progress {

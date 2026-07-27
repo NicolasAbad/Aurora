@@ -1115,3 +1115,143 @@ consumer" pattern (Sprint 2's `ProcessProgress`, Sprint 3's `minHardwareTier`).
 - Sprint 5 is NOT closed: its acceptance criterion ("full test-fail-narrative-retry-
   certify flow works and is narrated") needs the narration and the trigger UI, both
   deliberately deferred. Proceeding to Sprint 4.5 next, then back to finish Sprint 5's UI.
+
+## Sprint 4.5 — Presentation conventions — COMPLETE (2026-07-26)
+
+Five docs replaced (NARRATIVE_EVENTS, ECONOMY_MODEL, UI_SPEC, BACKLOG, SPRINTS) after
+the owner's manual-play upgrade audit. All PRESENTATION — no economy values changed,
+the lock stands. Covers the original three Sprint 4.5 items (cost-rendering overhaul,
+active process strip, staff availability chip) plus three new findings from the audit
+(upgrade copy, hiding v2-only items, the idle-staff trap) and a regression test for the
+tab-lock bug class.
+
+**Built:**
+- `src/data/narrative.ts` (new) — the first real consumer of CLAUDE.md rule 9 ("game
+  text only from NARRATIVE_EVENTS.md, referenced by ID"): `NARRATIVE_TEXT` (U-01..U-09
+  upgrade copy, T-10/T-11/T-12 idle-staff copy) + `narrativeText(id, vars?)` for T-10's
+  `{n}` open-slot-count placeholder. N-* (Mission Log) and T-01..T-09 (FTUE tooltips)
+  land when their own consumers do (Sprint 5's Mission Log, Sprint 8's tooltip system).
+- `core/types.ts` — `InternalUpgradeDef.description` renamed to `narrativeId` (it was
+  never actually rendered before this sprint — real gap, not a rename for its own sake);
+  `BuildingDef` gains `description: string`, populated for every building by transcribing
+  ECONOMY §4's Effect column (same "plain data field, not narrative-ID-routed" treatment
+  established for `ResearchNode.description` — a mechanical fact, not authored narrative
+  prose, so it doesn't go through NARRATIVE_EVENTS). **Flagging this transcription
+  choice explicitly**: NARRATIVE §6 only authored new prose for the 9 internal upgrades,
+  not for base building purchases, so building descriptions are ECONOMY-table text
+  lightly smoothed into sentences, not freshly-authored narrative voice — happy to
+  redo these as real NARRATIVE_EVENTS content if that's what "building... may not be
+  offered without plain-language copy" was meant to require.
+- `data/buildings.ts` fully rewritten: every building has a `description`; every
+  internal upgrade has `narrativeId` instead of the old unrendered `description`; Sound
+  Suppression, Cryogenic Stand, and Heavy Crane are **removed from the data entirely**
+  (not flagged/filtered — genuinely absent, so nothing downstream can accidentally
+  render them regardless of future UI changes). Radar was already correctly absent from
+  Tracking Station's upgrade list (confirmed, not a fix).
+- `data/resourceNames.ts` gains `RESOURCE_ICON` (icon per resource for cost display;
+  Funding uses `$` as a prefix instead, per UI_SPEC §4). `core/format.ts` gains
+  `formatCost`/`formatCostEntry` (string form, for non-JSX contexts like button labels
+  built from plain strings). New `ui/CostLabel.tsx` is the JSX form, used everywhere a
+  cost renders in markup — the one place that guarantees UI_SPEC §4's "every icon has a
+  tooltip with the full name" rule instead of leaving it to every consumer to remember.
+- **BuildingTile.tsx rewritten**: every tile shows `def.description` unconditionally
+  (before, only buildings with `production` showed any effect text at all — roughly
+  half the roster showed just a name, level, and price, a real "name and a price alone"
+  violation); internal upgrades now render their real `narrativeId`-resolved text
+  (previously computed and stored but never displayed at all); `unlockCondition.kind ===
+  'locked'` buildings (Training Center) render a locked badge with no purchase path
+  instead of a technically-functional free "Build" button; T-12 shows under any role row
+  that's fully staffed, explaining why the `+` is disabled instead of leaving it a silent
+  dead button. **Also closed a separate, pre-existing gap found during this audit**:
+  Training Center (`teaser: true` since Sprint 3.5/4) had zero UI consumers anywhere —
+  UI_SPEC §2b's one deliberate v1 teaser was never actually rendered. Added to the
+  Campus panel now.
+- `core/staff.ts` gains `openSlotsForRole` (role-specific — a Technician hire can't fill
+  an Engineer slot even if the program has open Engineer slots elsewhere) and
+  `totalOpenSlots` (the program-wide sum T-10 displays).
+- `StaffHiring.tsx`: T-10 always-visible open-slots line; T-11 gate before any hire that
+  would land with zero open slots for that specific role — `window.confirm(...)` with
+  the exact NARRATIVE §7 text (same confirm-dialog pattern already established for the
+  dev reset button), re-fires per hire, never blocks the hire outright (owner's explicit
+  "hiring is never blocked" instruction).
+- `ActiveProcessStrip.tsx` (new) — UI_SPEC §2c: gathers every in-flight process across
+  the three places they currently live (`research.inProgress`, `certifications.
+  inProgress`, the generic `processes` array's `training` entries) into one flat,
+  sorted-by-remaining-time chip strip directly under the ticker. **This is what makes a
+  promotion trackable at all right now** — nothing else in the UI showed its progress
+  before this. Tapping a chip jumps to the process's complex (Campus for research/
+  training, Testing for certification). Reuses the existing `ProcessProgress` component
+  for the bar/remaining-time rather than duplicating it. Collapses to zero height when
+  empty; overflow past 4 collapses into a tappable "+N".
+- `StaffAvailabilityChip.tsx` (new) — UI_SPEC §2c: `Available: 2 Tech · 1 Eng` in every
+  complex panel's header (unassigned pool only), tapping it switches to Campus.
+- `ui/ComplexTabs.test.tsx` (new) — the regression test for the tab-lock bug class (3rd
+  occurrence: Complex B in Sprint 3, Testing in Sprint 5): asserts Campus/Production/
+  Testing are genuinely state-driven, AND explicitly asserts Launch stays locked even
+  once `flightProgram` is researched — annotated that this specific assertion should be
+  *replaced* with a state-driven version when Sprint 7 builds Complex D's panel, not
+  just deleted, so its removal is a deliberate act, not an accidental regression.
+- `data/buildings.test.ts` (new) — structural guarantees stronger than "wasn't observed
+  in one Playwright run": no building declares a v2-only upgrade id (impossible to
+  render since the ids are simply absent from the data), Tracking Station has no Radar
+  upgrade, every internal upgrade's `narrativeId` resolves to real text, every building
+  has non-empty description text.
+- **Checked, not changed**: BACKLOG's parked "Second research track" concern
+  (`research.inProgress: Process | null` shouldn't become architecturally impossible to
+  extend). Confirmed it's cleanly encapsulated behind `resolveResearch`/`startResearch`
+  with no other system assuming "exactly one, ever" — extending it later is a normal
+  bounded migration (schema change + a resolution loop, mirroring how `core/time.ts`
+  already resolves multiple parallel generic processes), not an architectural dead end.
+  No code changed for this — confirmed by reading, not by adding speculative flexibility
+  ahead of the feature actually being built.
+
+**Verification:**
+- 204 tests passing (up from 200 at Sprint 5's core/data close: +2 staff.ts, +4
+  ComplexTabs.test.tsx, +4 buildings.test.ts — some prior counts folded into these).
+  Typecheck/lint/build clean, dev-only tooling confirmed still absent from the production
+  bundle, `sim/run.ts` re-run (untouched — presentation only) with no regression: pacing
+  floor still PASS, Flight Data shares unchanged.
+- Playwright, through a real browser (two script attempts — the first hit a real
+  ordering bug in the *script*, see below): confirmed Training Center renders with its
+  description and a locked badge, no buy button; T-10 shows "Open slots across the
+  program: 0" on a fresh save; hiring with zero open slots (the very first hire, nothing
+  built yet) shows the exact T-11 confirm text and re-fires on a second idle hire, not
+  just once; the hire button itself now reads "Hire ($57)" — no resource noun; Classroom
+  shows its real U-01 narrative text (not just a name and a price) and its Buy button
+  reads "Buy ($400)"; starting a Technician→Engineer promotion immediately shows a
+  "Promoting: Technician → Engineer · 15m 1s" chip in the process strip, which
+  disappears the instant the promotion resolves; the Production tab shows its own staff
+  chip without navigating to Campus; a full-page text scan found zero occurrences of
+  "Sound Suppression", "Cryogenic Stand", "Heavy Crane", or "Radar"; a scan of every
+  cost-bearing button found zero resource-noun-after-a-number occurrences. Zero console
+  errors. Screenshots: `25-sprint4.5-training-center.png`, `26-sprint4.5-process-
+  strip.png`.
+- **Real script bug, not a product bug (the inverse of the usual timing-trap pattern —
+  worth noting as its own category):** the first verification attempt tried to trigger
+  T-11 (hire with 0 open slots) *before* pitching any Funding at all — the Hire button
+  was correctly `disabled` (unaffordable, 50 F needed, 0 F available) and Playwright
+  timed out waiting for a click target that was never going to become clickable. Fixed
+  by moving the pitching step before the first hire attempt. Not logged to the timing-
+  traps memory (that file is specifically about time-warp/salary-drain interactions);
+  this was plain step-ordering.
+
+**Scope notes:**
+- The idle-hire confirm uses a native `window.confirm()`, matching the existing
+  dev-reset-button precedent — functionally correct and testable, but stylistically a
+  break from the control-room theme. Flagged as a candidate for an in-theme confirm
+  modal during Sprint 11 polish, not gold-plated now.
+- SPRINTS.md's own Sprint 4.5 section wasn't mechanically expanded to list items 1-3 as
+  numbered sub-tasks (it still shows the original 3-item list from before this audit) —
+  noted since SPRINTS.md is nominally "the authority on order and scope," but NARRATIVE
+  §6/§7 and UI_SPEC §4 fully specify the content either way, and the owner's chat
+  message was explicit and unambiguous about scope/ordering, so this didn't block
+  starting the work. Not fixed unilaterally (a doc-completeness gap, not a conflict to
+  resolve by editing the doc myself).
+- Sprint 5's Mission Log narration and certification-trigger UI are next, now unblocked
+  on the new convention. One open question flagged for that step: GDD §7's "designed
+  first failure" is meant to surprise the player (the scripted Probe-1 test 1 always
+  fails) — but UI_SPEC §4 now requires every purchasable to state its effect BEFORE
+  purchase. Does the certification button for that specific test need to say it will
+  fail, or is the existing narrative-surprise intent meant to override the transparency
+  rule for this one, deliberately-scripted case? Asking before writing that button's
+  copy, not guessing either way.

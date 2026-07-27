@@ -1,6 +1,6 @@
 import { BUILDINGS } from '../data/buildings';
 import { ROLES, STARTING_STAFF_CAP } from '../data/roles';
-import type { BuildingId, RoleId, StaffState } from './types';
+import type { BuildingId, GameState, RoleId, StaffState } from './types';
 
 /** Cost to hire the next unit of `role`, per ECONOMY §3 (`base × 1.15^hiredOfRole`). */
 export function hiringCost(role: RoleId, hiredOfRole: number): number {
@@ -73,4 +73,27 @@ export function buildingStaffRatio(staff: StaffState, buildingId: BuildingId, le
   const roles = Object.keys(BUILDINGS[buildingId].slots ?? {}) as RoleId[];
   if (roles.length === 0) return 1;
   return Math.min(...roles.map((role) => staffRatioForBuilding(staff, buildingId, role, level)));
+}
+
+/** Unfilled slots for a single role across every building — what a NEW hire of that
+ * role would actually have available to fill. Used to gate T-11 (about to hire with 0
+ * open slots for THIS role, specifically, since a Technician hire can't fill an
+ * Engineer slot even if the program has open Engineer slots elsewhere). */
+export function openSlotsForRole(staff: StaffState, buildings: GameState['buildings'], role: RoleId): number {
+  return (Object.keys(BUILDINGS) as BuildingId[]).reduce((sum, buildingId) => {
+    const slots = buildingSlotCount(buildingId, role, buildings[buildingId].level);
+    const assigned = assignedToBuilding(staff, role, buildingId);
+    return sum + Math.max(0, slots - assigned);
+  }, 0);
+}
+
+/** UI_SPEC §4 / NARRATIVE §7 (the idle-staff trap, T-10): total unfilled slots across
+ * every building and role in the program — "Open slots across the program: [N]," always
+ * visible in the hiring panel so a hire's destination (or lack of one) is never a
+ * surprise found out later. */
+export function totalOpenSlots(staff: StaffState, buildings: GameState['buildings']): number {
+  return (Object.keys(ROLES) as RoleId[]).reduce(
+    (sum, role) => sum + openSlotsForRole(staff, buildings, role),
+    0,
+  );
 }

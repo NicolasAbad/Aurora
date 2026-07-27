@@ -80,7 +80,7 @@
 2. Locked complexes greyed with visible conditions; milestone call-outs (small non-blocking modal).
 3. Polished "While you were away" (incl. payroll-stoppage reporting); designed session-1 ending (a timer always left running).
 4. Settings screen (UI_SPEC §6): save export/import (string + file), manual save, hard reset, sound/motion toggles. Import validates version and rejects corrupt saves with a clear message.
-5. Funnel verification via telemetry; balance pass = `sim/run.ts` day-by-day output vs the session table (including the sonda campaign days).
+5. Funnel verification via telemetry; balance pass = `sim/run.ts` day-by-day output vs the session table (including the sonda campaign days). **Economy unlock window: this is where the parked Campus/Production upgrade set (BACKLOG) gets priced and implemented — including the slot-adding upgrades that fix the idle-staff problem and the R&D Lab's parallel research track. Re-run the full sweep (all three profiles) afterwards; every sanity rule must still hold.**
 6. QA: save/load regression on every system; offline with every process kind; export→wipe→import round-trip test.
 7. **Private playtest build:** deploy to itch.io as a private/unlisted build for 3–5 trusted testers with the feedback form. The game's #1 risk is multi-day pacing, which cannot be validated solo — do not wait until Sprint 12 for external eyes.
 **Acceptance (END OF PHASE 1):** a fresh tester reaches the first successful SATELLITE launch (Aurora I) with no external explanation, having flown multiple sondas along the way, over a multi-day arc.

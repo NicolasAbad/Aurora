@@ -1,3 +1,6 @@
+import { RESOURCE_ICON } from '../data/resourceNames';
+import type { ResourceId } from './types';
+
 // ECONOMY_MODEL §12 (v2.2): "Suffixes from 10,000, always 3 significant figures:
 // 10.0K, 125K, 1.25M, 3.10B. Rates 1 decimal. Percentages integers."
 const SUFFIXES: [number, string][] = [
@@ -26,6 +29,21 @@ export function formatRate(value: number): string {
 
 export function formatPercent(value: number): string {
   return `${Math.round(value)}%`;
+}
+
+// UI_SPEC §4 (v3.0): "Costs and price tags render as icon + number, with NO resource
+// noun... Funds use the currency symbol $ as a prefix and no noun at all." Single
+// source of truth for this, so every consumer (BuildingTile, StaffHiring,
+// PromotionPanel, ResearchPanel, manual-action buttons) renders a price the same way.
+export function formatCostEntry(id: ResourceId, amount: number): string {
+  if (id === 'funding') return `$${formatAmount(amount)}`;
+  return `${RESOURCE_ICON[id]} ${formatAmount(amount)}`;
+}
+
+export function formatCost(cost: Partial<Record<ResourceId, number>>): string {
+  return (Object.entries(cost) as [ResourceId, number][])
+    .map(([id, amount]) => formatCostEntry(id, amount))
+    .join(' + ');
 }
 
 // UI_SPEC §4: "Every timer shows remaining time in human units (2h 14m, 45s)." Shared

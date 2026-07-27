@@ -58,6 +58,8 @@ Directly under the ticker, a persistent horizontal strip lists **every** running
 7. **Contracts panel** (appears with the Launch Rail for tier-0 offers; expands with satellite tiers post-Aurora I): offer cards (client, requirements with have/need coloring — including tier badges for Titanium requirements, deadline, pay), active contract with its build/queue status, pad queue visualization (who holds each pad — including Pad B once built).
 
 ## 4. States & feedback rules
+- **Nothing purchasable is offered without stating its effect.** Every building, upgrade and hire shows plain-language copy (NARRATIVE §6) describing what it does, visible BEFORE purchase — on the button, its tooltip, or the tile. A name and a price alone is a spec violation. Items not implemented in v1 (`[v2]` in ECONOMY §4) are not rendered at all — not greyed, not teased.
+- **Idle staff must never be a silent trap:** the hiring panel always shows total open slots across the program (T-10); hiring with zero open slots requires acknowledging that the hire will be idle and still paid (T-11); a fully-staffed building explains that slots are fixed and levelling is the way to grow output (T-12). Hiring is never blocked — the player keeps the choice, informed.
 - **Cost & amount rendering (systemic rule — replaces the old "no single-letter abbreviations" rule, which treated only the symptom):**
   - **Costs and price tags render as icon + number, with NO resource noun**: `[⚡] 400 · [🔧] 30`. Reading "400 Funding" or "30 Hardware" as a price is the bug — prices carry units, not internal data names.
   - **Funds use the currency symbol `$` as a prefix and no noun at all**: `$400`, `$1.25M`. This is the only resource with a symbol instead of an icon.

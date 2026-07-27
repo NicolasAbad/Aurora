@@ -13,3 +13,18 @@ export const RESOURCE_NAME: Record<ResourceId, string> = {
   reputation: 'Reputation',
   flightxp: 'Flight XP',
 };
+
+// UI_SPEC §4 (v3.0): "Funds use the currency symbol $ as a prefix and no noun at all —
+// this is the only resource with a symbol instead of an icon." Every other resource gets
+// an icon for cost/price display (icon + number, no resource noun). Icon choice itself
+// isn't specified anywhere in the docs — a presentation-only pick, not a balance or
+// content decision, flagged as such rather than treated as an obvious given.
+export const RESOURCE_ICON: Record<ResourceId, string> = {
+  funding: '$',
+  materials: '📦',
+  hardware: '🔧',
+  propellant: '⛽',
+  research: '🔬',
+  reputation: '⭐',
+  flightxp: '🚀',
+};

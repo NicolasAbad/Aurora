@@ -1,6 +1,8 @@
 # ECONOMY_MODEL.md — Aurora Program — Complete baseline numbers
 *Every value in the game. Claude Code does NOT invent numbers: if a value isn't here, ask and add it here first. Tick = 1 second (logical economy rate; the render loop is delta-based per CLAUDE.md rule 6). Baseline for the Sprint-0 headless simulator (`sim/run.ts`); adjust only via the simulator, updating this file.*
 
+**v3.2 changes (upgrade audit):** Radar clarified as part of the base Tracking Station (not purchasable); v2-only upgrades marked [v2] and explicitly not rendered in v1; player-facing upgrade copy now mandatory (NARRATIVE §6, UI_SPEC §4). No values changed.
+
 **v3.1 changes (design review — scoped economy unlock, item-limited):** tier-0 contract Confidence clarified (sonda formula, 100% reachable); Clean Room naming collision resolved (tier renamed "constellation batches"; the VAB upgrade is a real tier-2 prerequisite); Reputation gates added to satellite tiers (tier 1 ≥ 20, tier 2 ≥ 50 — safety nets, sim-verified at Sprint 9); contract launch failure vs missed-deadline penalty disambiguated; Rush Order gate rationale confirmed. **This is a SCOPED unlock for these items only — the rest of the economy stays locked and no existing value changed.**
 
 **v3.0 changes (presentation):** player-facing display names & cost rendering defined (§12) — Funds shown as $, costs as icon+number, no resource nouns in price tags. Presentation only: no ResourceId, value, or balance change; economy lock unaffected.
@@ -85,11 +87,12 @@ Insolvency behavior (Funding 0, salaries due): GDD §1b — staffed production p
 | Launch Pad B | 6,000 F + 1,500 M + 100 H | — (one-time) | Second pad: contracts and story missions can stage in parallel (each pad has its own queue, transfer, and weather window). **Unlocks after the first successful orbital launch (Aurora I success) + Reputation ≥ 40** — "Launch 1" wording is retired everywhere; unlocks are defined by event, same rule as §8b. Requires 1 additional Technician slot and its own Service Tower purchase for the +5 Confidence. | 1 Tech |
 
 ### Internal upgrades (one-time)
-Launch Pad: Service Tower 800 F+150 M (+5 Confidence) · Flame Trench 1,200 F+300 M (−30% pad turnaround) · Sound Suppression 2,500 F+500 M (heavy class, v2)
-Test Stand: Instrumentation 600 F+20 H (−25% certification time) · Cryogenic Stand 2,000 F+80 H (tier-2 engines, v2)
-Tracking: Radar (included) · Antenna Network 1,500 F+50 H (+25% Flight XP) · Weather Station 900 F+25 H (windows every 2 min)
-VAB: Heavy Crane 1,800 F+60 H (large stages, v2) · Clean Room 2,200 F+70 H (tier-2 contracts)
-Quarters: Classroom 400 F (promotions) · Cafeteria 700 F (−10% effective salaries)
+*Player-facing copy for each: NARRATIVE_EVENTS §6. Items marked **[v2]** are NOT implemented and NOT rendered in v1 — not greyed, not teased.*
+Launch Pad: Service Tower 800 F+150 M (+5 Confidence) · Flame Trench 1,200 F+300 M (−30% pad turnaround) · **[v2]** Sound Suppression (heavy class)
+Test Stand: Instrumentation 600 F+20 H (−25% certification time) · **[v2]** Cryogenic Stand (tier-2 engines)
+Tracking: Antenna Network 1,500 F+50 H (+25% Flight XP) · Weather Station 900 F+25 H (windows every 2 min). *(Radar is part of the base Tracking Station — it is NOT a purchasable upgrade and must not appear in the upgrade list.)*
+VAB: Clean Room 2,200 F+70 H (required for constellation-batch contracts, §10) · **[v2]** Heavy Crane (large stages)
+Quarters: Classroom 400 F (enables promotions) · Cafeteria 700 F (−10% effective salaries)
 
 ## 4b. Tick resolution order, starvation & contention
 Every economy tick resolves in this fixed order:

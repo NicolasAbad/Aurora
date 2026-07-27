@@ -4,6 +4,7 @@ import { isNodeAvailable, isNodeVisible } from '../core/research';
 import { progressFraction, remainingMs } from '../core/time';
 import { formatDuration } from '../core/format';
 import { useNow } from './useNow';
+import { CostLabel } from './CostLabel';
 import type { Process } from '../core/types';
 
 const BRANCH_LABELS: Record<ResearchNode['branch'], string> = {
@@ -69,7 +70,7 @@ function NodeCard({ node }: { node: ResearchNode }) {
       {state !== 'locked' && (
         <>
           <div className="research-node__cost">
-            {node.costR} Research, {formatDuration(node.durationMs)}
+            <CostLabel cost={{ research: node.costR }} />, {formatDuration(node.durationMs)}
           </div>
           {node.description && <div className="research-node__description">{node.description}</div>}
         </>

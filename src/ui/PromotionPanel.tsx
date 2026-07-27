@@ -1,9 +1,9 @@
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../state/persistStore';
 import { PROMOTIONS, ROLE_LABEL } from '../data/roles';
-import { RESOURCE_NAME } from '../data/resourceNames';
 import { formatDuration } from '../core/format';
 import { unassignedCount } from '../core/staff';
+import { CostLabel } from './CostLabel';
 
 // ECONOMY §3: promotions are gated ONLY by the Classroom upgrade, never by the target
 // role's direct-hire tech (the intended zero-Scientist bootstrap path). Progressive
@@ -33,7 +33,7 @@ export function PromotionPanel() {
               disabled={!canPromote}
               onClick={() => startPromotion(promo.from, promo.to)}
             >
-              Promote ({promo.costFunding} {RESOURCE_NAME.funding}, {formatDuration(promo.durationMs)})
+              Promote (<CostLabel cost={{ funding: promo.costFunding }} />, {formatDuration(promo.durationMs)})
             </button>
           </div>
         );

@@ -60,3 +60,27 @@ Payload flavor: "a batch of internet satellites", "a comms repeater", "a biology
 
 ## 5. Program Records board labels
 First ignition · First flight · Past the Kármán line · First orbit · First customer · First delivery
+
+## 6. Building upgrade descriptions (player-facing — every purchasable states its effect BEFORE purchase)
+Rule: no upgrade, building or hire may be offered without plain-language copy saying what it does. Values live in ECONOMY §4; this is the wording the player reads.
+
+| ID | Upgrade (building) | Description shown on the buy button/tooltip |
+|---|---|---|
+| U-01 | Classroom (Crew Quarters) | "Train your people to change roles: Technician → Engineer → Scientist. Required before any promotion — and the only path to your first Scientist." |
+| U-02 | Cafeteria (Crew Quarters) | "A proper canteen. Effective salaries drop 10% across the whole program." |
+| U-03 | Extended Rail (Launch Rail) | "A longer rail for bigger sounding rockets. Required to fly the S-2 — the vehicle that can cross into space." |
+| U-04 | Instrumentation (Engine Test Stand) | "Better sensors on the stand. Engine certifications finish 25% faster." |
+| U-05 | Service Tower (Launch Pad) | "A fixed tower for final checks at the pad. +5 Launch Confidence on every launch from this pad." |
+| U-06 | Flame Trench (Launch Pad) | "Channels the exhaust away from the pad. Pad turnaround after a launch is 30% shorter." |
+| U-07 | Antenna Network (Tracking Station) | "More ground antennas, more telemetry recovered. +25% Flight Experience from every flight." |
+| U-08 | Weather Station (Tracking Station) | "Your own forecasting. Launch weather windows open every 2 minutes instead of 2–5." |
+| U-09 | Clean Room (VAB) | "A contamination-controlled bay. Required to accept constellation-batch contracts — the program's most lucrative clients." |
+
+Rules: **v2-only upgrades (Sound Suppression, Cryogenic Stand, Heavy Crane) are NOT rendered in v1 at all** — not greyed, not teased. Every building tile likewise states what it produces or enables in plain language, never only a number.
+
+## 7. Staff & slot copy (the idle-staff trap)
+| ID | Moment | Text |
+|---|---|---|
+| T-10 | Hiring panel, always visible | "Open slots across the program: [N]" |
+| T-11 | About to hire with 0 open slots | "No open slots — this hire will sit idle and still draw salary. Idle staff can still be promoted (Technician → Engineer → Scientist)." |
+| T-12 | A building shows full slots (e.g. 2/2) | "Fully staffed. To produce more here, raise the building's level — slots are fixed per building." |
