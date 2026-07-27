@@ -1,4 +1,5 @@
 import { CERTIFICATION_TESTS_BY_ID, type CertificationTestDef } from '../data/certifications';
+import { markSeen } from '../data/narrative';
 import { applyGrant } from './economy';
 import { creditHardware, currentHardwareTier } from './hardware';
 import type { EngineCertificationState, EngineId, GameState, Process } from './types';
@@ -14,7 +15,8 @@ export interface CertificationState {
 const SCRIPTED_FAILURE_HARDWARE_RECOVERY = 6;
 const SCRIPTED_FAILURE_REWARD = { flightxp: 30, flightData: 250 };
 const STATIC_FIRE_SUCCESS_REWARD = { flightxp: 15, reputation: 2, flightData: 150 };
-const SCRIPTED_FAILURE_NARRATIVE_ID = 'N-07';
+const SCRIPTED_FAILURE_NARRATIVE_ID = 'N-07'; // First static fire failure
+const CERTIFICATION_SUCCESS_NARRATIVE_ID = 'N-08'; // Certification success
 
 /** Mirrors core/research.ts's isNodeAvailable shape: given the test's definition and its
  * engine's current progress, is this test startable right now? */
@@ -96,9 +98,7 @@ export function resolveCertification(
         flightxp: applyGrant(resources.flightxp, SCRIPTED_FAILURE_REWARD.flightxp, true),
         research: applyGrant(resources.research, SCRIPTED_FAILURE_REWARD.flightData, true),
       },
-      narrativeSeen: narrativeSeen.includes(SCRIPTED_FAILURE_NARRATIVE_ID)
-        ? narrativeSeen
-        : [...narrativeSeen, SCRIPTED_FAILURE_NARRATIVE_ID],
+      narrativeSeen: markSeen(narrativeSeen, SCRIPTED_FAILURE_NARRATIVE_ID),
       justCompleted: { testId, outcome: 'scriptedFailure' },
     };
   }
@@ -119,7 +119,7 @@ export function resolveCertification(
       reputation: applyGrant(resources.reputation, STATIC_FIRE_SUCCESS_REWARD.reputation, true),
       research: applyGrant(resources.research, STATIC_FIRE_SUCCESS_REWARD.flightData, true),
     },
-    narrativeSeen,
+    narrativeSeen: markSeen(narrativeSeen, CERTIFICATION_SUCCESS_NARRATIVE_ID),
     justCompleted: { testId, outcome: 'success' },
   };
 }

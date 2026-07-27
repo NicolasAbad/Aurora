@@ -1255,3 +1255,83 @@ tab-lock bug class.
   fail, or is the existing narrative-surprise intent meant to override the transparency
   rule for this one, deliberately-scripted case? Asking before writing that button's
   copy, not guessing either way.
+
+## Sprint 5 — CLOSED (2026-07-26)
+
+UI_SPEC replaced to v3.3, answering the disclosure-scoping question above: the rule is
+scoped to player CHOICES. Probe-1's scripted test 1 isn't one, so it's carved out —
+cost/duration shown like any process, no result or Confidence preview, since there's
+nothing to disclose and no Confidence formula applies to a single test (§7b describes
+the certification as a whole). Test 2 and extended get normal disclosure once test 1
+has resolved. This unblocked the last two Sprint 5 tasks: Mission Log narration and the
+certification trigger UI.
+
+**Built:**
+- `data/narrative.ts` gains N-01..N-17 (§1, all of it — transcribed once now that a real
+  consumer exists, rather than touching this file again every time a later sprint adds
+  the system behind one more beat) and `markSeen` (idempotent append, mirrors
+  `registerModifier`'s shape). **Only N-01 through N-08 have an actual trigger wired
+  anywhere in the code** — everything past N-08 needs Sprint 6+ systems (VAB, Aurora I,
+  contracts, Pad B) that don't exist yet; the text sits ready, unwired, same "infra
+  ahead of its content" restraint as everywhere else in this project.
+- Trigger wiring, at the store level (mirrors `trackFirstOccurrence`'s existing
+  alongside-the-pure-action pattern): N-01 (first pitch), N-02 (first hire), N-03
+  (Finance reaches level 1), N-06 (Test Stand built) are action-triggered in `pitch`/
+  `hire`/`buyBuilding`; N-04 (lifetime Funding crosses 300 — Complex B unlock) and N-05
+  (first Hardware ever fabricated) are threshold checks in `applyTick`, since passive
+  production can cross either with no discrete action to hook. N-07 (scripted failure)
+  and **N-08 (certification success — found missing while wiring this: the reward was
+  already correct since Sprint 5's core/data phase, but nothing marked the beat seen)**
+  are set directly in `core/certification.ts`'s own resolution, using the same
+  `markSeen` helper.
+- `ui/MissionLog.tsx` (new) — UI_SPEC §3.4: collapsible bottom panel, last entry always
+  visible as one italic line, expands to a full reverse-chronological feed. Pure display
+  over `narrative.seen`; renders nothing until the first beat fires (no empty panel on a
+  fresh save).
+- `data/certifications.ts`: `CertificationTestDef` gains an optional `description` —
+  **populated for test 2 and extended, deliberately absent for test 1** (the data-level
+  enforcement of the v3.3 carve-out — "genuinely absent," same pattern as the removed
+  `[v2]` upgrades, not a UI-side conditional that could be bypassed by accident).
+- `ui/CertificationPanel.tsx` (new) — mirrors `ResearchPanel`'s exact card-state shape
+  (locked/available/in-progress/done) and its `useNow`-scoped countdown pattern, shown
+  once the Test Stand is built (level ≥ 1). Test 1's card renders cost + duration only;
+  test 2/extended render their `description` too, once unlocked.
+- Wired into `App.tsx`: `MissionLog` at the app root (after `<main>`); `CertificationPanel`
+  inside `TestingPanel`, gated on Test Stand level.
+
+**Verification:**
+- 210 tests passing (up from 204), including new coverage for every narrative trigger
+  (`persistStore.test.ts`) and N-08 (`certification.test.ts`). Typecheck/lint/build
+  clean, dev tooling still excluded from the bundle, `sim/run.ts` unaffected (narrative
+  triggers touch no economy value).
+- Playwright, through a real browser, driving the actual certification mechanic live
+  (not injection — this is the one part of Sprint 5 where the mechanic itself, not just
+  UI reactivity, is what's under test): confirmed test 1's card shows cost ("🔧 10 + ⛽
+  50, 25m 0s") and duration with **zero** result or outcome text anywhere on it; starting
+  it puts a "Certifying" chip in the process strip; once it resolves, the Mission Log's
+  last-entry line shows N-07's real text verbatim and test 1 flips to "Done"; test 2
+  (previously locked, showing "Requires: first attempt resolved") becomes available with
+  its real disclosure text ("Guaranteed success. Certifies Probe-1..."); starting and
+  resolving it shows N-08's real text verbatim, flips test 2 to "Done," and unlocks
+  extended certification with its own disclosure; the expanded Mission Log feed contains
+  all beats in order. Zero console errors. Screenshots: `27-sprint5-scripted-failure-
+  narrated.png`, `28-sprint5-certified.png`.
+- **Real script bug caught before it produced a false result:** the first attempt reused
+  an 800ms `warpWaitThenReset` sized for Sprint 4.5's 3-minute research-node waits,
+  applied unchanged to certification's 25-minute tests (need ≥ ~2.5s real at ×600, not
+  0.8s) — test 1 never actually resolved in time, and the Mission Log's last entry
+  stayed on N-01 from the earlier pitch. A second issue, found in the same run: the
+  injected save's starting resources already implied `lifetimeEarned` past N-04/N-05's
+  thresholds (500 lifetime Funding, 50 lifetime Hardware), so both fired on the very
+  first live tick and displaced N-01 as "last entry" before the assertions meant to
+  check it — correct trigger behavior, but it made the script's own narrative-ordering
+  assertions misleading. Fixed by pre-seeding `narrative.seen` with `['N-04', 'N-05']`
+  in the injected save (consistent with what those resource values actually imply) and
+  fixing the wait durations; not logged to the timing-traps memory (no time-warp/salary
+  interaction this time, just two ordinary script-construction mistakes).
+
+**Sprint 5 acceptance, verified end to end through the integrated path:** "full test-
+fail-narrative-retry-certify flow works and is narrated." All five original tasks
+(Test Stand reachability, certifications as processes, scripted failure, Mission Log +
+narrative triggers, Flight Experience visible as a resource) are complete. Sprint 5 is
+closed. Next: Sprint 6 (sounding rockets).

@@ -1,11 +1,31 @@
 // CLAUDE.md rule 9: game text only from NARRATIVE_EVENTS.md, referenced by ID. This is
 // that lookup — the single place UI components resolve an ID to its player-facing text,
-// so nothing ever hardcodes a narrative string inline. Populated so far: U-* (upgrade
-// copy, §6) and T-10/T-11/T-12 (idle-staff copy, §7). N-* (Mission Log beats) and the
-// T-01..T-09 FTUE tooltips are added when their own consumers land (Sprint 5's Mission
-// Log, Sprint 8's tooltip system) — same "infra as its content is verified" restraint
-// used throughout this project, not a placeholder table of invented text.
+// so nothing ever hardcodes a narrative string inline. N-* text (§1, Mission Log beats)
+// is transcribed here in full now that Sprint 5 builds the Mission Log — but only
+// N-01..N-08 have a real TRIGGER wired anywhere in the code yet (see markSeen call
+// sites); N-09 onward sit ready, unwired, for whichever sprint builds VAB/Aurora I/
+// contracts/Pad B. T-01..T-09 FTUE tooltips are added with Sprint 8's tooltip system.
 export const NARRATIVE_TEXT: Record<string, string> = {
+  // §1 — Mission Log scripted beats (by trigger)
+  'N-01': 'You pitched your idea at a bar. Someone covered the tab out of pity. That counts as investment.',
+  'N-02': 'A technician quit a stable job to join you. His family is worried. He is not.',
+  'N-03': 'Someone now chases investors on your behalf. The word ‘salary’ appears for the first time.',
+  'N-04': 'You leased a warehouse on the edge of town. The landlord asked twice if the rocket thing was serious.',
+  'N-05': 'The first part came off the line. It’s small, it shines, and it cost more than the budget admits.',
+  'N-06': 'Local paper: ‘Who are these lunatics claiming they’ll reach space?’',
+  'N-07': 'The engine blew at four seconds. The team spent the night in the debris, taking notes. Nobody mentioned quitting.',
+  'N-08': 'Full burn. Sixty seconds of stable fire. Someone can be heard crying on the video. Nobody confesses.',
+  'N-08b': 'Your first rocket flew. It carried a university’s experiment and the hopes of everyone on payroll. The lab already wants a second flight.',
+  'N-08c': 'One hundred kilometers. For eleven seconds, something you built was in space. The bar where you made your first pitch named a drink after you.',
+  'N-09': 'The rocket stands whole for the first time. Smaller than people imagine. Bigger than the dream used to be.',
+  'N-10': 'Ten. Nine. Eight. The press showed up ‘in case it explodes.’ Seven. Six…',
+  'N-11': 'AURORA I IS FLYING. The paper that mocked you wants an exclusive. The skeptical investor called three times.',
+  'N-12': 'It didn’t make it. But the telemetry came back whole — and that, says your chief engineer, is worth more than the rocket.',
+  'N-13': 'The phone rings: people want to pay to put things on YOUR rockets. The plural was intentional.',
+  'N-14': 'First satisfied customer. The check has every zero they promised. Finance framed it.',
+  'N-15': 'Orbit. The word that sounded like science fiction back at that bar is now a line item in the quarterly plan.',
+  'N-16': 'Aurora II completed its third pass around Earth. In the control room: silence. Then the roar. Next stop: sending people.',
+  'N-17': 'A second pad. The field where the inspector once frowned at your Refinery now has two towers against the sky. The program is no longer a bet — it’s a place.',
   // §6 — building upgrade descriptions (every purchasable states its effect BEFORE purchase)
   'U-01':
     'Train your people to change roles: Technician → Engineer → Scientist. Required before any promotion — and the only path to your first Scientist.',
@@ -35,4 +55,10 @@ export function narrativeText(id: string, vars?: Record<string, string | number>
     (text, [key, value]) => text.replaceAll(`{${key}}`, String(value)),
     template,
   );
+}
+
+/** GDD §10: Mission Log beats are one-time milestones, not repeatable events — idempotent
+ * append, mirrors registerModifier's same-shape idempotency in core/modifiers.ts. */
+export function markSeen(seen: string[], id: string): string[] {
+  return seen.includes(id) ? seen : [...seen, id];
 }

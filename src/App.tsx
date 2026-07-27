@@ -11,6 +11,8 @@ import { PayrollBanner } from './ui/PayrollBanner';
 import { AwayModal } from './ui/AwayModal';
 import { ActiveProcessStrip } from './ui/ActiveProcessStrip';
 import { StaffAvailabilityChip } from './ui/StaffAvailabilityChip';
+import { CertificationPanel } from './ui/CertificationPanel';
+import { MissionLog } from './ui/MissionLog';
 import { TimeWarpControl } from './ui/TimeWarpControl';
 import { DevResetButton } from './ui/DevResetButton';
 import { useGameStore } from './state/persistStore';
@@ -92,6 +94,7 @@ function TestingPanel({ onSelectComplex }: ComplexPanelProps) {
   const payloadProcessingUnlocked = useGameStore((s) =>
     isUnlockConditionMet(BUILDINGS.payloadProcessing.unlockCondition, unlockContextFromState(s)),
   );
+  const testStandLevel = useGameStore((s) => s.buildings.testStand.level);
 
   return (
     <>
@@ -101,6 +104,7 @@ function TestingPanel({ onSelectComplex }: ComplexPanelProps) {
         <BuildingTile buildingId="launchRail" />
         {payloadProcessingUnlocked && <BuildingTile buildingId="payloadProcessing" />}
       </div>
+      {testStandLevel >= 1 && <CertificationPanel />}
     </>
   );
 }
@@ -126,6 +130,7 @@ export function App() {
         {activeComplex === 'production' && <ProductionPanel onSelectComplex={setActiveComplex} />}
         {activeComplex === 'testing' && <TestingPanel onSelectComplex={setActiveComplex} />}
       </main>
+      <MissionLog />
     </div>
   );
 }

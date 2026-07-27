@@ -5,6 +5,8 @@
 
 **v2.8 changes:** no single-letter resource abbreviations in player-facing UI; manual-action cooldowns get visible recharge + acknowledged clicks (§4).
 
+**v3.3 changes:** §4's effect-disclosure rule scoped explicitly to player CHOICES; carve-out added for Probe-1's scripted first certification test (GDD §7) — cost/duration still shown like any process, but no result or Confidence percentage, since there's no choice to inform and no Confidence formula applies to that individual test.
+
 **v2.6 changes:** progressive-disclosure rules added (§2b) — default is hidden-until-relevant; the full content surface is never visible from the start.
 
 **v2.1 changes:** payroll-unpaid ticker state and paused-building indicator added (§4); above-cap display rule added (§2); accent color default set to signal orange (owner may flip to cyan — single CSS variable).
@@ -58,7 +60,7 @@ Directly under the ticker, a persistent horizontal strip lists **every** running
 7. **Contracts panel** (appears with the Launch Rail for tier-0 offers; expands with satellite tiers post-Aurora I): offer cards (client, requirements with have/need coloring — including tier badges for Titanium requirements, deadline, pay), active contract with its build/queue status, pad queue visualization (who holds each pad — including Pad B once built).
 
 ## 4. States & feedback rules
-- **Nothing purchasable is offered without stating its effect.** Every building, upgrade and hire shows plain-language copy (NARRATIVE §6) describing what it does, visible BEFORE purchase — on the button, its tooltip, or the tile. A name and a price alone is a spec violation. Items not implemented in v1 (`[v2]` in ECONOMY §4) are not rendered at all — not greyed, not teased.
+- **Nothing purchasable is offered without stating its effect.** Every building, upgrade and hire shows plain-language copy (NARRATIVE §6) describing what it does, visible BEFORE purchase — on the button, its tooltip, or the tile. A name and a price alone is a spec violation. Items not implemented in v1 (`[v2]` in ECONOMY §4) are not rendered at all — not greyed, not teased. **Scope: this rule covers player CHOICES (upgrades, buildings, hires) — never a scripted narrative outcome.** Probe-1's first certification test (GDD §7, the designed first failure) shows its cost and duration like any process, but never a result or a Confidence percentage — there is nothing to disclose because the player isn't choosing an outcome, and no Confidence formula applies to that individual test (§7b's formula describes the certification as a whole). The surprise is preserved by omission of a result, not by omission of cost.
 - **Idle staff must never be a silent trap:** the hiring panel always shows total open slots across the program (T-10); hiring with zero open slots requires acknowledging that the hire will be idle and still paid (T-11); a fully-staffed building explains that slots are fixed and levelling is the way to grow output (T-12). Hiring is never blocked — the player keeps the choice, informed.
 - **Cost & amount rendering (systemic rule — replaces the old "no single-letter abbreviations" rule, which treated only the symptom):**
   - **Costs and price tags render as icon + number, with NO resource noun**: `[⚡] 400 · [🔧] 30`. Reading "400 Funding" or "30 Hardware" as a price is the bug — prices carry units, not internal data names.

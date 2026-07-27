@@ -21,7 +21,10 @@ import { applyModifiers, pruneExpiredModifiers } from '../core/modifiers';
 import { OFFLINE_CAP_MS, resolveOffline, type PayrollStoppage } from '../core/offlineResolution';
 import { resolveResearch } from '../core/research';
 import { resolveProcesses } from '../core/time';
+import { markSeen } from '../data/narrative';
 import { trackFirstOccurrence } from './telemetry';
+
+const COMPLEX_B_UNLOCK_FUNDING = 300; // ECONOMY §4, matches ComplexTabs' own gate
 
 export const SAVE_KEY = 'aurora-program-save';
 const AUTOSAVE_INTERVAL_MS = 10_000;
@@ -215,6 +218,7 @@ export const useGameStore = create<Store>()((set, get) => ({
     set((state) => ({
       resources: applyPitch(state.resources, state.buildings.offices.level),
       telemetry: trackFirstOccurrence(state.telemetry, 'first_pitch'),
+      narrative: { ...state.narrative, seen: markSeen(state.narrative.seen, 'N-01') }, // First manual pitch
     }));
   },
 
@@ -222,7 +226,14 @@ export const useGameStore = create<Store>()((set, get) => ({
     const state = get();
     const result = buyBuildingUpgrade(state.resources, state.buildings, buildingId);
     if (result) {
-      set({ ...result, telemetry: trackFirstOccurrence(state.telemetry, 'first_building_upgrade', { buildingId }) });
+      let seen = state.narrative.seen;
+      if (buildingId === 'finance' && result.buildings.finance.level === 1) seen = markSeen(seen, 'N-03');
+      if (buildingId === 'testStand' && result.buildings.testStand.level === 1) seen = markSeen(seen, 'N-06');
+      set({
+        ...result,
+        telemetry: trackFirstOccurrence(state.telemetry, 'first_building_upgrade', { buildingId }),
+        narrative: { ...state.narrative, seen },
+      });
     }
   },
 
@@ -254,7 +265,11 @@ export const useGameStore = create<Store>()((set, get) => ({
       role,
     );
     if (result) {
-      set({ ...result, telemetry: trackFirstOccurrence(state.telemetry, 'first_hire', { role }) });
+      set({
+        ...result,
+        telemetry: trackFirstOccurrence(state.telemetry, 'first_hire', { role }),
+        narrative: { ...state.narrative, seen: markSeen(state.narrative.seen, 'N-02') }, // First hire
+      });
     }
   },
 
@@ -347,6 +362,16 @@ export const useGameStore = create<Store>()((set, get) => ({
       Date.now(),
     );
 
+    // Passive/threshold beats (no discrete player action to hook): checked every tick
+    // against the freshly-resolved resources, same as ComplexTabs' own live unlock gate.
+    let seen = certificationResolution.narrativeSeen;
+    if (certificationResolution.resources.funding.lifetimeEarned >= COMPLEX_B_UNLOCK_FUNDING) {
+      seen = markSeen(seen, 'N-04'); // Complex B unlocked
+    }
+    if (certificationResolution.resources.hardware.lifetimeEarned > 0) {
+      seen = markSeen(seen, 'N-05'); // First Hardware fabricated
+    }
+
     set({
       resources: certificationResolution.resources,
       buildings,
@@ -354,7 +379,7 @@ export const useGameStore = create<Store>()((set, get) => ({
       staff: staffAfterCompletions,
       research: researchResolution.research,
       certifications: certificationResolution.certifications,
-      narrative: { ...state.narrative, seen: certificationResolution.narrativeSeen },
+      narrative: { ...state.narrative, seen },
       modifiers: researchResolution.modifiers,
       economyFlags: { ...state.economyFlags, payrollUnpaid },
     });

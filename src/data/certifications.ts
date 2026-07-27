@@ -16,6 +16,12 @@ export interface CertificationTestDef {
   stage: 'first' | 'retry' | 'extended';
   consumes: { hardware: number; propellant: number };
   durationMs: number;
+  // UI_SPEC §4 (v3.3): effect disclosure is scoped to player CHOICES. Test 1 is
+  // GDD §7's designed first failure, not a choice — it deliberately has NO description
+  // here (absent, not just unrendered — same "genuinely absent" pattern as the removed
+  // [v2] upgrades), so there is nothing for the UI to preview beyond cost/duration.
+  // Test 2 and extended are real choices (worth doing? worth doing now?) and get one.
+  description?: string;
 }
 
 export const CERTIFICATION_TESTS: CertificationTestDef[] = [
@@ -26,6 +32,7 @@ export const CERTIFICATION_TESTS: CertificationTestDef[] = [
     stage: 'first',
     consumes: { hardware: 10, propellant: 50 },
     durationMs: 25 * MIN,
+    // No description (see field comment) — UI_SPEC §4's carve-out for this exact test.
   },
   {
     id: 'probe1Test2',
@@ -34,6 +41,7 @@ export const CERTIFICATION_TESTS: CertificationTestDef[] = [
     stage: 'retry',
     consumes: { hardware: 8, propellant: 50 },
     durationMs: 25 * MIN,
+    description: 'Guaranteed success. Certifies Probe-1 — the engine that powers the S-1 and S-2 sounding rockets.',
   },
   {
     id: 'probe1Extended',
@@ -42,6 +50,7 @@ export const CERTIFICATION_TESTS: CertificationTestDef[] = [
     stage: 'extended',
     consumes: { hardware: 8, propellant: 50 },
     durationMs: 25 * MIN,
+    description: 'Optional. +30 Launch Confidence instead of +20, once certified.',
   },
 ];
 

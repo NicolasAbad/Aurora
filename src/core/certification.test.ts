@@ -102,6 +102,7 @@ describe('resolveCertification', () => {
     expect(result.resources.flightxp.amount).toBe(15);
     expect(result.resources.reputation.amount).toBe(2);
     expect(result.resources.research.amount).toBe(150);
+    expect(result.narrativeSeen).toEqual(['N-08']); // Certification success
   });
 
   it('probe1Extended grants no resource reward, only flips extendedCertified', () => {

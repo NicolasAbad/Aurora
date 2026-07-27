@@ -275,6 +275,56 @@ describe('certification flow through the real store (Sprint 5)', () => {
     expect(useGameStore.getState().certifications.engines.probe1.certified).toBe(true);
     // 30 (test1) + 15 (test2's static-fire-success reward)
     expect(useGameStore.getState().resources.flightxp.amount).toBe(45);
+    expect(useGameStore.getState().narrative.seen).toContain('N-08');
+  });
+});
+
+// Sprint 5: Mission Log beats fire from real store actions, not just core resolution
+// (N-07/N-08 are already covered above via the certification flow itself).
+describe('Mission Log narrative triggers (Sprint 5)', () => {
+  beforeEach(() => {
+    useGameStore.setState(createInitialState());
+  });
+
+  it('N-01 fires on the first pitch, not again on the second', () => {
+    useGameStore.getState().pitch();
+    expect(useGameStore.getState().narrative.seen).toEqual(['N-01']);
+    useGameStore.getState().pitch();
+    expect(useGameStore.getState().narrative.seen).toEqual(['N-01']); // idempotent
+  });
+
+  it('N-02 fires on the first hire', () => {
+    useGameStore.setState((s) => ({ resources: { ...s.resources, funding: { ...s.resources.funding, amount: 200 } } }));
+    useGameStore.getState().hire('technician');
+    expect(useGameStore.getState().narrative.seen).toContain('N-02');
+  });
+
+  it('N-03 fires the moment Finance reaches level 1, not before', () => {
+    useGameStore.setState((s) => ({ resources: { ...s.resources, funding: { ...s.resources.funding, amount: 200 } } }));
+    expect(useGameStore.getState().narrative.seen).not.toContain('N-03');
+    useGameStore.getState().buyBuilding('finance');
+    expect(useGameStore.getState().narrative.seen).toContain('N-03');
+  });
+
+  it('N-06 fires the moment the Test Stand is built', () => {
+    useGameStore.setState((s) => ({
+      resources: { ...s.resources, funding: { ...s.resources.funding, amount: 2000 }, materials: { ...s.resources.materials, amount: 500 }, hardware: { ...s.resources.hardware, amount: 100, byTier: { aluminum: 100, titanium: 0 } } },
+    }));
+    useGameStore.getState().buyBuilding('testStand');
+    expect(useGameStore.getState().narrative.seen).toContain('N-06');
+  });
+
+  it('N-04 fires via applyTick once lifetime Funding crosses 300 (Complex B unlock)', () => {
+    useGameStore.setState((s) => ({ resources: { ...s.resources, funding: { ...s.resources.funding, amount: 300, lifetimeEarned: 300, cap: null } } }));
+    expect(useGameStore.getState().narrative.seen).not.toContain('N-04');
+    useGameStore.getState().applyTick(0);
+    expect(useGameStore.getState().narrative.seen).toContain('N-04');
+  });
+
+  it('N-05 fires via applyTick once any Hardware has ever been fabricated', () => {
+    useGameStore.setState((s) => ({ resources: { ...s.resources, hardware: { ...s.resources.hardware, lifetimeEarned: 1 } } }));
+    useGameStore.getState().applyTick(0);
+    expect(useGameStore.getState().narrative.seen).toContain('N-05');
   });
 });
 
