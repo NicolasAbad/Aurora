@@ -1,6 +1,8 @@
 # ECONOMY_MODEL.md — Aurora Program — Complete baseline numbers
 *Every value in the game. Claude Code does NOT invent numbers: if a value isn't here, ask and add it here first. Tick = 1 second (logical economy rate; the render loop is delta-based per CLAUDE.md rule 6). Baseline for the Sprint-0 headless simulator (`sim/run.ts`); adjust only via the simulator, updating this file.*
 
+**v3.5 changes (owner manual-play findings — first-hour experience):** Auto-refuel and Engine Test Stand's per-level leveling both had NO defined effect at all (real gaps, not player misunderstanding) — now defined (§5, §4). Sounding rockets tech's role clarified as a pure gate (§5), matching the honest-zero-effect pattern already used for Aluminum alloys. Hardware tier production confirmed unchanged (automatic at current researched tier, §4 Fabrication row) — the "nothing happened" report was a missing UI confirmation, not a missing mechanic; fixed in UI_SPEC §4 (tier-change toast). **Test Stand's new per-level effect and Auto-refuel's duration change affect real timing outcomes — Sprint 8's sweep must re-verify the pacing floor/ceiling and salary band still hold.**
+
 **v3.4 changes (Sprint 6 ratifications — no values changed):** Propellant load for sondas confirmed as a live check consumed at launch, not a timed step (§7a's "Launch consumes" header was already explicit); GDD §7b's full failure package (60% Hardware recovery, half-duration re-integration, 80%/60% XP/Flight-Data) confirmed to apply to ALL launch failures including sondas, not Aurora I only; Program Records for "First flight" and "Past the Kármán line" confirmed to gate on a SUCCESSFUL flight — only "First ignition" carries the explicit even-on-failure carve-out.
 
 **v3.2 changes (upgrade audit):** Radar clarified as part of the base Tracking Station (not purchasable); v2-only upgrades marked [v2] and explicitly not rendered in v1; player-facing upgrade copy now mandatory (NARRATIVE §6, UI_SPEC §4). No values changed.
@@ -67,15 +69,15 @@ Insolvency behavior (Funding 0, salaries due): GDD §1b — staffed production p
 | Building | Base cost | Factor | Effect | Slots |
 |---|---|---|---|---|
 | Supply Depot | 200 F | 1.13 | +1.5 Materials/s per level | 2 Tech |
-| Fabrication | 350 F + 100 M | 1.15 | +0.3 Hardware/s per level (consumes 2 M per Hardware; produces at current tier) | 1 Eng + 1 Tech |
-| Refinery | 300 F + 80 M | 1.14 | +0.5 Propellant/s per level (consumes 1 M per unit) | 1 Eng |
+| Fabrication | 350 F + 100 M | 1.15 | +0.3 Hardware/s per level. **Consumes 2 Materials per Hardware produced** (UI must show this as its own line, not folded into the output line). Produces at current researched tier automatically. | 1 Eng + 1 Tech |
+| Refinery | 300 F + 80 M | 1.14 | +0.5 Propellant/s per level. **Consumes 1 Material per Propellant produced** (its own visible line, same rule as Fabrication). | 1 Eng |
 | Warehouse | 250 F + 50 M | 1.07 | +500 F / +300 M / +75 H cap per level | — |
 | Propellant Depot | 400 F + 120 M | 1.07 | +250 Propellant cap per level | — |
 
 ### Complex C — Testing (unlock: tech "Test stand")
 | Building | Base cost | Factor | Effect | Slots |
 |---|---|---|---|---|
-| Engine Test Stand | 800 F + 300 M + 40 H | 1.20 | Enables certifications (§6) + sonda assembly workshop | 2 Eng + 1 Tech |
+| Engine Test Stand | 800 F + 300 M + 40 H | 1.20 | Enables certifications (§6) + sonda assembly workshop. **Each level beyond 1: −3% certification duration**, stacking multiplicatively with the Instrumentation upgrade (previously undefined — leveling had no effect at all, a real gap). | 2 Eng + 1 Tech |
 | Launch Rail | 300 F + 100 M | one-time | Launches sounding rockets (mini-checklist §7a). Upgrade: Extended Rail 400 F + 100 M (enables S-2) | 1 Tech |
 | Payload Processing | 1,500 F + 200 H | 1.20 | Enables satellite contracts (post-Aurora I) | 1 Eng + 1 Sci |
 
@@ -108,8 +110,8 @@ Starvation is per building, per tick, and self-recovers the moment inputs suffic
 
 ## 5. Research tree v1 (cost in Research, real-time duration)
 Materials: **Aluminum alloys** (25 R, 5 min — *branch entry node: no production effect in v1; the Aluminum Hardware tier is available from the start with NO tech required. Its function is to gate Titanium and to be an early, affordable teaching node. Flavor: certifying aluminum stock for flight hardware*) → Titanium (400 R, 3 h)
-Propulsion: **Sounding rockets (20 R, 4 min)** → Probe-1 engine (40 R, 10 min) → Orbital-1 engine (500 R, 4 h)
-Operations: Basic logistics (60 R, 15 min: transfer −25%) → **Remote Ops (120 R, 45 min: offline cap 10 h → 16 h)** → VAB queues (350 R, 2 h: auto-queue stages) → Auto-refuel (600 R, 5 h)
+Propulsion: **Sounding rockets (20 R, 4 min — gate-only: unlocks Probe-1 engine certification at the Test Stand, no other effect, same honest-zero-effect pattern as Aluminum alloys)** → Probe-1 engine (40 R, 10 min) → Orbital-1 engine (500 R, 4 h)
+Operations: Basic logistics (60 R, 15 min: −25% pad transfer time) → **Remote Ops (120 R, 45 min: offline cap 10 h → 16 h)** → VAB queues (350 R, 2 h: auto-queue stages) → Auto-refuel (600 R, 5 h: **−50% propellant loading duration for satellite-class missions** — previously undefined, a real gap; sonda Propellant is a live check, not timed, per v3.4, so this node's effect is Aurora-I-and-beyond specific)
 Program: Basic engineering (15 R, 3 min) → Scientific method (80 R, 20 min) → Test stand (150 R, 40 min) → Flight operations (250 R, 1 h) → Flight program (400 R, 2 h) → Orbital flight (700 R, 6 h)
 
 ## 6. Engine certification (Test Stand)

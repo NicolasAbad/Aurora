@@ -1,6 +1,8 @@
 # NARRATIVE_EVENTS.md — Aurora Program — Complete v1 game text (English)
 *All game text lives here, referenced by ID. Claude Code writes no new narrative: missing beats get added here first. Tone: skeptical press slowly turning believer; dry-humored internal memos.*
 
+**v3.5 changes:** research node descriptions (§8), UI feedback toasts (§9), and manual verb copy (§10) added — closing real content gaps (Sounding rockets, Auto-refuel, VAB queues, Rush Order all previously had no player-facing text). Sections renumbered sequentially.
+
 **v2.1 changes:** doc-ID references removed from player-facing text (N-08c, N-15); E-04 effect restated as pool + modifier (no tracked individuals); T-07 (payroll unpaid) and T-08 (propellant capacity) tooltips added.
 
 ## 1. Mission Log — scripted beats (by trigger)
@@ -84,3 +86,34 @@ Rules: **v2-only upgrades (Sound Suppression, Cryogenic Stand, Heavy Crane) are 
 | T-10 | Hiring panel, always visible | "Open slots across the program: [N]" |
 | T-11 | About to hire with 0 open slots | "No open slots — this hire will sit idle and still draw salary. Idle staff can still be promoted (Technician → Engineer → Scientist)." |
 | T-12 | A building shows full slots (e.g. 2/2) | "Fully staffed. To produce more here, raise the building's level — slots are fixed per building." |
+## 8. Research node descriptions (player-facing — every node states its effect, including zero-effect gates)
+| Branch | Node | Description |
+|---|---|---|
+| Materials | Aluminum alloys | "Certifying aluminum stock for flight hardware. No other effect — unlocks Titanium research." |
+| Materials | Titanium | "Unlocks Titanium-tier Hardware. Fabrication starts producing at this tier automatically — no switch to flip." |
+| Propulsion | Sounding rockets | "Groundwork for suborbital flight. No other effect — unlocks Probe-1 engine certification at the Test Stand." |
+| Propulsion | Probe-1 engine | "Certify the engine that powers your S-1 and S-2 sounding rockets." |
+| Propulsion | Orbital-1 engine | "Certify the engine that powers Aurora I — your first satellite." |
+| Operations | Basic logistics | "Streamlined ground handling. −25% pad transfer time." |
+| Operations | Remote Ops | "Remote monitoring while you're away. Offline cap: 10h → 16h." |
+| Operations | VAB queues | "Stages integrate automatically once the previous one finishes — no manual click between them." |
+| Operations | Auto-refuel | "Automated propellant handling for satellite-class missions. −50% propellant loading time." |
+| Program | Basic engineering | "Unlocks hiring Engineers directly (promotion remains available and, at higher headcounts, cheaper — see the staff panel)." |
+| Program | Scientific method | "Unlocks hiring Scientists directly." |
+| Program | Test stand | "Unlocks the Testing complex." |
+| Program | Flight operations | "Unlocks hiring Controllers directly." |
+| Program | Flight program | "Unlocks the Launch complex." |
+| Program | Orbital flight | "Unlocks Aurora II and the orbital mission class." |
+
+## 9. UI feedback text (toasts, confirmations — not narrative beats)
+| ID | Moment | Text |
+|---|---|---|
+| T-14 | First tick of a new Hardware tier | "Fabrication now produces Titanium-tier Hardware." (one-time toast, not a Mission Log entry) |
+| T-15 | Releasing a staff member (inline confirm) | "Release this [role]? No refund of hiring cost. Confirm?" |
+| T-16 | First entry into the Testing complex | "The Test Stand certifies engines before they fly — every engine, every time. Certifications run as timed processes; track them in the strip above." |
+| T-17 | First entry into the Launch complex | "This is where rockets fly. Build the VAB, integrate a rocket, and complete the launch checklist — every item, every time — to unlock the countdown." |
+
+## 10. Manual verb descriptions (missing from earlier docs — same "no purchasable without effect text" rule)
+| Verb | Description |
+|---|---|
+| Rush Order | "Trade Funding for instant Materials when you need them now instead of waiting on the Depot." |

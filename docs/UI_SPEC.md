@@ -50,16 +50,35 @@ Directly under the ticker, a persistent horizontal strip lists **every** running
 
 **Staff availability everywhere:** every complex tab shows a compact staff chip in its header — `Available: 2 Tech · 1 Eng` (unassigned pool only) — so assignment decisions never require navigating to Campus first. Tapping it opens the staff panel.
 
+## 2d. Campus staged reveal (the "hidden tutorial") & Research panel gating
+§2b's "hidden until relevant" rule was written but never given exact per-building conditions for Campus — this section fills that gap. The sequence below IS the FTUE for the opening minutes; each reveal is a direct consequence of the player's last action, never a timer or a tooltip alone.
+
+| Step | Trigger | What appears |
+|---|---|---|
+| 1 | Game start | Offices only. Ticker shows Funds only. |
+| 2 | Lifetime Funding earned ≥ 150 | Finance tile |
+| 3 | Finance built (level ≥ 1) | Staff/hiring panel and its ticker access |
+| 4 | Staff pool reaches its cap (2/2 at start) for the first time | Crew Quarters AND R&D Lab tiles, together |
+| 5 | (unchanged) | Training Center: the one deliberate v1 teaser, always locked-visible from the start (GDD §3) |
+
+**Research panel is hidden entirely until R&D Lab is built (level ≥ 1).** Showing 15 nodes across 4 branches before the player can research anything is exactly the overload this section exists to prevent. Once the panel appears, §2b's existing node-by-node reveal (available or one prerequisite away) applies as already specified.
+
 ## 3. Screens
 1. **Main dashboard** — ticker + tabs + tiles (above).
 2. **Staff panel** (from Campus tab or ticker tap): role pools, hire buttons with next cost, assignment matrix (building × role steppers), salary total/s vs income/s, capacity bar (Quarters).
-3. **Research panel**: 4 branch columns, node cards with cost/duration/effect, states: locked/available/in-progress (progress ring)/done. One active node — its timer shows in the panel header.
+3. **Research panel — compact tree (v1.1 redesign, replaces the always-expanded card grid):** 4 branch columns, each a vertical chain of SMALL nodes (icon + name only, no inline cost/duration/effect) connected by dependency lines — locked (dim, no icon detail)/available (bright, pulsing border)/in-progress (fill animates with progress)/done (checked, filled). Tapping a node opens a bottom detail sheet (mobile) / side panel (desktop) with its full cost, duration, effect text, and the Start button — only one node's detail is open at a time. This keeps the whole tree visible in the vertical space a single old-style card used to take, while the detail-on-demand pattern avoids the "wall of cards" the owner flagged. One active node — its timer shows in the panel header AND in the process strip (§2c).
 4. **Launch Sequence screen** (own full screen, entered from Launch tab when a mission is staged; one instance per pad once Pad B exists, with a pad selector header): mission header, 8-item checklist with real-time states (done ✓ green / active with spinner+timer / pending grey), Confidence % with tap-to-expand breakdown of every term, dominant full-width COUNTDOWN button (disabled until checklist complete; the single largest interactive element in the game), Mission Log strip at the bottom narrating live.
 5. **Countdown & result** — full-screen takeover: 10→0 with narrative feed, then result card (success/failure), rewards breakdown (XP, Reputation, Flight Data, Records unlocked), next-objective teaser.
 6. **"While you were away"** — modal on open when >5 min elapsed: per-resource gains, processes completed, anything now ready, **and any payroll-stoppage window (start, duration, what was paused)**.
 7. **Contracts panel** (appears with the Launch Rail for tier-0 offers; expands with satellite tiers post-Aurora I): offer cards (client, requirements with have/need coloring — including tier badges for Titanium requirements, deadline, pay), active contract with its build/queue status, pad queue visualization (who holds each pad — including Pad B once built).
 
 ## 4. States & feedback rules
+- **A capped resource always names what raises the cap.** When a resource sits at/near its cap, the ticker's amber warning is tappable and states the specific building/upgrade that raises it (e.g. "Build a Warehouse to raise this cap") — leveling an unrelated building (a common confusion: Finance does not raise the Funding cap, Warehouse does) must never be the only clue.
+- **Every consuming building shows its inputs, not just its output.** Fabrication/Refinery-type tiles show a "Consumes: 2 Materials per Hardware" line beside their production line — production without cost is only half the picture.
+- **Upgrade buttons preview the NEXT level's delta**, not just the current effect: "Level 16 → +2 Funding/s (currently +30/s)". Answers "why upgrade" at a glance, every level, forever.
+- **A node/upgrade with no mechanical effect says so explicitly** — "No other effect — unlocks Titanium research" — never silence. Silence reads as broken, not as "nothing to report."
+- **Tier changes get a one-time confirmation.** The instant a new Hardware tier is researched, the ticker's Hardware row becomes tier-aware (breakdown visible) and a one-time toast fires (NARRATIVE §8, T-14) — otherwise "nothing happened" is the correct-but-illegible truth (new Hardware now accrues to the new tier, but nothing may consume it yet).
+- **Promotion surfaces its own economic case when it's true.** Hiring cost scales `1.15^hiredOfThatRole` per role while promotion cost is flat — so at higher headcounts, promoting is objectively cheaper than hiring. When that's currently true for a role, the staff panel shows a small hint: "Promoting is cheaper than hiring right now." No value changes — this is surfacing an incentive the numbers already contain, not adding one.
 - **Nothing purchasable is offered without stating its effect.** Every building, upgrade and hire shows plain-language copy (NARRATIVE §6) describing what it does, visible BEFORE purchase — on the button, its tooltip, or the tile. A name and a price alone is a spec violation. Items not implemented in v1 (`[v2]` in ECONOMY §4) are not rendered at all — not greyed, not teased. **Scope: this rule covers player CHOICES (upgrades, buildings, hires) — never a scripted narrative outcome.** Probe-1's first certification test (GDD §7, the designed first failure) shows its cost and duration like any process, but never a result or a Confidence percentage — there is nothing to disclose because the player isn't choosing an outcome, and no Confidence formula applies to that individual test (§7b's formula describes the certification as a whole). The surprise is preserved by omission of a result, not by omission of cost.
 - **Idle staff must never be a silent trap:** the hiring panel always shows total open slots across the program (T-10); hiring with zero open slots requires acknowledging that the hire will be idle and still paid (T-11); a fully-staffed building explains that slots are fixed and levelling is the way to grow output (T-12). Hiring is never blocked — the player keeps the choice, informed.
 - **Cost & amount rendering (systemic rule — replaces the old "no single-letter abbreviations" rule, which treated only the symptom):**
@@ -76,6 +95,9 @@ Directly under the ticker, a persistent horizontal strip lists **every** running
 - **Payroll unpaid (GDD §1b):** persistent red "PAYROLL UNPAID" chip in the ticker; every paused staffed building shows a pause icon + "awaiting payroll" microcopy; the chip taps through to the Staff panel. Tooltip T-07 fires the first time. Color is never the only signal (icon + text).
 - Confidence <100 at countdown: button shows "Launch at 87%" and requires a confirm tap with the risk stated plainly. No hidden odds, ever. The odds shown are the true committed odds (roll drawn at checklist completion, GDD §7b).
 - Empty/locked states always state the unlock condition — never a bare padlock.
+
+## 4b. Staff dismissal (new capability)
+The staff panel gains a "Release" action per pool member (unassign first if assigned). No refund of hiring cost — that's the real cost of a hiring mistake, same philosophy as insolvency being self-inflicted-but-recoverable. Salary stops the instant of release; the slot they occupied frees immediately. Confirm-on-click (single tap + inline confirm, not a modal) since it's reversible in spirit (re-hiring is always possible) but irreversible in save state.
 
 ## 5. Responsive rules
 Desktop (≥1024): sidebar nav, tiles in 2–3 columns, Log docked. Mobile (<768): tab bar, single-column tiles, Log as bottom sheet, Launch screen unchanged (it is already mobile-shaped). Touch targets ≥44 px. The Android wrap (post-launch) reuses the mobile layout as-is.
