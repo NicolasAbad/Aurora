@@ -50,7 +50,7 @@ describe('startNextAuroraStage', () => {
   it('starts structure first, paying 30 Hardware, starting a 20-min integration process', () => {
     const state = fundedState();
     const now = 1000;
-    const result = startNextAuroraStage(state.resources, mission(), 'padA', [], engineState(), [], now);
+    const result = startNextAuroraStage(state.resources, mission(), 'padA', [], engineState(), [], [], now);
     expect(result).not.toBeNull();
     expect(result!.resources.hardware.amount).toBe(170); // 200 - 30
     expect(result!.processes).toEqual([
@@ -62,31 +62,31 @@ describe('startNextAuroraStage', () => {
   it('refuses the "engines" stage until Orbital-1 is certified', () => {
     const state = fundedState();
     const m = mission({ pads: { padA: { rocketStatus: 'integrating', stagesDone: ['structure'], checklist: mission().pads.padA!.checklist, confidence: 0, committedRoll: null } } });
-    expect(startNextAuroraStage(state.resources, m, 'padA', [], engineState(), [], 0)).toBeNull();
-    expect(startNextAuroraStage(state.resources, m, 'padA', [], engineState({ certified: true }), [], 0)).not.toBeNull();
+    expect(startNextAuroraStage(state.resources, m, 'padA', [], engineState(), [], [], 0)).toBeNull();
+    expect(startNextAuroraStage(state.resources, m, 'padA', [], engineState({ certified: true }), [], [], 0)).not.toBeNull();
   });
 
   it('refuses when a stage is already running for this pad', () => {
     const state = fundedState();
     const running: Process = { id: 'x', kind: 'integration', startedAt: 0, durationMs: 1000, payload: { missionKind: 'auroraI', padId: 'padA', stageId: 'structure' } };
-    expect(startNextAuroraStage(state.resources, mission(), 'padA', [running], engineState(), [], 0)).toBeNull();
+    expect(startNextAuroraStage(state.resources, mission(), 'padA', [running], engineState(), [], [], 0)).toBeNull();
   });
 
   it('refuses when the cost is unaffordable', () => {
     const state = createInitialState(); // 0 Hardware
-    expect(startNextAuroraStage(state.resources, mission(), 'padA', [], engineState(), [], 0)).toBeNull();
+    expect(startNextAuroraStage(state.resources, mission(), 'padA', [], engineState(), [], [], 0)).toBeNull();
   });
 
   it('refuses for a pad that does not exist yet (padB before it is built)', () => {
     const state = fundedState();
-    expect(startNextAuroraStage(state.resources, mission(), 'padB', [], engineState(), [], 0)).toBeNull();
+    expect(startNextAuroraStage(state.resources, mission(), 'padB', [], engineState(), [], [], 0)).toBeNull();
   });
 
   it('resolves Flight Review instantly (0 duration): no process, pays 50 Research, marks stagesDone', () => {
     const state = fundedState();
     const stagesDone = ['structure', 'engines', 'guidance', 'satellitePayload', 'finalIntegration', 'padTransfer', 'propellantLoad'];
     const m = mission({ pads: { padA: { rocketStatus: 'on_pad', stagesDone, checklist: mission().pads.padA!.checklist, confidence: 0, committedRoll: null } } });
-    const result = startNextAuroraStage(state.resources, m, 'padA', [], engineState({ certified: true }), [], 0);
+    const result = startNextAuroraStage(state.resources, m, 'padA', [], engineState({ certified: true }), [], [], 0);
     expect(result).not.toBeNull();
     expect(result!.resources.research.amount).toBe(150); // 200 - 50
     expect(result!.processes).toEqual([]);
@@ -96,7 +96,7 @@ describe('startNextAuroraStage', () => {
   it('halves the stage duration when a re-integration bonus is pending for this pad', () => {
     const state = fundedState();
     const m = mission({ auroraHalfDurationNext: { padA: true } });
-    const result = startNextAuroraStage(state.resources, m, 'padA', [], engineState(), [], 0);
+    const result = startNextAuroraStage(state.resources, m, 'padA', [], engineState(), [], [], 0);
     expect(result!.processes[0].durationMs).toBe(10 * MIN); // half of structure's 20 min
   });
 
@@ -104,7 +104,7 @@ describe('startNextAuroraStage', () => {
     const state = fundedState();
     const stagesDone = ['structure', 'engines', 'guidance', 'satellitePayload', 'finalIntegration', 'padTransfer'];
     const m = mission({ pads: { padA: { rocketStatus: 'on_pad', stagesDone, checklist: mission().pads.padA!.checklist, confidence: 0, committedRoll: null } } });
-    const result = startNextAuroraStage(state.resources, m, 'padA', [], engineState({ certified: true }), ['autoRefuel'], 0);
+    const result = startNextAuroraStage(state.resources, m, 'padA', [], engineState({ certified: true }), ['autoRefuel'], [], 0);
     expect(result!.processes[0].durationMs).toBe(1.5 * MIN); // half of propellantLoad's 3 min
   });
 
@@ -115,21 +115,37 @@ describe('startNextAuroraStage', () => {
       pads: { padA: { rocketStatus: 'on_pad', stagesDone, checklist: mission().pads.padA!.checklist, confidence: 0, committedRoll: null } },
       auroraHalfDurationNext: { padA: true },
     });
-    const result = startNextAuroraStage(state.resources, m, 'padA', [], engineState({ certified: true }), ['autoRefuel'], 0);
+    const result = startNextAuroraStage(state.resources, m, 'padA', [], engineState({ certified: true }), ['autoRefuel'], [], 0);
     expect(result!.processes[0].durationMs).toBe(0.75 * MIN); // 3 min * 0.5 (re-integration) * 0.5 (auto-refuel)
+  });
+
+  it('halves the padTransfer stage duration when Basic logistics is researched (ECONOMY §5 v3.5 follow-up SCOPED UNLOCK)', () => {
+    const state = fundedState();
+    const stagesDone = ['structure', 'engines', 'guidance', 'satellitePayload', 'finalIntegration'];
+    const m = mission({ pads: { padA: { rocketStatus: 'in_vab', stagesDone, checklist: mission().pads.padA!.checklist, confidence: 0, committedRoll: null } } });
+    const modifiers = [{ id: 'research:basicLogistics', source: 'basicLogistics', target: 'transfer.duration', op: 'mult' as const, value: 0.75 }];
+    const result = startNextAuroraStage(state.resources, m, 'padA', [], engineState({ certified: true }), [], modifiers, 0);
+    expect(result!.processes[0].durationMs).toBe(3.75 * MIN); // 75% of padTransfer's 5 min
+  });
+
+  it('does NOT apply the transfer.duration modifier to a non-transfer stage', () => {
+    const state = fundedState();
+    const modifiers = [{ id: 'research:basicLogistics', source: 'basicLogistics', target: 'transfer.duration', op: 'mult' as const, value: 0.75 }];
+    const result = startNextAuroraStage(state.resources, mission(), 'padA', [], engineState(), [], modifiers, 0);
+    expect(result!.processes[0].durationMs).toBe(20 * MIN); // structure's full 20 min, unaffected
   });
 });
 
 describe('maybeAutoQueueAuroraStage', () => {
   it('does nothing without vabQueues researched', () => {
     const state = fundedState();
-    const result = maybeAutoQueueAuroraStage(state.resources, mission(), 'padA', [], engineState(), [], 0);
+    const result = maybeAutoQueueAuroraStage(state.resources, mission(), 'padA', [], engineState(), [], [], 0);
     expect(result.processes).toEqual([]);
   });
 
   it('auto-starts a VAB stage once vabQueues is researched', () => {
     const state = fundedState();
-    const result = maybeAutoQueueAuroraStage(state.resources, mission(), 'padA', [], engineState(), ['vabQueues'], 0);
+    const result = maybeAutoQueueAuroraStage(state.resources, mission(), 'padA', [], engineState(), ['vabQueues'], [], 0);
     expect(result.processes).toHaveLength(1);
     expect(result.processes[0].payload.stageId).toBe('structure');
   });
@@ -138,7 +154,7 @@ describe('maybeAutoQueueAuroraStage', () => {
     const state = fundedState();
     const stagesDone = ['structure', 'engines', 'guidance', 'satellitePayload', 'finalIntegration'];
     const m = mission({ pads: { padA: { rocketStatus: 'in_vab', stagesDone, checklist: mission().pads.padA!.checklist, confidence: 0, committedRoll: null } } });
-    const result = maybeAutoQueueAuroraStage(state.resources, m, 'padA', [], engineState({ certified: true }), ['vabQueues'], 0);
+    const result = maybeAutoQueueAuroraStage(state.resources, m, 'padA', [], engineState({ certified: true }), ['vabQueues'], [], 0);
     expect(result.processes).toEqual([]);
   });
 });
@@ -289,7 +305,7 @@ describe('resolveAuroraTick (per-tick composition)', () => {
     ];
 
     const result = resolveAuroraTick(
-      state.resources, m, state.buildings, state.staff, engineState(), 0, state.research.completed, [], completed, 1000,
+      state.resources, m, state.buildings, state.staff, engineState(), 0, state.research.completed, [], [], completed, 1000,
     );
 
     expect(result.mission.pads.padA?.stagesDone).toEqual(['structure']);
@@ -314,7 +330,7 @@ describe('resolveAuroraTick (per-tick composition)', () => {
     const m = mission({ pads: { padA: pad } });
 
     const result = resolveAuroraTick(
-      state.resources, m, state.buildings, state.staff, engineState({ certified: true }), 0, [], [], [], 1000,
+      state.resources, m, state.buildings, state.staff, engineState({ certified: true }), 0, [], [], [], [], 1000,
     );
     expect(result.mission.pads.padA?.committedRoll).not.toBeNull();
   });

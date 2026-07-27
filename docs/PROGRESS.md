@@ -1760,18 +1760,61 @@ asked for:**
   T-14 text and did NOT appear as a Mission Log entry. Zero console errors across both
   passes. Screenshots `39`–`44` under `sprint7.5-*.png`.
 
-**Flagged, not fixed (out of this sprint's scope):** `basicLogistics`'s -25%
-pad-transfer-time modifier (`transfer.duration`) is registered on research completion
-but never queried by `core/auroraMission.ts`'s `padTransfer` stage — a real, separate gap
-from anything this sprint's SCOPED UNLOCK named. Not fixed here because wiring it changes
-real pacing (a pad-transfer speedup) outside the two effects the doc explicitly asked to
-re-verify against the sweep this sprint; the owner should decide whether it's a SCOPED
-UNLOCK for Sprint 8 or its own fix.
-
 **Sprint 7.5 acceptance, verified end to end through the integrated path:** "a fresh save
 shows only Offices for the first ~2 minutes of clean play, reaching Finance/Staff/
 Quarters+Lab in the documented order; the research tree fits without scrolling past 2-3
 screens on desktop; every building/upgrade/research node states its effect; Test Stand
 leveling and Auto-refuel visibly do something; staff can be released; sim sweep still
-green." All six original tasks are complete. Sprint 7.5 is closed. Next: Sprint 8 (FTUE &
-Phase 1 close), per SPRINTS.md.
+green." All six original tasks are complete. Sprint 7.5 is closed.
+
+## Sprint 7.5 follow-up — basicLogistics SCOPED UNLOCK (2026-07-27, same day)
+
+The gap flagged above (found while wiring Instrumentation, deliberately left unfixed
+pending an owner decision) was picked up immediately as its own SCOPED UNLOCK, same
+treatment as the Test Stand/Auto-refuel pair: `basicLogistics`'s -25% pad-transfer-time
+modifier (`transfer.duration`, ECONOMY §5) was registered on research completion since
+Sprint 4 but never queried anywhere. Now wired into `core/auroraMission.ts`'s
+`startNextAuroraStage` for the `padTransfer` stage specifically (the only stage this
+modifier ever applies to — every other Aurora I stage duration is untouched by it),
+via `applyModifiers(stageDef.durationMs, modifiers, 'transfer.duration', now)`, stacked
+multiplicatively with the pending re-integration/Auto-refuel discounts where more than
+one applies at once. `modifiers` is threaded through `startNextAuroraStage` →
+`maybeAutoQueueAuroraStage` → `resolveAuroraTick` → `resolveMissionsContractsAndRecords`
+→ both `applyTick`/`computeBootOffline` and the direct `startAuroraStage` store action,
+queried as it stood BEFORE the current tick's own resolution — the exact same "a
+modifier only takes effect the moment it's registered" precedent `offline.capMs`'s query
+already established, kept consistent rather than inventing a second convention.
+`sim/run.ts`'s `startAuroraStage` applies the same 0.75× to the `padTransfer` stage.
+
+327 tests passing (up from 325 — two new `core/auroraMission.test.ts` cases: the
+modifier applying to `padTransfer` and explicitly NOT applying to an unrelated stage).
+Typecheck/lint/build clean.
+
+**Note on the request to re-run "all three profiles":** the sim currently only
+implements two (`optimal`/`human`) — a third `casual` profile plus a dedicated
+pacing-ceiling flag (human > day 12) were noted earlier in this file (v3.1 section,
+"Lower-urgency... will land before Sprint 8... not yet done") as a real, previously-known
+gap between SPRINTS.md's Sprint 0 spec and what actually got built. Still not built —
+flagging again now that "before Sprint 8" has arrived, rather than silently running two
+profiles under a claim of three, or building a whole new profile unasked. The sweep below
+covers what exists: the dual-profile run plus the multi-seed human sweep (which already
+gives a 45-day, 10-seed read that would catch a day-12 ceiling breach even without a
+dedicated flag — none of the ten seeds got anywhere close).
+
+**Full sweep re-run post-fix:**
+
+| Metric | Value | Target |
+|---|---|---|
+| Days to Aurora I — optimal (seed 42) | day 3 | n/a (upper bound) |
+| Days to Aurora I — human (seed 42) | day 5 | floor: not before day 5 — **PASS** |
+| Days to Aurora I — human, median (seeds 1-10, 45d) | 5.0 (range 5.0-5.0) | ceiling: not past day 12 — comfortably clear |
+| Salary ratio — optimal (5 checkpoints) | 53.0% flat | 30-55% |
+| Salary ratio — human (5 checkpoints) | 54.2% → 55.0% (settles) | 30-55% |
+| Flight Data share — sonda (human, median) | 24.4% (range 23.7-24.4%) | 20-35% |
+| Flight Data share — satellite (human, median) | 24.7% (range 24.7-24.8%) | 20-35% |
+
+Numbers are unchanged to within rounding from the pre-fix Sprint 7.5 sweep — a
+pad-transfer stage is only 5 minutes against a multi-day arc, so a 25% cut to it doesn't
+move day-level pacing metrics measurably. No ECONOMY_MODEL value was changed by this run
+— reporting only, per standing instruction. Next: Sprint 8 (FTUE & Phase 1 close), per
+SPRINTS.md — **holding per explicit instruction, not starting yet.**

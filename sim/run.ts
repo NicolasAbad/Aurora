@@ -1040,7 +1040,12 @@ function startAuroraStage(state: SimState): void {
   // ECONOMY §5 v3.5 (SCOPED UNLOCK): Auto-refuel halves propellantLoad's duration only —
   // sonda Propellant is a live check, not timed, so it never applies there (v3.4).
   const autoRefuelMult = stage.id === 'propellantLoad' && state.techCompleted.has('autoRefuel') ? 0.5 : 1;
-  state.auroraTimer = { remainingMs: stage.durationMs * autoRefuelMult, onComplete: () => {} };
+  // ECONOMY §5 v3.5 follow-up (SCOPED UNLOCK): Basic logistics' -25% pad-transfer-time
+  // modifier, real for the first time this pass — was registered since Sprint 4 but
+  // never queried anywhere (core/auroraMission.ts's own startNextAuroraStage now applies
+  // it too; see core/certification.ts's Instrumentation fix for the same class of gap).
+  const basicLogisticsMult = stage.id === 'padTransfer' && state.techCompleted.has('basicLogistics') ? 0.75 : 1;
+  state.auroraTimer = { remainingMs: stage.durationMs * autoRefuelMult * basicLogisticsMult, onComplete: () => {} };
 }
 
 function tickAurora(state: SimState, deltaMs: number): void {

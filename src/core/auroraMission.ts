@@ -21,12 +21,14 @@ import { canAffordCost, payCost } from './actions';
 import { computeConfidenceBreakdown } from './confidence';
 import { applyGrant } from './economy';
 import { creditHardware, currentHardwareTier } from './hardware';
+import { applyModifiers } from './modifiers';
 import { buildingStaffRatio } from './staff';
 import type {
   ChecklistItemId,
   EngineCertificationState,
   GameState,
   MissionState,
+  Modifier,
   PadId,
   PadMissionState,
   Process,
@@ -81,8 +83,13 @@ const AUTO_REFUEL_DURATION_MULT = 0.5;
  * certified (ECONOMY §7: "Engines (Orbital-1 certified)"). Pays cost upfront, same
  * pattern as every other timed process in this codebase. Applies the pending
  * re-integration discount (GDD §7b) if this pad has one — see `mission.auroraHalfDurationNext`
- * — and Auto-refuel's propellant-loading discount (ECONOMY §5 v3.5), stacked
- * multiplicatively when both happen to apply at once.
+ * — Auto-refuel's propellant-loading discount (ECONOMY §5 v3.5), and Basic logistics'
+ * -25% pad-transfer-time modifier (`transfer.duration`, ECONOMY §5 — registered on
+ * research completion since Sprint 4 but never actually queried anywhere until this
+ * Sprint 7.5 follow-up SCOPED UNLOCK), stacked multiplicatively when more than one
+ * happens to apply at once. `modifiers` is queried as it stood BEFORE this tick's own
+ * resolution — same "a modifier only takes effect the moment it's registered" precedent
+ * `offline.capMs`'s query already established (state/persistStore.ts).
  */
 export function startNextAuroraStage(
   resources: GameState['resources'],
@@ -91,6 +98,7 @@ export function startNextAuroraStage(
   processes: Process[],
   engineState: EngineCertificationState,
   completedTech: string[],
+  modifiers: Modifier[],
   now: number,
 ): StartAuroraStageResult | null {
   const pad = mission.pads[padId];
@@ -108,8 +116,12 @@ export function startNextAuroraStage(
   const nextResources = payCost(resources, stageDef.cost);
   const halfDuration = mission.auroraHalfDurationNext?.[padId] ?? false;
   const autoRefuel = stageId === 'propellantLoad' && completedTech.includes('autoRefuel');
+  const baseDurationMs =
+    stageId === 'padTransfer'
+      ? applyModifiers(stageDef.durationMs, modifiers, 'transfer.duration', now)
+      : stageDef.durationMs;
   const durationMs =
-    stageDef.durationMs *
+    baseDurationMs *
     (halfDuration ? FAILURE_REINTEGRATION_DURATION_RATE : 1) *
     (autoRefuel ? AUTO_REFUEL_DURATION_MULT : 1);
 
@@ -161,6 +173,7 @@ export function maybeAutoQueueAuroraStage(
   processes: Process[],
   engineState: EngineCertificationState,
   completedTech: string[],
+  modifiers: Modifier[],
   now: number,
 ): StartAuroraStageResult {
   const unchanged = { resources, mission, processes };
@@ -170,7 +183,7 @@ export function maybeAutoQueueAuroraStage(
   const stageId = nextAuroraStageId(pad.stagesDone);
   if (!stageId || !(VAB_STAGE_IDS as string[]).includes(stageId)) return unchanged;
 
-  return startNextAuroraStage(resources, mission, padId, processes, engineState, completedTech, now) ?? unchanged;
+  return startNextAuroraStage(resources, mission, padId, processes, engineState, completedTech, modifiers, now) ?? unchanged;
 }
 
 /** Flips `stagesDone`/`rocketStatus` for whichever pad's stage just completed — mirrors
@@ -389,6 +402,7 @@ export function resolveAuroraTick(
   engineState: EngineCertificationState,
   flightXp: number,
   completedTech: string[],
+  modifiers: Modifier[],
   processes: Process[],
   completedProcesses: Process[],
   now: number,
@@ -399,7 +413,7 @@ export function resolveAuroraTick(
   let nextResources = resources;
   let nextProcesses = processes;
   for (const padId of Object.keys(nextMission.pads) as PadId[]) {
-    const autoQueued = maybeAutoQueueAuroraStage(nextResources, nextMission, padId, nextProcesses, engineState, completedTech, now);
+    const autoQueued = maybeAutoQueueAuroraStage(nextResources, nextMission, padId, nextProcesses, engineState, completedTech, modifiers, now);
     nextResources = autoQueued.resources;
     nextMission = autoQueued.mission;
     nextProcesses = autoQueued.processes;
