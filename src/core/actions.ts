@@ -13,7 +13,11 @@ import {
   totalStaffCap,
   unassignedCount,
 } from './staff';
-import { isCertificationTestAvailable, type CertificationState } from './certification';
+import {
+  certificationDurationMultiplier,
+  isCertificationTestAvailable,
+  type CertificationState,
+} from './certification';
 import { applyGrant, costAtLevel, pitchYield } from './economy';
 import { hardwareAtOrAboveTier, spendHardware } from './hardware';
 import { isNodeAvailable, type ResearchState } from './research';
@@ -230,6 +234,34 @@ export function adjustStaffAssignment(
   };
 }
 
+/**
+ * UI_SPEC §4b (Sprint 7.5, new capability): releases one hired unit of `role`. No refund
+ * of hiring cost — the real cost of a hiring mistake, same philosophy as insolvency
+ * being self-inflicted-but-recoverable. Salary stops the instant of release with no
+ * extra bookkeeping: `totalSalaryPerSecond` reads `pool.hired` directly, so the very
+ * next tick's cost is already lower. Unassigns first if every hired unit of this role
+ * happens to be currently assigned somewhere — pool members have no individual identity
+ * in v1 (unlike Astronaut), so which specific assignment frees is arbitrary; picks the
+ * first building with a nonzero count. No-op if nothing of this role is hired.
+ */
+export function releaseStaff(staff: StaffState, role: RoleId): StaffState | null {
+  const pool = staff.pools[role];
+  if (pool.hired < 1) return null;
+
+  let assigned = pool.assigned;
+  if (unassignedCount(staff, role) < 1) {
+    const buildingId = (Object.keys(assigned) as BuildingId[]).find((id) => (assigned[id] ?? 0) > 0);
+    if (buildingId) {
+      assigned = { ...assigned, [buildingId]: assigned[buildingId] - 1 };
+    }
+  }
+
+  return {
+    ...staff,
+    pools: { ...staff.pools, [role]: { hired: pool.hired - 1, assigned } },
+  };
+}
+
 export interface StartResearchResult {
   resources: GameState['resources'];
   research: ResearchState;
@@ -275,11 +307,17 @@ export interface StartCertificationResult {
 /** ECONOMY §6: starts `testId` if it's currently available for its engine (sequencing
  * per core/certification.ts's isCertificationTestAvailable), nothing else is already
  * testing ("one test at a time", same pattern as research), and Hardware+Propellant
- * cover its cost — paid upfront, same as every other timed process here. */
+ * cover its cost — paid upfront, same as every other timed process here. Duration is
+ * scaled by Test Stand's level + Instrumentation (ECONOMY §4 v3.5, Sprint 7.5 SCOPED
+ * UNLOCK) — computed once at start, not re-derived at resolution, same "commit at the
+ * decisive moment" spirit as the roll below (a later Test Stand upgrade mid-test must
+ * not retroactively speed up an already-running test). */
 export function startCertification(
   resources: GameState['resources'],
   certifications: CertificationState,
   testId: string,
+  testStandLevel: number,
+  instrumentationBought: boolean,
   now: number,
   randomFn: () => number = Math.random,
 ): StartCertificationResult | null {
@@ -304,7 +342,7 @@ export function startCertification(
         id: `certification-${testId}-${now}`,
         kind: 'certification',
         startedAt: now,
-        durationMs: test.durationMs,
+        durationMs: test.durationMs * certificationDurationMultiplier(testStandLevel, instrumentationBought),
         payload,
       },
     },

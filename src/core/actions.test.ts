@@ -8,6 +8,7 @@ import {
   applyRushOrder,
   buyBuildingUpgrade,
   hireStaff,
+  releaseStaff,
   startCertification,
   startPromotion,
   startResearch,
@@ -184,6 +185,39 @@ describe('adjustStaffAssignment', () => {
   });
 });
 
+describe('releaseStaff — UI_SPEC §4b (Sprint 7.5, staff dismissal)', () => {
+  it('releases one unassigned hired unit, no refund', () => {
+    const state = createInitialState();
+    state.staff.pools.technician.hired = 2;
+    const staff = releaseStaff(state.staff, 'technician');
+    expect(staff).not.toBeNull();
+    expect(staff!.pools.technician.hired).toBe(1);
+  });
+
+  it('unassigns one first if every hired unit is currently assigned somewhere', () => {
+    const state = createInitialState();
+    state.staff.pools.technician.hired = 1;
+    state.staff.pools.technician.assigned.finance = 1;
+    const staff = releaseStaff(state.staff, 'technician');
+    expect(staff!.pools.technician.hired).toBe(0);
+    expect(staff!.pools.technician.assigned.finance).toBe(0);
+  });
+
+  it('prefers releasing an already-unassigned unit over touching an assignment', () => {
+    const state = createInitialState();
+    state.staff.pools.technician.hired = 2;
+    state.staff.pools.technician.assigned.finance = 1; // 1 assigned, 1 free
+    const staff = releaseStaff(state.staff, 'technician');
+    expect(staff!.pools.technician.hired).toBe(1);
+    expect(staff!.pools.technician.assigned.finance).toBe(1); // untouched
+  });
+
+  it('no-ops when nothing of this role is hired', () => {
+    const state = createInitialState();
+    expect(releaseStaff(state.staff, 'scientist')).toBeNull();
+  });
+});
+
 describe('startResearch', () => {
   it('starts an available, affordable node, deducting Research and setting inProgress', () => {
     const state = createInitialState();
@@ -278,7 +312,7 @@ describe('startCertification', () => {
   it('starts the first available test (probe1Test1), deducting Hardware+Propellant and setting inProgress', () => {
     const state = fundedState();
     const now = Date.now();
-    const result = startCertification(state.resources, state.certifications, 'probe1Test1', now);
+    const result = startCertification(state.resources, state.certifications, 'probe1Test1', 1, false, now);
     expect(result).not.toBeNull();
     expect(result!.resources.hardware.amount).toBe(10); // 20 - 10
     expect(result!.resources.propellant.amount).toBe(50); // 100 - 50
@@ -293,20 +327,20 @@ describe('startCertification', () => {
 
   it('refuses probe1Test2 before probe1Test1 has resolved (sequencing)', () => {
     const state = fundedState();
-    expect(startCertification(state.resources, state.certifications, 'probe1Test2', Date.now())).toBeNull();
+    expect(startCertification(state.resources, state.certifications, 'probe1Test2', 1, false, Date.now())).toBeNull();
   });
 
   it('allows probe1Test2 once probe1Test1 has been attempted', () => {
     const state = fundedState();
     state.certifications.engines.probe1.attempted = true;
-    const result = startCertification(state.resources, state.certifications, 'probe1Test2', Date.now());
+    const result = startCertification(state.resources, state.certifications, 'probe1Test2', 1, false, Date.now());
     expect(result).not.toBeNull();
   });
 
   it('refuses probe1Extended before the engine is certified', () => {
     const state = fundedState();
     state.certifications.engines.probe1.attempted = true; // test1 done, not yet certified
-    expect(startCertification(state.resources, state.certifications, 'probe1Extended', Date.now())).toBeNull();
+    expect(startCertification(state.resources, state.certifications, 'probe1Extended', 1, false, Date.now())).toBeNull();
   });
 
   it('refuses when something is already testing (one test at a time)', () => {
@@ -318,17 +352,17 @@ describe('startCertification', () => {
       durationMs: 1000,
       payload: { testId: 'probe1Test1' },
     };
-    expect(startCertification(state.resources, state.certifications, 'probe1Test1', Date.now())).toBeNull();
+    expect(startCertification(state.resources, state.certifications, 'probe1Test1', 1, false, Date.now())).toBeNull();
   });
 
   it('refuses when Hardware/Propellant cannot cover the cost', () => {
     const state = createInitialState(); // 0 Hardware, 0 Propellant
-    expect(startCertification(state.resources, state.certifications, 'probe1Test1', Date.now())).toBeNull();
+    expect(startCertification(state.resources, state.certifications, 'probe1Test1', 1, false, Date.now())).toBeNull();
   });
 
   it('refuses an unknown test id', () => {
     const state = fundedState();
-    expect(startCertification(state.resources, state.certifications, 'notARealTest', Date.now())).toBeNull();
+    expect(startCertification(state.resources, state.certifications, 'notARealTest', 1, false, Date.now())).toBeNull();
   });
 
   it('draws and stores a committedRoll for a probabilistic test (Orbital-1), never redrawn later — rule 12', () => {
@@ -336,15 +370,23 @@ describe('startCertification', () => {
     state.resources.hardware.amount = 25;
     state.resources.propellant.amount = 150;
     const now = Date.now();
-    const result = startCertification(state.resources, state.certifications, 'orbital1Base', now, () => 0.37);
+    const result = startCertification(state.resources, state.certifications, 'orbital1Base', 1, false, now, () => 0.37);
     expect(result).not.toBeNull();
     expect(result!.certifications.inProgress?.payload).toEqual({ testId: 'orbital1Base', committedRoll: 0.37 });
   });
 
   it('does NOT draw a committedRoll for a deterministic test (Probe-1)', () => {
     const state = fundedState();
-    const result = startCertification(state.resources, state.certifications, 'probe1Test1', Date.now(), () => 0.99);
+    const result = startCertification(state.resources, state.certifications, 'probe1Test1', 1, false, Date.now(), () => 0.99);
     expect(result!.certifications.inProgress?.payload).toEqual({ testId: 'probe1Test1' });
+  });
+
+  it('scales duration by Test Stand level and Instrumentation (ECONOMY §4 v3.5)', () => {
+    const state = fundedState();
+    const now = Date.now();
+    // level 5 -> -12% (0.03 * 4); with Instrumentation stacked -> * 0.75.
+    const result = startCertification(state.resources, state.certifications, 'probe1Test1', 5, true, now);
+    expect(result!.certifications.inProgress?.durationMs).toBeCloseTo(25 * 60_000 * 0.88 * 0.75);
   });
 });
 

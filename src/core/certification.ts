@@ -30,6 +30,28 @@ const CERTIFICATION_SUCCESS_NARRATIVE_ID = 'N-08'; // Certification success
 // NARRATIVE_EVENTS id applies — no beat fires for it.
 export const ORBITAL1_FAILURE_FLIGHT_XP = 60;
 
+// ECONOMY §4 v3.5 (Sprint 7.5 SCOPED UNLOCK): Test Stand leveling had no effect at all
+// before this — a real gap, not player error. "Each level beyond 1: -3% certification
+// duration, stacking multiplicatively with the Instrumentation upgrade." Instrumentation
+// itself (NARRATIVE U-04: "-25% faster") was ALSO never wired anywhere in code (grepped —
+// dead narrative text) despite the doc treating it as already-established; both are fixed
+// together here since "stacking with Instrumentation" can't be implemented correctly
+// without Instrumentation's own effect existing first. Internal-upgrade effects in this
+// codebase are checked directly at their point of use rather than routed through
+// core/modifiers.ts (same precedent as confidence.ts's Service Tower check) — the
+// Modifier registry is reserved for research-tree effects (every existing registered
+// Modifier comes from data/researchTree.ts).
+export const TEST_STAND_DURATION_REDUCTION_PER_LEVEL = 0.03;
+const INSTRUMENTATION_DURATION_MULT = 0.75;
+
+/** Linear (not compounding) per-level reduction, matching this codebase's other
+ * per-level effects (`base * level`, never `base ^ level`) — level 1 = no reduction
+ * ("beyond 1"), level 5 = -12%. Stacks multiplicatively with Instrumentation, per §4 v3.5. */
+export function certificationDurationMultiplier(testStandLevel: number, instrumentationBought: boolean): number {
+  const levelMult = Math.max(0, 1 - TEST_STAND_DURATION_REDUCTION_PER_LEVEL * Math.max(0, testStandLevel - 1));
+  return instrumentationBought ? levelMult * INSTRUMENTATION_DURATION_MULT : levelMult;
+}
+
 /** Mirrors core/research.ts's isNodeAvailable shape: given the test's definition and its
  * engine's current progress, is this test startable right now? */
 export function isCertificationTestAvailable(

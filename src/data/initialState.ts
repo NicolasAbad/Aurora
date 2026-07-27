@@ -23,6 +23,7 @@ export function createInitialState(): GameState {
   return {
     schemaVersion: 4,
     lastSeenAt: Date.now(),
+    staffCapReachedOnce: false,
     resources: {
       funding: { amount: 0, cap: 500, lifetimeEarned: 0 },
       research: { amount: 0, cap: null, lifetimeEarned: 0 },

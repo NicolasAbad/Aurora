@@ -11,6 +11,7 @@ import {
   buyBuildingUpgrade,
   buyInternalUpgrade,
   hireStaff,
+  releaseStaff,
   startCertification,
   startPromotion,
   startResearch,
@@ -28,6 +29,7 @@ import { applyModifiers, pruneExpiredModifiers } from '../core/modifiers';
 import { OFFLINE_CAP_MS, resolveOffline, type PayrollStoppage } from '../core/offlineResolution';
 import { contextFromState, resolveRecords } from '../core/records';
 import { resolveResearch } from '../core/research';
+import { totalHired, totalStaffCap } from '../core/staff';
 import {
   applyCompletedSoundingProcesses,
   launchSoundingMission,
@@ -297,6 +299,8 @@ export interface GameActions {
   hire: (role: RoleId) => void;
   /** delta is typically +1/-1 from a UI stepper; no-ops if it would violate slots/hired. */
   assign: (role: RoleId, buildingId: BuildingId, delta: number) => void;
+  /** UI_SPEC §4b: releases one hired unit of `role`. No refund, no cooldown. No-op if none hired. */
+  release: (role: RoleId) => void;
   /** No-ops if the node isn't available, something else is already researching, or Research is short. */
   startResearchNode: (nodeId: string) => void;
   /** No-ops if the Classroom isn't built, no unassigned unit of `from`, or Funding is short. */
@@ -390,8 +394,16 @@ export const useGameStore = create<Store>()((set, get) => ({
       role,
     );
     if (result) {
+      // UI_SPEC §2d Campus reveal step 4: "the staff pool reaches its cap for the first
+      // time" — a one-way trigger (rule: once revealed, Crew Quarters/R&D Lab stay
+      // revealed even if a later Release, §4b, drops the pool back under cap), so it's
+      // latched here rather than derived live from the current hired/cap comparison.
+      const staffCapReachedOnce =
+        state.staffCapReachedOnce ||
+        totalHired(result.staff) >= totalStaffCap(state.buildings.crewQuarters.level);
       set({
         ...result,
+        staffCapReachedOnce,
         telemetry: trackFirstOccurrence(state.telemetry, 'first_hire', { role }),
         narrative: { ...state.narrative, seen: markSeen(state.narrative.seen, 'N-02') }, // First hire
       });
@@ -401,6 +413,12 @@ export const useGameStore = create<Store>()((set, get) => ({
   assign: (role, buildingId, delta) => {
     const state = get();
     const staff = adjustStaffAssignment(state.staff, role, buildingId, delta, state.buildings[buildingId].level);
+    if (staff) set({ staff });
+  },
+
+  release: (role) => {
+    const state = get();
+    const staff = releaseStaff(state.staff, role);
     if (staff) set({ staff });
   },
 
@@ -421,7 +439,14 @@ export const useGameStore = create<Store>()((set, get) => ({
 
   startCertificationTest: (testId) => {
     const state = get();
-    const result = startCertification(state.resources, state.certifications, testId, Date.now());
+    const result = startCertification(
+      state.resources,
+      state.certifications,
+      testId,
+      state.buildings.testStand.level,
+      state.buildings.testStand.upgrades.includes('instrumentation'),
+      Date.now(),
+    );
     if (result) {
       set({ ...result, telemetry: trackFirstOccurrence(state.telemetry, 'first_certification_started', { testId }) });
     }
@@ -499,6 +524,7 @@ export const useGameStore = create<Store>()((set, get) => ({
       padId,
       state.processes,
       state.certifications.engines.orbital1,
+      state.research.completed,
       Date.now(),
     );
     if (result) {

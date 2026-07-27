@@ -1,8 +1,10 @@
+import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../state/persistStore';
 import { formatAmount, formatRate } from '../core/format';
 import { getResourceRatePerSecond } from '../core/selectors';
-import type { ResourceId } from '../core/types';
+import { BUILDINGS } from '../data/buildings';
+import type { BuildingId, ResourceId } from '../core/types';
 
 const PRIMARY: { id: ResourceId; label: string }[] = [
   { id: 'funding', label: 'Funding' },
@@ -26,11 +28,21 @@ function isRevealed(id: ResourceId, resources: Record<ResourceId, { lifetimeEarn
   return id === 'funding' || resources[id].lifetimeEarned > 0;
 }
 
+// UI_SPEC §4 (v3.5): "a capped resource always names what raises the cap" — derived from
+// BUILDINGS' own `capBonus` data (no second, driftable copy of "Warehouse raises
+// Funding/Materials/Hardware, Propellant Depot raises Propellant").
+function buildingsThatRaiseCap(id: ResourceId): string[] {
+  return (Object.values(BUILDINGS) as (typeof BUILDINGS)[BuildingId][])
+    .filter((def) => def.capBonus?.[id] !== undefined)
+    .map((def) => def.name);
+}
+
 export function Ticker() {
   const resources = useGameStore(useShallow((s) => s.resources));
   const production = useGameStore(
     useShallow((s) => ({ buildings: s.buildings, staff: s.staff })),
   );
+  const [capHintFor, setCapHintFor] = useState<ResourceId | null>(null);
 
   const visiblePrimary = PRIMARY.filter(({ id }) => isRevealed(id, resources));
   const visibleSecondary = SECONDARY.filter(({ id }) => isRevealed(id, resources));
@@ -48,14 +60,37 @@ export function Ticker() {
             : nearCap
               ? ' ticker__stat--near-cap'
               : '';
-          return (
-            <div key={id} className={`ticker__stat${stateClass}`}>
+          const cappable = overCap || nearCap;
+          const raisedBy = buildingsThatRaiseCap(id);
+
+          const stat = (
+            <>
               <span className="ticker__label">{label}</span>
               <span className="ticker__value">
                 {formatAmount(res.amount)}
                 {res.cap !== null ? ` / ${formatAmount(res.cap)}` : ''}
               </span>
               <span className="ticker__rate">{formatRate(rate)}/s</span>
+              {cappable && capHintFor === id && (
+                <span className="ticker__cap-hint">
+                  {raisedBy.length > 0 ? `Build ${raisedBy.join(' or ')} to raise this cap.` : 'No cap-raising building yet.'}
+                </span>
+              )}
+            </>
+          );
+
+          return cappable ? (
+            <button
+              key={id}
+              type="button"
+              className={`ticker__stat ticker__stat-button${stateClass}`}
+              onClick={() => setCapHintFor((current) => (current === id ? null : id))}
+            >
+              {stat}
+            </button>
+          ) : (
+            <div key={id} className={`ticker__stat${stateClass}`}>
+              {stat}
             </div>
           );
         })}

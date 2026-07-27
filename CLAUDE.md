@@ -103,6 +103,7 @@ interface BuildingState { level: number; upgrades: string[];
 }
 
 interface GameState { schemaVersion: number; lastSeenAt: number;
+  staffCapReachedOnce?: boolean; // UI_SPEC §2d Campus reveal step 4; additive optional, rule 5
   resources: Record<Exclude<ResourceId,'hardware'>, ResourceState> & { hardware: HardwareState };
   staff: StaffState;
   buildings: Record<BuildingId, BuildingState>;

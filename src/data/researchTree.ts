@@ -17,13 +17,12 @@ export interface ResearchNode {
   // checked directly by id elsewhere (e.g. core/hardware.ts's currentHardwareTier,
   // ROLES' unlockTech, BuildingDef.unlockCondition), not modeled as a numeric modifier.
   effect?: { target: string; op: 'mult' | 'add'; value: number };
-  // Node-card blurb (same "plain data field" pattern as InternalUpgradeDef.description,
-  // not narrative-ID-routed). Only present where directly verified against real
-  // code/data (a modifier, a ROLES.unlockTech match, or a BuildingDef.unlockCondition
-  // match) — deliberately omitted for nodes whose gameplay effect isn't wired into
-  // anything yet (soundingRockets/probe1Engine/orbital1Engine/vabQueues/autoRefuel/
-  // orbitalFlight), rather than invent a plausible-sounding claim.
-  description?: string;
+  // NARRATIVE_EVENTS §8 (v3.5): every node's player-facing blurb, INCLUDING the
+  // honest-zero-effect ones (aluminum/soundingRockets) — rule 9, "referenced by ID."
+  // Unlike InternalUpgradeDef.narrativeId, §8 has no separate ID column: the node's own
+  // `id` IS the key into data/narrative.ts's NARRATIVE_TEXT (see ResearchPanel.tsx's
+  // narrativeText(node.id) call site). No literal field here to avoid a second,
+  // driftable copy of the same string.
 }
 
 export const RESEARCH_TREE: ResearchNode[] = [
@@ -40,7 +39,6 @@ export const RESEARCH_TREE: ResearchNode[] = [
     // This node's only functions: Titanium's prerequisite, and the Materials branch's
     // entry node (without it the branch would show a single unreachable 400 R node for
     // the whole first era — UI_SPEC §2b's progressive disclosure would hide it entirely).
-    description: 'Certifying aluminum stock for flight hardware.', // flavor only, per owner instruction — must not promise a benefit
   },
   {
     id: 'titanium',
@@ -51,7 +49,6 @@ export const RESEARCH_TREE: ResearchNode[] = [
     deps: ['aluminum'],
     // Unlocks the Titanium Hardware tier — checked directly by id in
     // core/hardware.ts's currentHardwareTier, not a modifier.
-    description: 'Unlocks the Titanium Hardware tier.',
   },
   // --- Propulsion ---
   {
@@ -87,7 +84,6 @@ export const RESEARCH_TREE: ResearchNode[] = [
     durationMs: 15 * MIN,
     deps: [],
     effect: { target: 'transfer.duration', op: 'mult', value: 0.75 }, // -25%
-    description: '-25% transfer time.',
   },
   {
     id: 'remoteOps',
@@ -97,7 +93,6 @@ export const RESEARCH_TREE: ResearchNode[] = [
     durationMs: 45 * MIN,
     deps: ['basicLogistics'],
     effect: { target: 'offline.capMs', op: 'add', value: 6 * HOUR }, // 10h -> 16h
-    description: 'Offline progress cap: 10h -> 16h.',
   },
   {
     id: 'vabQueues',
@@ -116,6 +111,9 @@ export const RESEARCH_TREE: ResearchNode[] = [
     costR: 600,
     durationMs: 5 * HOUR,
     deps: ['vabQueues'],
+    // ECONOMY §5 v3.5: -50% propellant loading duration for satellite-class missions —
+    // checked directly by id in core/auroraMission.ts's startNextAuroraStage, same
+    // "feature toggle, not a numeric modifier" pattern as vabQueues above.
   },
   // --- Program ---
   {
@@ -125,7 +123,6 @@ export const RESEARCH_TREE: ResearchNode[] = [
     costR: 15,
     durationMs: 3 * MIN,
     deps: [],
-    description: 'Unlocks hiring Engineers.', // verified: ROLES.engineer.unlockTech === 'basicEngineering'
   },
   {
     id: 'scientificMethod',
@@ -134,7 +131,6 @@ export const RESEARCH_TREE: ResearchNode[] = [
     costR: 80,
     durationMs: 20 * MIN,
     deps: ['basicEngineering'],
-    description: 'Unlocks hiring Scientists.', // verified: ROLES.scientist.unlockTech === 'scientificMethod'
   },
   {
     id: 'testStand',
@@ -143,7 +139,6 @@ export const RESEARCH_TREE: ResearchNode[] = [
     costR: 150,
     durationMs: 40 * MIN,
     deps: ['scientificMethod'],
-    description: 'Unlocks the Engine Test Stand and Launch Rail.', // verified: both buildings' unlockCondition
   },
   {
     id: 'flightOperations',
@@ -152,7 +147,6 @@ export const RESEARCH_TREE: ResearchNode[] = [
     costR: 250,
     durationMs: HOUR,
     deps: ['testStand'],
-    description: 'Unlocks hiring Controllers.', // verified: ROLES.controller.unlockTech === 'flightOperations'
   },
   {
     id: 'flightProgram',
@@ -161,7 +155,6 @@ export const RESEARCH_TREE: ResearchNode[] = [
     costR: 400,
     durationMs: 2 * HOUR,
     deps: ['flightOperations'],
-    description: 'Unlocks Complex D — Launch.', // verified: VAB/Launch Pad/Launch Control/Tracking Station unlockCondition
   },
   {
     id: 'orbitalFlight',

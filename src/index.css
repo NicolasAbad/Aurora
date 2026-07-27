@@ -79,6 +79,87 @@ body {
   color: var(--text-dim);
 }
 
+/* UI_SPEC §4 (v3.5): "a capped resource always names what raises the cap" — tappable
+ * near-cap/over-cap stat, inline reveal below the ticker. */
+/* Deliberately does NOT reset `display` — `.ticker__stat`'s flex-column layout (applied
+ * via the second class on the same element) must survive the button reset below it. */
+.ticker__stat-button {
+  background: none;
+  border: none;
+  margin: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ticker__cap-hint {
+  color: var(--amber);
+  font-size: 0.7em;
+  white-space: nowrap;
+}
+
+/* UI_SPEC §4 (v3.5): tier-change one-time toast (NARRATIVE T-14) — not a Mission Log
+ * entry, so it lives here as an ephemeral overlay instead. */
+.tier-toast {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 10px 16px;
+  font-size: 0.9em;
+  z-index: 200;
+  animation: tier-toast-fade 4s ease-in-out forwards;
+}
+
+@keyframes tier-toast-fade {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  10%,
+  80% {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+}
+
+/* UI_SPEC §3.4/NARRATIVE §9 (T-16/T-17): dismissible first-entry tooltip banner. */
+.first-entry-tip {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--panel);
+  border: 1px dashed var(--accent);
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+  font-size: 0.9em;
+}
+
+.first-entry-tip button {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.1em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.first-entry-tip button:hover {
+  color: var(--text);
+}
+
 .complex-tabs {
   display: flex;
   border-bottom: 1px solid var(--border);
@@ -271,6 +352,17 @@ body {
   padding: 6px 10px;
 }
 
+.building-tile__consumes {
+  color: var(--text-dim);
+  font-size: 0.8em;
+}
+
+.building-tile__delta-preview {
+  color: var(--text-dim);
+  font-size: 0.8em;
+  font-variant-numeric: tabular-nums;
+}
+
 .building-tile__internal-upgrade {
   display: flex;
   flex-direction: column;
@@ -360,10 +452,22 @@ body {
   font-size: 0.85em;
 }
 
+.staff-panel__row-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .staff-panel__row {
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.staff-panel__row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .staff-panel__row button {
@@ -384,6 +488,46 @@ body {
 .staff-panel__locked {
   color: var(--text-dim);
   font-size: 0.85em;
+}
+
+/* UI_SPEC §4b (Sprint 7.5, staff dismissal): Release action per pool member. */
+.staff-panel__release-button {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 0.8em;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.staff-panel__release-button:hover {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+.staff-panel__release-confirm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8em;
+  color: var(--amber);
+}
+
+.staff-panel__release-confirm button {
+  background: var(--border);
+  color: var(--text);
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.staff-panel__promotion-hint {
+  color: var(--amber);
+  font-size: 0.8em;
 }
 
 /* NARRATIVE §7 / UI_SPEC §4 (T-10, the idle-staff trap): always-visible, not a warning
@@ -656,10 +800,136 @@ body {
   font-weight: 400;
 }
 
-.research-panel__branches {
+/* UI_SPEC §3 (v1.1 redesign): compact vertical tree, replaces the old always-expanded
+ * card grid (.research-panel__branches). Branch columns + a docked detail panel that
+ * appears once a node is tapped — .research-node__* classes below are still shared with
+ * CertificationPanel/SoundingMissionPanel/LaunchSequencePanel's own card language;
+ * nothing here touches those. */
+.research-tree {
   display: flex;
   gap: 20px;
   align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.research-tree__branches {
+  display: flex;
+  gap: 20px;
+  flex: 2;
+  min-width: 280px;
+  flex-wrap: wrap;
+}
+
+.research-tree__chain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 2px solid var(--border);
+  padding-left: 10px;
+  margin-left: 4px;
+}
+
+.research-tree__node {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  font-size: 0.9em;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+.research-tree__node:hover {
+  border-color: var(--border);
+}
+
+.research-tree__node-mark {
+  color: var(--text-dim);
+  width: 1em;
+  text-align: center;
+}
+
+.research-tree__node--locked {
+  opacity: 0.45;
+}
+
+.research-tree__node--available {
+  border-color: var(--accent);
+  animation: research-node-pulse 1.6s ease-in-out infinite;
+}
+
+.research-tree__node--in-progress {
+  border-color: var(--accent);
+  background: rgba(255, 122, 26, 0.12);
+}
+
+.research-tree__node--in-progress .research-tree__node-mark {
+  color: var(--accent);
+}
+
+.research-tree__node--done {
+  color: var(--accent);
+}
+
+.research-tree__node--done .research-tree__node-mark {
+  color: var(--accent);
+}
+
+.research-tree__node--selected {
+  background: var(--panel);
+  border-color: var(--accent);
+}
+
+@keyframes research-node-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 122, 26, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(255, 122, 26, 0);
+  }
+}
+
+.research-detail {
+  flex: 1;
+  min-width: 220px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  border-radius: 4px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-self: flex-start;
+}
+
+.research-detail__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.research-detail__name {
+  font-weight: 600;
+}
+
+.research-detail__close {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.2em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.research-detail__close:hover {
+  color: var(--text);
 }
 
 .research-branch {

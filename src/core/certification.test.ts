@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../data/initialState';
 import { CERTIFICATION_TESTS_BY_ID } from '../data/certifications';
-import { isCertificationTestAvailable, resolveCertification, type CertificationState } from './certification';
+import {
+  certificationDurationMultiplier,
+  isCertificationTestAvailable,
+  resolveCertification,
+  type CertificationState,
+} from './certification';
 import type { EngineCertificationState, Process } from './types';
 
 const MIN = 60_000;
@@ -39,6 +44,27 @@ describe('isCertificationTestAvailable', () => {
         engineState({ certified: true, extendedCertified: true }),
       ),
     ).toBe(false);
+  });
+});
+
+describe('certificationDurationMultiplier — ECONOMY §4 v3.5 SCOPED UNLOCK', () => {
+  it('level 1 (or below) with no Instrumentation: no reduction', () => {
+    expect(certificationDurationMultiplier(1, false)).toBe(1);
+    expect(certificationDurationMultiplier(0, false)).toBe(1);
+  });
+
+  it('each level beyond 1 is -3%, linear (not compounding)', () => {
+    expect(certificationDurationMultiplier(2, false)).toBeCloseTo(0.97);
+    expect(certificationDurationMultiplier(5, false)).toBeCloseTo(0.88);
+  });
+
+  it('Instrumentation stacks multiplicatively with the level bonus', () => {
+    expect(certificationDurationMultiplier(1, true)).toBeCloseTo(0.75);
+    expect(certificationDurationMultiplier(5, true)).toBeCloseTo(0.88 * 0.75);
+  });
+
+  it('never goes negative at absurd levels', () => {
+    expect(certificationDurationMultiplier(100, false)).toBeGreaterThanOrEqual(0);
   });
 });
 

@@ -70,12 +70,19 @@ export interface StartAuroraStageResult {
   processes: Process[];
 }
 
+// ECONOMY §5 v3.5 (Sprint 7.5 SCOPED UNLOCK): "-50% propellant loading duration for
+// satellite-class missions" — previously undefined, a real gap. Sonda Propellant is a
+// live check, not timed (v3.4), so this only ever applies to the propellantLoad stage.
+const AUTO_REFUEL_DURATION_MULT = 0.5;
+
 /**
  * Starts (or, for the 0-duration Flight Review, instantly resolves) the next stage in
  * sequence for `padId`. The "Engines" stage additionally requires Orbital-1 already
  * certified (ECONOMY §7: "Engines (Orbital-1 certified)"). Pays cost upfront, same
  * pattern as every other timed process in this codebase. Applies the pending
- * re-integration discount (GDD §7b) if this pad has one — see `mission.auroraHalfDurationNext`.
+ * re-integration discount (GDD §7b) if this pad has one — see `mission.auroraHalfDurationNext`
+ * — and Auto-refuel's propellant-loading discount (ECONOMY §5 v3.5), stacked
+ * multiplicatively when both happen to apply at once.
  */
 export function startNextAuroraStage(
   resources: GameState['resources'],
@@ -83,6 +90,7 @@ export function startNextAuroraStage(
   padId: PadId,
   processes: Process[],
   engineState: EngineCertificationState,
+  completedTech: string[],
   now: number,
 ): StartAuroraStageResult | null {
   const pad = mission.pads[padId];
@@ -99,7 +107,11 @@ export function startNextAuroraStage(
 
   const nextResources = payCost(resources, stageDef.cost);
   const halfDuration = mission.auroraHalfDurationNext?.[padId] ?? false;
-  const durationMs = stageDef.durationMs * (halfDuration ? FAILURE_REINTEGRATION_DURATION_RATE : 1);
+  const autoRefuel = stageId === 'propellantLoad' && completedTech.includes('autoRefuel');
+  const durationMs =
+    stageDef.durationMs *
+    (halfDuration ? FAILURE_REINTEGRATION_DURATION_RATE : 1) *
+    (autoRefuel ? AUTO_REFUEL_DURATION_MULT : 1);
 
   if (stageDef.durationMs === 0) {
     // Flight Review (ECONOMY §7: "pure Research spend, no timer") — resolved instantly,
@@ -158,7 +170,7 @@ export function maybeAutoQueueAuroraStage(
   const stageId = nextAuroraStageId(pad.stagesDone);
   if (!stageId || !(VAB_STAGE_IDS as string[]).includes(stageId)) return unchanged;
 
-  return startNextAuroraStage(resources, mission, padId, processes, engineState, now) ?? unchanged;
+  return startNextAuroraStage(resources, mission, padId, processes, engineState, completedTech, now) ?? unchanged;
 }
 
 /** Flips `stagesDone`/`rocketStatus` for whichever pad's stage just completed — mirrors

@@ -13,6 +13,7 @@ import {
   buildingStaffRatio,
   unassignedCount,
 } from '../core/staff';
+import { upgradeDeltaPreview } from '../core/upgradePreview';
 import type { BuildingId, ResourceId, RoleId } from '../core/types';
 import { CostLabel } from './CostLabel';
 
@@ -47,6 +48,12 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
   // must not appear as an assignment target at all, not just refuse the click.
   const roles = level >= 1 ? (Object.keys(def.slots ?? {}) as RoleId[]) : [];
 
+  // UI_SPEC §4 (v3.5): leveled buildings preview the next level's delta on the Upgrade
+  // button itself, "every level, forever" — one-time buildings have no "next level".
+  const deltaPreview = !isLocked && !isOneTime
+    ? upgradeDeltaPreview(buildingId, level, buildingStaffRatio(staff, buildingId, level))
+    : null;
+
   return (
     <div className="building-tile">
       <div className="building-tile__header">
@@ -71,6 +78,14 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
           {def.production.consumes && starvedIndicator && (
             <span className="building-tile__starved"> — STARVED</span>
           )}
+        </div>
+      )}
+
+      {/* UI_SPEC §4 (v3.5): "Every consuming building shows its inputs, not just its
+          output" — its own line beside the production line, not folded into it. */}
+      {def.production?.consumes && (
+        <div className="building-tile__consumes">
+          Consumes: <CostLabel cost={def.production.consumes} /> per {RESOURCE_NAME[def.production.resource]}
         </div>
       )}
 
@@ -133,6 +148,8 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
       })}
 
       {children}
+
+      {deltaPreview && <div className="building-tile__delta-preview">{deltaPreview}</div>}
 
       {isLocked ? (
         <span className="building-tile__locked-badge">Locked in v1</span>

@@ -178,6 +178,55 @@ describe('game store actions (Sprint 1 acceptance loop)', () => {
   });
 });
 
+// UI_SPEC §2d (Sprint 7.5): the Campus reveal's Crew Quarters/R&D Lab step is a one-way
+// latch, not a live comparison, specifically so a later Release (§4b) can't hide them again.
+describe('staffCapReachedOnce — UI_SPEC §2d Campus reveal, one-way latch', () => {
+  beforeEach(() => {
+    useGameStore.setState(createInitialState());
+  });
+
+  it('flips true the moment hiring reaches the starting cap (2)', () => {
+    const { pitch, hire } = useGameStore.getState();
+    for (let i = 0; i < 20; i++) pitch();
+    expect(useGameStore.getState().staffCapReachedOnce).toBeFalsy();
+    hire('technician');
+    expect(useGameStore.getState().staffCapReachedOnce).toBeFalsy(); // 1/2, not yet
+    hire('technician');
+    expect(useGameStore.getState().staffCapReachedOnce).toBe(true); // 2/2
+  });
+
+  it('stays true even after Release drops the pool back under cap', () => {
+    const { pitch, hire, release } = useGameStore.getState();
+    for (let i = 0; i < 20; i++) pitch();
+    hire('technician');
+    hire('technician');
+    expect(useGameStore.getState().staffCapReachedOnce).toBe(true);
+    release('technician');
+    expect(useGameStore.getState().staffCapReachedOnce).toBe(true); // still latched
+    expect(useGameStore.getState().staff.pools.technician.hired).toBe(1);
+  });
+});
+
+describe('release — UI_SPEC §4b staff dismissal, through the real store', () => {
+  beforeEach(() => {
+    useGameStore.setState(createInitialState());
+  });
+
+  it('releasing drops salary burn on the very next tick', () => {
+    const { pitch, hire, applyTick } = useGameStore.getState();
+    for (let i = 0; i < 20; i++) pitch();
+    hire('technician');
+    const before = useGameStore.getState().resources.funding.amount;
+    applyTick(60_000); // 1 Technician * 0.15/s * 60s = 9 F salary
+    expect(useGameStore.getState().resources.funding.amount).toBeCloseTo(before - 9);
+
+    useGameStore.getState().release('technician');
+    const afterRelease = useGameStore.getState().resources.funding.amount;
+    applyTick(60_000); // 0 hired now — no salary
+    expect(useGameStore.getState().resources.funding.amount).toBe(afterRelease);
+  });
+});
+
 // SPRINTS.md Sprint 2 task 3: "global time multiplier applied at the timestamp layer,
 // so ... processes ... accelerate consistently. Without this, multi-hour timers are
 // untestable." Confirms warp actually reaches process completion, not just economy.

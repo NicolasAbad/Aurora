@@ -1,6 +1,7 @@
+import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../state/persistStore';
-import { ROLE_LABEL, ROLES } from '../data/roles';
+import { PROMOTIONS, ROLE_LABEL, ROLES } from '../data/roles';
 import { RESOURCE_NAME } from '../data/resourceNames';
 import { narrativeText } from '../data/narrative';
 import {
@@ -12,9 +13,56 @@ import {
   totalSalaryPerSecond,
   totalStaffCap,
 } from '../core/staff';
-import { formatRate } from '../core/format';
+import { formatCostEntry, formatRate } from '../core/format';
 import { CostLabel } from './CostLabel';
 import type { RoleId } from '../core/types';
+
+/** UI_SPEC §4b: Release action per pool member — inline confirm (single tap + inline
+ * confirm, not a browser `window.confirm` modal), since it's reversible in spirit
+ * (re-hiring is always possible) but irreversible in save state (no refund). */
+function ReleaseButton({ role, hired }: { role: RoleId; hired: number }) {
+  const [confirming, setConfirming] = useState(false);
+  const release = useGameStore((s) => s.release);
+  if (hired === 0) return null;
+
+  if (confirming) {
+    return (
+      <span className="staff-panel__release-confirm">
+        {narrativeText('T-15', { role: ROLE_LABEL[role] })}
+        <button
+          type="button"
+          onClick={() => {
+            release(role);
+            setConfirming(false);
+          }}
+        >
+          Confirm
+        </button>
+        <button type="button" onClick={() => setConfirming(false)}>
+          Cancel
+        </button>
+      </span>
+    );
+  }
+
+  return (
+    <button type="button" className="staff-panel__release-button" onClick={() => setConfirming(true)}>
+      Release
+    </button>
+  );
+}
+
+/** UI_SPEC §4b: "the staff panel shows a hint when promoting a role is currently cheaper
+ * than hiring it" — surfaces math the game already has (hire cost scales
+ * 1.15^hiredOfThatRole, promotion cost is flat), no value change. Only engineer/scientist
+ * are ever promotion TARGETS (ECONOMY §3). */
+function promotionCheaperHint(role: RoleId, hired: number): string | null {
+  const promo = PROMOTIONS.find((p) => p.to === role);
+  if (!promo) return null;
+  const nextHireCost = hiringCost(role, hired);
+  if (promo.costFunding >= nextHireCost) return null;
+  return `Promoting is cheaper than hiring right now (${ROLE_LABEL[promo.from]} → ${ROLE_LABEL[role]}: ${formatCostEntry('funding', promo.costFunding)} vs. hiring: ${formatCostEntry('funding', nextHireCost)}).`;
+}
 
 export function StaffHiring() {
   const staff = useGameStore(useShallow((s) => s.staff));
@@ -53,20 +101,28 @@ export function StaffHiring() {
       <div className="staff-panel__open-slots">{narrativeText('T-10', { n: openSlots })}</div>
       {(Object.keys(ROLES) as RoleId[]).map((role) => {
         const unlocked = isRoleUnlocked(role, completedTech);
-        const cost = hiringCost(role, staff.pools[role].hired);
+        const roleHired = staff.pools[role].hired;
+        const cost = hiringCost(role, roleHired);
         const canHire = unlocked && hired < cap && funding >= cost;
+        const cheaperHint = unlocked ? promotionCheaperHint(role, roleHired) : null;
         return (
-          <div key={role} className="staff-panel__row">
-            <span>
-              {ROLE_LABEL[role]} ({staff.pools[role].hired})
-            </span>
-            {unlocked ? (
-              <button type="button" disabled={!canHire} onClick={() => handleHire(role)}>
-                Hire (<CostLabel cost={{ funding: cost }} />)
-              </button>
-            ) : (
-              <span className="staff-panel__locked">Requires tech: {ROLES[role].unlockTech}</span>
-            )}
+          <div key={role} className="staff-panel__row-group">
+            <div className="staff-panel__row">
+              <span>
+                {ROLE_LABEL[role]} ({roleHired})
+              </span>
+              <span className="staff-panel__row-actions">
+                {unlocked ? (
+                  <button type="button" disabled={!canHire} onClick={() => handleHire(role)}>
+                    Hire (<CostLabel cost={{ funding: cost }} />)
+                  </button>
+                ) : (
+                  <span className="staff-panel__locked">Requires tech: {ROLES[role].unlockTech}</span>
+                )}
+                <ReleaseButton role={role} hired={roleHired} />
+              </span>
+            </div>
+            {cheaperHint && <div className="staff-panel__promotion-hint">{cheaperHint}</div>}
           </div>
         );
       })}

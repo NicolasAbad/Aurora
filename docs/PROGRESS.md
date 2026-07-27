@@ -1633,3 +1633,145 @@ unlock, Aurora I stage integration incl. satellite payload, full 8-item Launch S
 + `core/confidence.ts` + Orbital-1 probabilistic certification, roll commitment, countdown
 → resolution → results with rewards + Records) are complete. Sprint 7 is closed. Next:
 Sprint 8 (FTUE & Phase 1 close).
+
+## Sprint 7.5 — CLOSED (2026-07-27)
+
+Discovery & clarity pass — the owner's first end-to-end playthrough of Sprint 7's build,
+inserted between Sprint 7 and Sprint 8. Five docs replaced (UI_SPEC, ECONOMY_MODEL,
+NARRATIVE_EVENTS, SPRINTS, BACKLOG), all to **v3.5**; diffed against the repo version
+before applying (rule 5b) — all five diffs were clean and additive, nothing dropped.
+Committed separately (`39fb439`) before any implementation, matching the established
+pattern of ratifying a doc replacement before building against it.
+
+**Two real, pre-existing gaps found and closed while implementing the explicitly-listed
+SCOPED UNLOCK items — not scope creep, but necessary to implement what the doc actually
+asked for:**
+- ECONOMY §4 v3.5 frames Test Stand's new per-level effect as "stacking multiplicatively
+  with the Instrumentation upgrade" — phrased as though Instrumentation's own -25%
+  (NARRATIVE U-04) already worked. Grepped the codebase: it was dead narrative text,
+  never wired into `startCertification`'s duration anywhere. Can't implement "stacks
+  with Instrumentation" without Instrumentation doing anything, so both were wired
+  together in `core/certification.ts`'s new `certificationDurationMultiplier`.
+- Confirmed (not fixed — out of scope, flagged below) a second, unrelated latent gap:
+  `basicLogistics`'s -25% pad-transfer-time research effect registers a
+  `transfer.duration` modifier (`core/modifiers.ts`) that is never queried anywhere —
+  `core/auroraMission.ts`'s `padTransfer` stage duration ignores it entirely. Left
+  untouched deliberately: it's a different bug from what this sprint's SCOPED UNLOCK
+  named, and the doc was careful to scope which two effects get to move pacing numbers
+  this sprint ("re-run the sweep" was said about Test Stand/Auto-refuel specifically,
+  not this). Flagging for the owner rather than silently expanding scope.
+
+**Built:**
+- **Campus staged reveal (UI_SPEC §2d):** `App.tsx`'s `CampusPanel` gates Finance (150
+  lifetime Funding) and the Staff panel (Finance built) on live, naturally-monotonic
+  state — no schema change needed for those two. Crew Quarters + R&D Lab's reveal
+  ("staff pool reaches its cap for the first time") is NOT naturally monotonic once
+  staff dismissal exists in the same sprint (a player could hit 2/2, then Release back
+  under cap) — backed by a new persisted one-way latch, `GameState.staffCapReachedOnce`
+  (additive optional field, rule 5, no migration; set in the `hire` action, mirroring
+  N-02's "First hire" pattern). Research panel hidden entirely until R&D Lab is built.
+- **Research panel redesign (UI_SPEC §3):** `ResearchPanel.tsx` rewritten — a compact
+  vertical chain per branch (small nodes, ✓/◐/○ status glyph, connected by a border-left
+  rail) replacing the always-expanded card grid; tapping a node opens a docked detail
+  panel (cost/duration/full effect text/Start), only one open at a time. Deliberately
+  left `.research-node`/`.research-panel` classes untouched — CertificationPanel,
+  SoundingMissionPanel and LaunchSequencePanel all still use that card language for
+  their own unrelated cards; the redesign is scoped to ResearchPanel only, via new
+  `.research-tree*`/`.research-detail*` classes.
+- **Missing text (NARRATIVE §8/§9/§10):** every research node now has real player-facing
+  copy, including the two honest-zero-effect gates (`aluminum`, `soundingRockets`) —
+  routed through `narrativeText(node.id)` (§8 has no separate ID column, so the node's
+  own id doubles as the key — same "referenced by ID" spirit as U-01..U-09, just without
+  a redundant second namespace). `ResearchNode.description` (the old inline-data-field
+  pattern) removed entirely now that real narrative content owns this text (rule 9).
+  T-14 (tier toast)/T-15 (release confirm)/T-16/T-17 (complex first-entry tips) added;
+  Rush Order's description (§10) now renders on its tile.
+- **Clarity rules (UI_SPEC §4):** `BuildingTile` gained a "Consumes: X per Y" line for
+  Fabrication/Refinery (their `production.consumes` was already real data, just never
+  rendered) and a next-level delta preview (new `core/upgradePreview.ts`, pure +
+  unit-tested — covers production/capBonus/staffCapBonus buildings plus Test Stand's new
+  per-level effect; returns `null` rather than inventing a claim for buildings with no
+  wired numeric effect yet, e.g. Tracking Station's XP multiplier, which is Sprint 10).
+  `Ticker`'s near-cap/over-cap resource rows are now tappable, naming the building that
+  raises that cap (derived from `BUILDINGS`' own `capBonus` data, not a second hardcoded
+  map). A one-time `TierChangeToast` fires on the Aluminum→Titanium transition
+  (session-local `useRef` baseline so a returning player who already has Titanium never
+  sees it replay) — explicitly NOT a Mission Log entry, per the doc.
+- **Staff dismissal (UI_SPEC §4b, new capability):** `core/actions.ts`'s `releaseStaff`
+  (no refund; unassigns one first only if every hired unit of that role is currently
+  assigned somewhere) + a `release` store action; `StaffHiring.tsx` gained a Release
+  button per role with an inline confirm (a local-state two-step, not a browser
+  `window.confirm` modal — the doc is explicit this should read as reversible-feeling
+  even though the save-state change isn't). Salary stops the instant of release with no
+  extra bookkeeping — `totalSalaryPerSecond` already reads `pool.hired` directly.
+  Promotion-cheaper hint added to the same panel (`hiringCost(role, hired) > flat
+  promotion cost` — surfaces existing math, no value change).
+- **SCOPED UNLOCK (ECONOMY §4/§5 v3.5):** Test Stand's per-level effect (linear, not
+  compounding, matching every other per-level effect in this codebase — `-3%` per level
+  beyond 1, stacking multiplicatively with Instrumentation) and Auto-refuel's effect
+  (`-50%` on the `propellantLoad` Aurora-I-class stage specifically — sonda Propellant is
+  a live check, not timed, per v3.4, so it never applies there). Both computed once at
+  process START (`startCertification`/`startNextAuroraStage`), not re-derived at
+  resolution — a later upgrade mid-process must not retroactively speed up an
+  already-running timer. `sim/run.ts` updated to apply both (Instrumentation itself is
+  NOT modeled in the bot's purchasing — it never buys internal upgrades besides Extended
+  Rail/Classroom — a documented, conservative-direction simplification, not a gap).
+
+**Verification:**
+- 325 tests passing (up from 306), including `core/certification.test.ts`'s
+  `certificationDurationMultiplier` suite, `core/upgradePreview.test.ts` (new file),
+  `core/actions.test.ts`'s `releaseStaff` suite, `core/auroraMission.test.ts`'s two new
+  Auto-refuel/stacking cases, and `state/persistStore.test.ts`'s
+  `staffCapReachedOnce`/`release` suites exercising the real store (including the
+  specific regression this sprint's own staff-dismissal capability could have caused:
+  Release dropping the pool back under cap must NOT re-hide Crew Quarters/R&D Lab).
+  Typecheck (`tsc -b`, project references — not the bare `tsc --noEmit` this repo's root
+  config alone won't actually check), lint, and production build all clean; dev-only
+  tooling confirmed still absent from `dist/assets/*.js`.
+- Full sim sweep re-run post-SCOPED-UNLOCK, per the doc's explicit instruction: dual
+  profile (seed 42, 30 days) — human still reaches Aurora I on day 5 exactly (pacing
+  floor PASS, not before day 5), salary ratio 55% (top of the intended 30-55% band,
+  unchanged); multi-seed sweep (seeds 1-10, 45 days) — median days to Aurora I still 5.0
+  (comfortably under the day-12 ceiling too), Flight Data share 24.4%/24.7%
+  sonda/satellite (both still inside 20-35%). No ECONOMY_MODEL value changed by this
+  run — the two new effects shifted the numbers by less than a percentage point, not
+  enough to threaten either sanity rule; reported per instruction, not tuned.
+- Playwright, through a real browser, driving the two things the sprint's own acceptance
+  text called out as needing LIVE verification (not injection) — a genuinely fresh save,
+  no pre-seeded state: confirmed step 1 shows literally only Offices + the Training
+  Center tease (zero Finance/Staff/Quarters/Lab/Research panel); pitched to exactly 150
+  lifetime Funding live, confirmed Finance alone appears; built Finance live, confirmed
+  the Staff panel appears while Quarters/Lab/Research stay hidden; hired one Technician
+  (1/2) and confirmed Quarters/Lab still don't appear; hired the second (2/2) and
+  confirmed both appear together in the same frame; **released a Technician back to 1/2
+  and confirmed Crew Quarters/R&D Lab stayed visible** — the one-way-latch regression
+  this sprint's own new capability could have caused, proven live, not just unit-tested;
+  built R&D Lab, confirmed the Research panel then (and only then) appears. Tree
+  interaction: tapped "Aluminum alloys," confirmed its detail panel states the zero
+  effect explicitly ("No other effect — unlocks Titanium research"); tapped "Sounding
+  rockets," confirmed the first detail closed and only one was open at a time; confirmed
+  the × close button works. A second pass (injected save — repetitive grind: a
+  level-5 Test Stand, a stocked economy, not the mechanic under test) confirmed Test
+  Stand's delta preview reads "Level 6 → -15% certification duration (currently -12%)";
+  Fabrication's new consumption line reads "Consumes: 📦 2 per Hardware"; tapping
+  near-cap Funding on the ticker reveals "Build Warehouse to raise this cap"; the T-16
+  Testing-complex tooltip appears and dismisses; and — researched Titanium live under
+  ×600 warp (18s real for its 3h duration) — the tier-change toast fired with the exact
+  T-14 text and did NOT appear as a Mission Log entry. Zero console errors across both
+  passes. Screenshots `39`–`44` under `sprint7.5-*.png`.
+
+**Flagged, not fixed (out of this sprint's scope):** `basicLogistics`'s -25%
+pad-transfer-time modifier (`transfer.duration`) is registered on research completion
+but never queried by `core/auroraMission.ts`'s `padTransfer` stage — a real, separate gap
+from anything this sprint's SCOPED UNLOCK named. Not fixed here because wiring it changes
+real pacing (a pad-transfer speedup) outside the two effects the doc explicitly asked to
+re-verify against the sweep this sprint; the owner should decide whether it's a SCOPED
+UNLOCK for Sprint 8 or its own fix.
+
+**Sprint 7.5 acceptance, verified end to end through the integrated path:** "a fresh save
+shows only Offices for the first ~2 minutes of clean play, reaching Finance/Staff/
+Quarters+Lab in the documented order; the research tree fits without scrolling past 2-3
+screens on desktop; every building/upgrade/research node states its effect; Test Stand
+leveling and Auto-refuel visibly do something; staff can be released; sim sweep still
+green." All six original tasks are complete. Sprint 7.5 is closed. Next: Sprint 8 (FTUE &
+Phase 1 close), per SPRINTS.md.

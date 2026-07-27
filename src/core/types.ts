@@ -308,6 +308,13 @@ export interface TelemetryEvent {
 export interface GameState {
   schemaVersion: number;
   lastSeenAt: number;
+  // UI_SPEC §2d: Campus staged reveal — Crew Quarters/R&D Lab appear the first time the
+  // staff pool reaches its cap, and (unlike the funding/building-level reveal steps,
+  // which are naturally monotonic) must STAY revealed even if staff dismissal (§4b)
+  // later drops the pool back under cap. Additive optional field (rule 5, no migration);
+  // absent/false is live-OR'd with "already built" at the UI layer so no pre-existing
+  // save regresses (see App.tsx's CampusPanel).
+  staffCapReachedOnce?: boolean;
   resources: Record<Exclude<ResourceId, 'hardware'>, ResourceState> & {
     hardware: HardwareState;
   };

@@ -42,6 +42,33 @@ export const NARRATIVE_TEXT: Record<string, string> = {
   'T-11':
     'No open slots — this hire will sit idle and still draw salary. Idle staff can still be promoted (Technician → Engineer → Scientist).',
   'T-12': 'Fully staffed. To produce more here, raise the building’s level — slots are fixed per building.',
+  // §8 (v3.5) — research node descriptions, keyed by the node's own id (RESEARCH_TREE /
+  // researchTree.ts) rather than a T-/N-/U- id: §8's table has no separate ID column,
+  // and every node id is already a stable, unique key — reusing it is the natural
+  // "referenced by ID" reading (rule 9) rather than inventing a parallel namespace.
+  aluminum: 'Certifying aluminum stock for flight hardware. No other effect — unlocks Titanium research.',
+  titanium: 'Unlocks Titanium-tier Hardware. Fabrication starts producing at this tier automatically — no switch to flip.',
+  soundingRockets: 'Groundwork for suborbital flight. No other effect — unlocks Probe-1 engine certification at the Test Stand.',
+  probe1Engine: 'Certify the engine that powers your S-1 and S-2 sounding rockets.',
+  orbital1Engine: 'Certify the engine that powers Aurora I — your first satellite.',
+  basicLogistics: 'Streamlined ground handling. -25% pad transfer time.',
+  remoteOps: 'Remote monitoring while you’re away. Offline cap: 10h -> 16h.',
+  vabQueues: 'Stages integrate automatically once the previous one finishes — no manual click between them.',
+  autoRefuel: 'Automated propellant handling for satellite-class missions. -50% propellant loading time.',
+  basicEngineering: 'Unlocks hiring Engineers directly (promotion remains available and, at higher headcounts, cheaper — see the staff panel).',
+  scientificMethod: 'Unlocks hiring Scientists directly.',
+  testStand: 'Unlocks the Testing complex.',
+  flightOperations: 'Unlocks hiring Controllers directly.',
+  flightProgram: 'Unlocks the Launch complex.',
+  orbitalFlight: 'Unlocks Aurora II and the orbital mission class.',
+  // §9 — UI feedback text (toasts, confirmations — not Mission Log entries; rendered
+  // directly at the point of relevance, same treatment as T-10/T-11/T-12 above).
+  'T-14': 'Fabrication now produces Titanium-tier Hardware.',
+  'T-15': 'Release this {role}? No refund of hiring cost. Confirm?',
+  'T-16': 'The Test Stand certifies engines before they fly — every engine, every time. Certifications run as timed processes; track them in the strip above.',
+  'T-17': 'This is where rockets fly. Build the VAB, integrate a rocket, and complete the launch checklist — every item, every time — to unlock the countdown.',
+  // §10 — manual verb descriptions (same "no purchasable without effect text" rule).
+  rushOrder: 'Trade Funding for instant Materials when you need them now instead of waiting on the Depot.',
 };
 
 /** Resolves an ID to its text, filling any `{name}` placeholders (T-10's open-slot

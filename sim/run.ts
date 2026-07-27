@@ -66,6 +66,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  certificationDurationMultiplier,
   ORBITAL1_FAILURE_FLIGHT_XP,
   SCRIPTED_FAILURE_REWARD as CERT_SCRIPTED_FAILURE_REWARD,
   STATIC_FIRE_SUCCESS_REWARD as CERT_STATIC_FIRE_SUCCESS_REWARD,
@@ -799,6 +800,16 @@ function updateResearchStallTracking(state: SimState): void {
   }
 }
 
+// ECONOMY §4 v3.5 (Sprint 7.5 SCOPED UNLOCK): Test Stand's per-level -3% certification
+// duration, imported from the real core/certification.ts so the sim can't drift from the
+// shipped formula. Instrumentation (the other half of "stacks multiplicatively with")
+// is NOT modeled here — the bot never buys internal upgrades besides Extended Rail and
+// Classroom (see header note's documented simplifications) — so this sim slightly
+// UNDER-states real achievable pacing, the conservative direction.
+function certDurationMult(state: SimState): number {
+  return certificationDurationMultiplier(state.buildingLevel.testStand, false);
+}
+
 function startCertification(state: SimState): void {
   if (state.certTimer || state.buildingLevel.testStand === 0) return;
 
@@ -806,7 +817,7 @@ function startCertification(state: SimState): void {
     pay(state, CERT_PROBE1_TEST1);
     state.certTimer = {
       kind: 'probe1Test1',
-      remainingMs: CERT_DURATION,
+      remainingMs: CERT_DURATION * certDurationMult(state),
       onComplete: () => {
         state.probe1Test1Done = true;
         grant(state, 'hardware', 6, true); // 60% recovery of the 10 spent, per GDD §7b
@@ -822,7 +833,7 @@ function startCertification(state: SimState): void {
     pay(state, CERT_PROBE1_TEST2);
     state.certTimer = {
       kind: 'probe1Test2',
-      remainingMs: CERT_DURATION,
+      remainingMs: CERT_DURATION * certDurationMult(state),
       onComplete: () => {
         state.probe1Test2Done = true;
         grant(state, 'flightxp', STATIC_FIRE_SUCCESS_REWARD.flightxp, true);
@@ -837,7 +848,7 @@ function startCertification(state: SimState): void {
     pay(state, CERT_PROBE1_EXT);
     state.certTimer = {
       kind: 'probe1Extended',
-      remainingMs: CERT_DURATION,
+      remainingMs: CERT_DURATION * certDurationMult(state),
       onComplete: () => {
         state.probe1ExtendedDone = true;
         state.day.notes.push('probe1 extended cert (S-1/S-2 now guaranteed)');
@@ -853,7 +864,7 @@ function startCertification(state: SimState): void {
     pay(state, CERT_ORBITAL1_BASE);
     state.certTimer = {
       kind: 'orbital1Base',
-      remainingMs: ORBITAL1_BASE_DURATION,
+      remainingMs: ORBITAL1_BASE_DURATION * certDurationMult(state),
       onComplete: () => {
         if (rng() < ORBITAL1_SUCCESS_RATE) {
           state.orbital1BaseDone = true;
@@ -871,7 +882,7 @@ function startCertification(state: SimState): void {
           // (core/certification.ts) keeps rolling every retry for real.
           state.certTimer = {
             kind: 'orbital1Base',
-            remainingMs: ORBITAL1_RETRY_DURATION,
+            remainingMs: ORBITAL1_RETRY_DURATION * certDurationMult(state),
             onComplete: () => {
               state.orbital1BaseDone = true; // retry succeeds deterministically in-sim
               grant(state, 'flightxp', STATIC_FIRE_SUCCESS_REWARD.flightxp, true);
@@ -893,7 +904,7 @@ function startCertification(state: SimState): void {
     pay(state, CERT_ORBITAL1_EXT);
     state.certTimer = {
       kind: 'orbital1Extended',
-      remainingMs: ORBITAL1_EXT_DURATION,
+      remainingMs: ORBITAL1_EXT_DURATION * certDurationMult(state),
       onComplete: () => {
         state.orbital1ExtendedDone = true;
         state.day.notes.push('orbital1 extended cert (Aurora I now guaranteed)');
@@ -1026,7 +1037,10 @@ function startAuroraStage(state: SimState): void {
   const stage = AURORA_I_STAGES[state.auroraStageIndex];
   if (!canAfford(state, stage.cost)) return;
   pay(state, stage.cost);
-  state.auroraTimer = { remainingMs: stage.durationMs, onComplete: () => {} };
+  // ECONOMY §5 v3.5 (SCOPED UNLOCK): Auto-refuel halves propellantLoad's duration only —
+  // sonda Propellant is a live check, not timed, so it never applies there (v3.4).
+  const autoRefuelMult = stage.id === 'propellantLoad' && state.techCompleted.has('autoRefuel') ? 0.5 : 1;
+  state.auroraTimer = { remainingMs: stage.durationMs * autoRefuelMult, onComplete: () => {} };
 }
 
 function tickAurora(state: SimState, deltaMs: number): void {
