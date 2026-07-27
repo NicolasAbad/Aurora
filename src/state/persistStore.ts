@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { createInitialState } from '../data/initialState';
-import type { BuildingId, GameState, RoleId } from '../core/types';
+import type { BuildingId, GameState, RoleId, SoundingRocketId } from '../core/types';
 import { CURRENT_SCHEMA_VERSION, migrate } from './migrations';
 import {
   adjustStaffAssignment,
@@ -16,10 +16,20 @@ import {
   startResearch,
 } from '../core/actions';
 import { resolveCertification } from '../core/certification';
+import { acceptContract, maybeGenerateTierZeroOffer, resolveContractDeadlines } from '../core/contracts';
 import { resolveEconomyTick } from '../core/economy';
 import { applyModifiers, pruneExpiredModifiers } from '../core/modifiers';
 import { OFFLINE_CAP_MS, resolveOffline, type PayrollStoppage } from '../core/offlineResolution';
+import { contextFromState, resolveRecords } from '../core/records';
 import { resolveResearch } from '../core/research';
+import {
+  applyCompletedSoundingProcesses,
+  launchSoundingMission,
+  paySoundingFlightReview,
+  resolveSoundingChecklist,
+  startSoundingAssembly,
+  startSoundingWeatherCheck,
+} from '../core/soundingMission';
 import { resolveProcesses } from '../core/time';
 import { markSeen } from '../data/narrative';
 import { trackFirstOccurrence } from './telemetry';
@@ -80,6 +90,49 @@ export function hardResetSave(): void {
   window.location.reload();
 }
 
+/**
+ * Shared by computeBootOffline (offline gap) and applyTick (online frame): advances the
+ * sounding mission's process-backed checklist items, live-recomputes/commits its roll,
+ * rotates the tier-0 contract offer, penalizes any missed deadline, and grants any
+ * newly-earned Program Record — the same four-step composition either way, just fed a
+ * different `now`/`completedProcesses` (rule 6: offline reuses the exact same resolution
+ * logic as online).
+ */
+function resolveSoundingContractsAndRecords(
+  mission: GameState['mission'],
+  resources: GameState['resources'],
+  contracts: GameState['contracts'],
+  records: string[],
+  certifications: GameState['certifications'],
+  completedProcesses: GameState['processes'],
+  launchRailBuilt: boolean,
+  now: number,
+): {
+  mission: GameState['mission'];
+  resources: GameState['resources'];
+  contracts: GameState['contracts'];
+  records: string[];
+} {
+  const missionAfterProcesses = applyCompletedSoundingProcesses(mission, completedProcesses);
+  const missionResolved = resolveSoundingChecklist(missionAfterProcesses, resources, certifications.engines.probe1);
+
+  const contractsWithOffer = maybeGenerateTierZeroOffer(contracts, launchRailBuilt, now);
+  const deadlineResolution = resolveContractDeadlines(contractsWithOffer, resources, now);
+
+  const recordsResolution = resolveRecords(
+    records,
+    deadlineResolution.resources,
+    contextFromState({ certifications, mission: missionResolved, contracts: deadlineResolution.contracts }),
+  );
+
+  return {
+    mission: missionResolved,
+    resources: recordsResolution.resources,
+    contracts: deadlineResolution.contracts,
+    records: recordsResolution.records,
+  };
+}
+
 export interface AwaySummary {
   elapsedMs: number;
   appliedMs: number;
@@ -137,14 +190,30 @@ function computeBootOffline(): { initialState: GameState; awaySummary: AwaySumma
     now,
   );
 
+  // Sounding missions/contracts/records: same tick-composition helper the online loop
+  // uses, fed the offline gap's completed processes and the post-gap `now` (rule 6).
+  const soundingResolution = resolveSoundingContractsAndRecords(
+    loaded.mission,
+    certificationResolution.resources,
+    loaded.contracts,
+    loaded.records,
+    certificationResolution.certifications,
+    offline.completedProcesses,
+    offline.buildings.launchRail.level >= 1,
+    now,
+  );
+
   const initialState: GameState = {
     ...loaded,
-    resources: certificationResolution.resources,
+    resources: soundingResolution.resources,
     buildings: offline.buildings,
     processes: offline.processes,
     staff: staffAfterCompletions,
     research: researchResolution.research,
     certifications: certificationResolution.certifications,
+    mission: soundingResolution.mission,
+    contracts: soundingResolution.contracts,
+    records: soundingResolution.records,
     narrative: { ...loaded.narrative, seen: certificationResolution.narrativeSeen },
     // Modifier.expiresAt contract: pruned again here (not just at load) against the
     // POST-GAP `now` — a modifier that expired partway through an offline gap must not
@@ -160,12 +229,13 @@ function computeBootOffline(): { initialState: GameState; awaySummary: AwaySumma
           elapsedMs: offline.elapsedMs,
           appliedMs: offline.appliedMs,
           capped: offline.capped,
-          fundingGained: offline.resources.funding.amount - loaded.resources.funding.amount,
-          // Uses certificationResolution.resources, not offline.resources: a
-          // certification test resolving during the gap credits Flight Data into
-          // Research too (ECONOMY §8), same as it would from a live tick — omitting it
-          // here would silently under-report the summary for that gap.
-          researchGained: certificationResolution.resources.research.amount - loaded.resources.research.amount,
+          // Uses soundingResolution.resources, not offline.resources, for both: a
+          // certification resolving during the gap credits Flight Data into Research
+          // (ECONOMY §8), and a newly-earned Program Record can credit Funding during the
+          // gap too (e.g. "First ignition" backfilling the instant that certification
+          // resolves) — omitting either would silently under-report the summary.
+          fundingGained: soundingResolution.resources.funding.amount - loaded.resources.funding.amount,
+          researchGained: soundingResolution.resources.research.amount - loaded.resources.research.amount,
           stoppage: offline.stoppage,
         }
       : null;
@@ -202,6 +272,20 @@ export interface GameActions {
   /** No-ops if the test isn't available for its engine, something else is already
    * testing, or Hardware/Propellant are short. */
   startCertificationTest: (testId: string) => void;
+  /** No-ops if a mission is already in flight, the rocket isn't unlocked, the required
+   * buildings aren't built, or Hardware is short. `contractId` links this build to an
+   * accepted tier-0 contract (S-1 only, ECONOMY §10). */
+  startSoundingMission: (rocketId: SoundingRocketId, contractId?: string | null) => void;
+  /** No-ops if there's no mission in flight, the item is already done, or a weather
+   * check is already running. */
+  startWeatherCheck: () => void;
+  /** No-ops outside an S-2 mission, if already paid, or Research is short. */
+  payFlightReview: () => void;
+  /** No-ops until the checklist has committed a roll (rule 12). Resolves the
+   * already-decided outcome and resets the mission slot either way. */
+  launchSounding: () => void;
+  /** No-ops if the offer doesn't exist, has expired, or is already accepted. */
+  acceptContractOffer: (offerId: string) => void;
   /** Called once per animation frame by the game loop (see core/tick.ts + main.tsx).
    * `warp` (dev builds only, default 1) is the real caller passing a possibly-warped
    * multiplier — see `applyTick`'s implementation for why processes need it separately
@@ -302,6 +386,70 @@ export const useGameStore = create<Store>()((set, get) => ({
     }
   },
 
+  startSoundingMission: (rocketId, contractId = null) => {
+    const state = get();
+    const result = startSoundingAssembly(
+      state.resources,
+      state.mission,
+      state.research.completed,
+      state.buildings.testStand.level >= 1,
+      state.buildings.launchRail.level >= 1,
+      state.buildings.launchRail.upgrades.includes('extendedRail'),
+      state.certifications.engines.probe1,
+      state.processes,
+      rocketId,
+      contractId,
+      Date.now(),
+    );
+    if (result) {
+      set({
+        ...result,
+        telemetry: trackFirstOccurrence(state.telemetry, 'first_sounding_mission_started', { rocketId }),
+      });
+    }
+  },
+
+  startWeatherCheck: () => {
+    const state = get();
+    const result = startSoundingWeatherCheck(state.mission, state.processes, Date.now());
+    if (result) set(result);
+  },
+
+  payFlightReview: () => {
+    const state = get();
+    const result = paySoundingFlightReview(state.resources, state.mission);
+    if (result) set(result);
+  },
+
+  launchSounding: () => {
+    const state = get();
+    const result = launchSoundingMission(
+      state.resources,
+      state.mission,
+      state.contracts,
+      state.narrative.seen,
+      state.research.completed,
+      Date.now(),
+    );
+    if (result) {
+      set({
+        resources: result.resources,
+        mission: result.mission,
+        contracts: result.contracts,
+        narrative: { ...state.narrative, seen: result.narrativeSeen },
+        telemetry: trackFirstOccurrence(state.telemetry, 'first_sounding_launch'),
+      });
+    }
+  },
+
+  acceptContractOffer: (offerId) => {
+    const state = get();
+    const contracts = acceptContract(state.contracts, offerId, Date.now());
+    if (contracts) {
+      set({ contracts, telemetry: trackFirstOccurrence(state.telemetry, 'first_contract_accepted') });
+    }
+  },
+
   applyTick: (deltaMs, warp = 1) => {
     const state = get();
     const { resources, buildings, payrollUnpaid } = resolveEconomyTick(
@@ -372,12 +520,30 @@ export const useGameStore = create<Store>()((set, get) => ({
       seen = markSeen(seen, 'N-05'); // First Hardware fabricated
     }
 
+    // Sounding mission/contracts/records: same composition computeBootOffline uses,
+    // fed this frame's completedProcesses (assembly/weather-window entries in the
+    // generic array above, already warp-shifted alongside everything else in it) and
+    // the real clock.
+    const soundingResolution = resolveSoundingContractsAndRecords(
+      state.mission,
+      certificationResolution.resources,
+      state.contracts,
+      state.records,
+      certificationResolution.certifications,
+      completedProcesses,
+      buildings.launchRail.level >= 1,
+      Date.now(),
+    );
+
     set({
-      resources: certificationResolution.resources,
+      resources: soundingResolution.resources,
       buildings,
       processes,
       staff: staffAfterCompletions,
       research: researchResolution.research,
+      mission: soundingResolution.mission,
+      contracts: soundingResolution.contracts,
+      records: soundingResolution.records,
       certifications: certificationResolution.certifications,
       narrative: { ...state.narrative, seen },
       modifiers: researchResolution.modifiers,

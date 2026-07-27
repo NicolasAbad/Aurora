@@ -21,7 +21,7 @@ const ROLE_IDS: RoleId[] = ['technician', 'engineer', 'scientist', 'controller']
 
 export function createInitialState(): GameState {
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
     lastSeenAt: Date.now(),
     resources: {
       funding: { amount: 0, cap: 500, lifetimeEarned: 0 },
@@ -70,6 +70,8 @@ export function createInitialState(): GameState {
         },
       },
       launches: [],
+      sounding: null,
+      soundingHalfDurationNext: {},
     },
     economyFlags: { payrollUnpaid: false },
     contracts: { offers: [], active: [] },

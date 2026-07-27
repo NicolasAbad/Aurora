@@ -55,10 +55,42 @@ describe('migrate — v2 to v3 (Sprint 5: certification state)', () => {
     expect(migrated.resources.funding.amount).toBe(42);
   });
 
-  it('walking from v1 also lands on v3 with both migrations applied', () => {
+  it('walking from v1 also lands on the current version with every migration applied', () => {
     const v1Save = { schemaVersion: 1, buildings: { finance: { level: 1, upgrades: [] } } };
     const migrated = migrate(v1Save, 1) as { schemaVersion: number; certifications: unknown };
-    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(migrated.certifications).not.toBeUndefined();
+  });
+});
+
+describe('migrate — v3 to v4 (Sprint 6: sounding-mission state)', () => {
+  it('adds an idle sounding slot to a v3 save, nothing in flight retroactively', () => {
+    const v3Save = {
+      schemaVersion: 3,
+      mission: { pads: {}, launches: [{ id: 'existing-launch' }] },
+    };
+
+    const migrated = migrate(v3Save, 3) as {
+      schemaVersion: number;
+      mission: {
+        pads: unknown;
+        launches: unknown[];
+        sounding: unknown;
+        soundingHalfDurationNext: Record<string, boolean>;
+      };
+    };
+
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(migrated.mission.sounding).toBeNull();
+    expect(migrated.mission.soundingHalfDurationNext).toEqual({});
+    // Pre-existing fields untouched.
+    expect(migrated.mission.launches).toEqual([{ id: 'existing-launch' }]);
+  });
+
+  it('walking from v1 also lands on the current version with every migration applied', () => {
+    const v1Save = { schemaVersion: 1, buildings: { finance: { level: 1, upgrades: [] } } };
+    const migrated = migrate(v1Save, 1) as { schemaVersion: number; mission: { sounding: unknown } };
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(migrated.mission.sounding).toBeNull();
   });
 });

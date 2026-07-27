@@ -73,9 +73,20 @@ interface PadMissionState {
   confidence: number;
   committedRoll: number | null; // drawn at checklist completion (rule 12); null until then
 }
+// ECONOMY §7a: sounding rockets launch from the Launch Rail (Complex C), not a pad.
+type SoundingRocketId = 's1'|'s2';
+type SoundingChecklistItemId = 'assembled'|'propellantReady'|'weatherWindow'|'flightReview'; // flightReview: S-2 only
+interface SoundingMissionState {
+  rocketId: SoundingRocketId; contractId: string | null; // tier-0 ContractOffer id, if linked
+  checklist: Record<SoundingChecklistItemId, boolean>;
+  confidence: number; // ECONOMY §7a simplified formula
+  committedRoll: number | null; // drawn at checklist completion (rule 12); null until then
+}
 interface MissionState {
   pads: Partial<Record<PadId, PadMissionState>>; // v1 start: { padA: … }; padB added when built
   launches: LaunchRecord[];
+  sounding: SoundingMissionState | null; // current sounding-rocket attempt; null = none in progress
+  soundingHalfDurationNext: Partial<Record<SoundingRocketId, boolean>>; // GDD §7b re-integration bonus
 }
 
 interface EconomyFlags { payrollUnpaid: boolean; } // GDD §1b insolvency state, drives UI banner

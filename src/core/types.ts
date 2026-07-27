@@ -178,15 +178,49 @@ export interface PadMissionState {
 
 export interface LaunchRecord {
   id: string;
-  padId: PadId;
+  // Sounding rockets (S-1/S-2) launch from the Launch Rail (Complex C), not a Complex D
+  // pad — null for those; ActiveContract.padId below already established this same
+  // "no pad involved yet" nullability for tier-0 contracts, same reasoning here.
+  padId: PadId | null;
   missionType: 'staticFireTest' | 's1' | 's2' | 'auroraI' | 'auroraII' | 'contract';
   success: boolean;
   timestamp: number;
+  contractId?: string; // ContractOffer id this flight fulfilled, if any (additive, rule 5)
+}
+
+// ECONOMY §7a: sounding rockets, the pre-orbital launch loop (GDD §6b's rung 1-2). Closed
+// union, not open-ended — v1 only ever adds these two (same "every named variant up
+// front" precedent as EngineId/PadId, so a later addition never needs a migration).
+export type SoundingRocketId = 's1' | 's2';
+
+// Real-time checklist items — "the full launch loop in miniature" (SPRINTS Sprint 6),
+// simplified from PadMissionState's 8-item ChecklistItemId. 'flightReview' only applies
+// to S-2 ("Same + flight review (20 R)", ECONOMY §7a) — present-but-unused for an S-1
+// mission, same "uniform shape, some fields inert for some variants" pattern as
+// BuildingState.starvedIndicator on non-consumer buildings.
+export type SoundingChecklistItemId =
+  | 'assembled'
+  | 'propellantReady'
+  | 'weatherWindow'
+  | 'flightReview';
+
+export interface SoundingMissionState {
+  rocketId: SoundingRocketId;
+  contractId: string | null; // tier-0 ContractOffer id this flight fulfills, if linked (ECONOMY §10)
+  checklist: Record<SoundingChecklistItemId, boolean>;
+  confidence: number; // ECONOMY §7a simplified formula; live-recomputed until committedRoll is drawn
+  committedRoll: number | null; // drawn the instant the checklist completes (rule 12); null until then
 }
 
 export interface MissionState {
   pads: Partial<Record<PadId, PadMissionState>>; // v1 start: { padA: … }; padB added when built
   launches: LaunchRecord[];
+  sounding: SoundingMissionState | null; // current sounding-rocket attempt; null = none in progress
+  // GDD §7b: a failed launch's next re-assembly of the SAME rocket type runs at 50%
+  // duration ("re-integration"). Persists across the mission-slot reset that happens on
+  // resolution (`sounding` above goes back to null); consumed the next time that rocket
+  // type starts a fresh assembly (core/soundingMission.ts).
+  soundingHalfDurationNext: Partial<Record<SoundingRocketId, boolean>>;
 }
 
 export interface EconomyFlags {
@@ -237,12 +271,27 @@ export interface ActiveContract {
   acceptedAt: number;
   padId: PadId | null;
   fulfilled: boolean;
+  // Set once, the moment the −15 Reputation missed-deadline penalty (ECONOMY §10) is
+  // applied, so a tick-driven check never re-penalizes the same contract twice. Additive
+  // optional field (rule 5) — absent on any contract accepted before this existed.
+  deadlineMissed?: boolean;
 }
 
 export interface ContractState {
   offers: ContractOffer[];
   active: ActiveContract[];
 }
+
+// ECONOMY §8b: auto-awarded once each, by event (never by launch number). `records:
+// string[]` on GameState stays generic (RecordId values pushed into it), matching
+// `research.completed`'s own "string[] of ids" shape rather than a dedicated array type.
+export type RecordId =
+  | 'firstIgnition'
+  | 'firstFlight'
+  | 'pastKarman'
+  | 'firstOrbit'
+  | 'firstCustomer'
+  | 'firstDelivery';
 
 export interface TelemetryEvent {
   id: string;

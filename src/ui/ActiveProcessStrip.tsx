@@ -4,6 +4,7 @@ import { useGameStore } from '../state/persistStore';
 import { RESEARCH_BY_ID } from '../data/researchTree';
 import { CERTIFICATION_TESTS_BY_ID } from '../data/certifications';
 import { ROLE_LABEL } from '../data/roles';
+import { SOUNDING_ROCKETS } from '../data/soundingRockets';
 import { remainingMs } from '../core/time';
 import { useNow } from './useNow';
 import { ProcessProgress } from './ProcessProgress';
@@ -62,9 +63,16 @@ function useActiveChips(): Chip[] {
         complex: 'campus',
       });
     }
-    // Other kinds (integration, transfer, contract_build, weather_window) have no
-    // current UI consumer — added here the same sprint that gives them a real payload,
-    // same "infra only where content exists" restraint as everywhere else in this codebase.
+    if (p.kind === 'integration' && p.payload.missionKind === 'sounding') {
+      const rocket = SOUNDING_ROCKETS[p.payload.rocketId as 's1' | 's2'];
+      chips.push({ id: p.id, label: `Assembling: ${rocket.name}`, process: p, complex: 'testing' });
+    }
+    if (p.kind === 'weather_window' && p.payload.missionKind === 'sounding') {
+      chips.push({ id: p.id, label: 'Weather window', process: p, complex: 'testing' });
+    }
+    // Remaining kinds (transfer, contract_build) have no current UI consumer — added
+    // here the same sprint that gives them a real payload, same "infra only where
+    // content exists" restraint as everywhere else in this codebase.
   }
 
   return chips;

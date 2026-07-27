@@ -28,10 +28,13 @@
 //     Sprint 8, not before.
 // plus days-to-Aurora-I for both profiles (docs/PROGRESS.md carries the comparison).
 //
-// Research tree, certification, sounding-rocket and Aurora I values aren't owned by any
-// core/ or data/ module yet (those land in Sprint 4-7) so they're transcribed here
-// directly from ECONOMY_MODEL §5-§8. When those sprints build the real data files, point
-// this simulator at them instead of the local tables below — don't let two copies drift.
+// Certification and Aurora I values aren't owned by any core/ or data/ module yet (those
+// land in Sprint 7) so they're transcribed here directly from ECONOMY_MODEL §6-§7.
+// Sounding-rocket, tier-0 contract and Program Record values (Sprint 6) now import their
+// real counterparts from src/data/soundingRockets.ts, src/data/contracts.ts and
+// src/core/records.ts instead of keeping a second hardcoded copy here — see the S1_*/
+// S2_*/TIER0_*/RECORDS definitions below. When Sprint 7 builds real data files for
+// certification/Aurora I, point this simulator at them too.
 //
 // Simplifications the bot makes that a real player wouldn't have to (documented instead
 // of silently guessed away — see docs/PROGRESS.md "Sprint 0 findings" for the doc gaps
@@ -63,8 +66,11 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { costAtLevel, pitchYield, productionPerSecond } from '../src/core/economy';
+import { RECORD_DEFS } from '../src/core/records';
 import { BUILDINGS } from '../src/data/buildings';
+import { CONTRACT_TIERS, TIER0_PAYLOAD_EXTRA_HARDWARE, TIER0_PAYLOAD_EXTRA_PROPELLANT } from '../src/data/contracts';
 import { RESEARCH_TREE, type ResearchNode } from '../src/data/researchTree';
+import { SOUNDING_ROCKETS, WEATHER_WINDOW_MAX_MS, WEATHER_WINDOW_MIN_MS } from '../src/data/soundingRockets';
 import type { BuildingId, ResourceId, RoleId, UnlockCondition } from '../src/core/types';
 
 // ---------------------------------------------------------------------------
@@ -169,28 +175,60 @@ const ORBITAL1_EXT_DURATION = 2 * HOUR;
 const STATIC_FIRE_SUCCESS_REWARD = { flightxp: 15, reputation: 2, researchFlightData: 150 };
 const SCRIPTED_FAILURE_REWARD = { flightxp: 30, researchFlightData: 250 }; // ECONOMY §6 v2.5
 
-const S1_ASSEMBLY = { hardware: 8, durationMs: 10 * MIN };
-const S1_LAUNCH_PROPELLANT = 30;
-const S1_WEATHER_MS = 3 * MIN; // ECONOMY §11: uniform 2-5 min; using the midpoint
-const S1_REWARD = { flightxp: 15, researchFlightData: 200, reputation: 1 }; // ECONOMY §7a v2.5
+// Sprint 6: was this file's own hardcoded copy; now imports src/data/soundingRockets.ts
+// so the two can't drift (same pattern as Sprint 4's RESEARCH_TREE import above).
+const S1_ASSEMBLY = { hardware: SOUNDING_ROCKETS.s1.assemblyHardware, durationMs: SOUNDING_ROCKETS.s1.assemblyDurationMs };
+const S1_LAUNCH_PROPELLANT = SOUNDING_ROCKETS.s1.launchPropellant;
+const S1_WEATHER_MS = (WEATHER_WINDOW_MIN_MS + WEATHER_WINDOW_MAX_MS) / 2; // ECONOMY §11: uniform 2-5 min; using the midpoint
+const S1_REWARD = {
+  flightxp: SOUNDING_ROCKETS.s1.successReward.flightxp,
+  researchFlightData: SOUNDING_ROCKETS.s1.successReward.flightData,
+  reputation: SOUNDING_ROCKETS.s1.successReward.reputation,
+};
 
-const S2_ASSEMBLY = { hardware: 20, durationMs: 25 * MIN };
-const S2_LAUNCH_PROPELLANT = 80;
-const S2_FLIGHT_REVIEW_R = 20;
-const S2_REWARD = { flightxp: 50, researchFlightData: 1000, reputation: 10 }; // ECONOMY §7a v2.5
+const S2_ASSEMBLY = { hardware: SOUNDING_ROCKETS.s2.assemblyHardware, durationMs: SOUNDING_ROCKETS.s2.assemblyDurationMs };
+const S2_LAUNCH_PROPELLANT = SOUNDING_ROCKETS.s2.launchPropellant;
+const S2_FLIGHT_REVIEW_R = SOUNDING_ROCKETS.s2.flightReviewCostResearch!;
+const S2_REWARD = {
+  flightxp: SOUNDING_ROCKETS.s2.successReward.flightxp,
+  researchFlightData: SOUNDING_ROCKETS.s2.successReward.flightData,
+  reputation: SOUNDING_ROCKETS.s2.successReward.reputation,
+};
 
-const TIER0_CONTRACT_COST = { hardware: 10, propellant: 40 };
+// ECONOMY §10: all-inclusive = the standard S-1 (assembly + launch) + client payload
+// integration (src/data/contracts.ts's TIER0_PAYLOAD_EXTRA_*).
+const TIER0_CONTRACT_COST = {
+  hardware: SOUNDING_ROCKETS.s1.assemblyHardware + TIER0_PAYLOAD_EXTRA_HARDWARE,
+  propellant: SOUNDING_ROCKETS.s1.launchPropellant + TIER0_PAYLOAD_EXTRA_PROPELLANT,
+};
+// Sim-only approximation, not owned by any real data file (the real game runs a
+// contract-linked flight through the actual sonda checklist/confidence/roll — this sim
+// deliberately doesn't model that, see the header note's guaranteed-success simplification).
 const TIER0_CONTRACT_BUILD_MS = 12 * MIN; // approximated: same order as an S-1 assembly
-const TIER0_CONTRACT_ROTATION_MS = 6 * HOUR;
-// Contract rewards per tier, combining ECONOMY §10 (Funding pay) and §8 (explicit
-// per-tier Flight XP / Reputation / Flight Data — v2.3 left this as one ambiguous range;
-// v2.4 resolved which number goes with which tier; v2.5 raised the Flight Data values).
-// The sim only models tier-0 (satellite tiers 1/2 need Payload Processing + post-Aurora-I
-// systems this sim doesn't build); tiers 1/2 are here for when that's implemented.
+const TIER0_CONTRACT_ROTATION_MS = CONTRACT_TIERS[0].offerRotationMs;
+// Contract rewards per tier: src/data/contracts.ts's CONTRACT_TIERS (ECONOMY §8's
+// "Contract fulfilled" row, ON TOP of the underlying flight's own reward). The sim only
+// models tier-0 (satellite tiers 1/2 need Payload Processing + post-Aurora-I systems this
+// sim doesn't build); tiers 1/2 are here for when that's implemented.
 const CONTRACT_REWARDS = {
-  0: { funding: 400, reputation: 3, flightxp: 40, researchFlightData: 450 },
-  1: { funding: 3000, reputation: 10, flightxp: 60, researchFlightData: 600 },
-  2: { funding: 8000, reputation: 25, flightxp: 80, researchFlightData: 750 },
+  0: {
+    funding: CONTRACT_TIERS[0].reward.funding,
+    reputation: CONTRACT_TIERS[0].reward.reputation,
+    flightxp: CONTRACT_TIERS[0].reward.flightxp,
+    researchFlightData: CONTRACT_TIERS[0].reward.flightData,
+  },
+  1: {
+    funding: CONTRACT_TIERS[1].reward.funding,
+    reputation: CONTRACT_TIERS[1].reward.reputation,
+    flightxp: CONTRACT_TIERS[1].reward.flightxp,
+    researchFlightData: CONTRACT_TIERS[1].reward.flightData,
+  },
+  2: {
+    funding: CONTRACT_TIERS[2].reward.funding,
+    reputation: CONTRACT_TIERS[2].reward.reputation,
+    flightxp: CONTRACT_TIERS[2].reward.flightxp,
+    researchFlightData: CONTRACT_TIERS[2].reward.flightData,
+  },
 } as const;
 
 const FUNDING_ROUND_I = { yieldAmount: 500, cooldownMs: 10 * MIN, reputationGate: 25 };
@@ -214,13 +252,14 @@ const AURORA_I_STAGES: {
 ];
 const AURORA_I_REWARD = { flightxp: 250, researchFlightData: 2000, reputation: 60 }; // ECONOMY §8 v2.5
 
+// Sprint 6: now imports src/core/records.ts's RECORD_DEFS instead of a local copy.
 const RECORDS = {
-  firstIgnition: { funding: 200, reputation: 3 },
-  firstFlight: { funding: 500, reputation: 5 },
-  pastKarman: { funding: 1000, reputation: 8 },
-  firstOrbit: { funding: 3000, reputation: 15 },
-  firstCustomer: { funding: 400, reputation: 3 },
-  firstDelivery: { funding: 1500, reputation: 10 },
+  firstIgnition: RECORD_DEFS.firstIgnition.reward,
+  firstFlight: RECORD_DEFS.firstFlight.reward,
+  pastKarman: RECORD_DEFS.pastKarman.reward,
+  firstOrbit: RECORD_DEFS.firstOrbit.reward,
+  firstCustomer: RECORD_DEFS.firstCustomer.reward,
+  firstDelivery: RECORD_DEFS.firstDelivery.reward,
 } as const;
 
 // ---------------------------------------------------------------------------

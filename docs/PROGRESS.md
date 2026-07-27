@@ -1335,3 +1335,151 @@ fail-narrative-retry-certify flow works and is narrated." All five original task
 (Test Stand reachability, certifications as processes, scripted failure, Mission Log +
 narrative triggers, Flight Experience visible as a resource) are complete. Sprint 5 is
 closed. Next: Sprint 6 (sounding rockets).
+
+## Sprint 6 — CLOSED (2026-07-27)
+
+Sounding rockets: the first launches. ECONOMY §7a describes the mechanic ("the full
+launch loop in miniature") but leaves several implementation-level questions open —
+resolved here from the numbers actually given, not invented, each noted below so a
+future sprint can revisit the reasoning rather than the conclusion alone.
+
+**Schema (`schemaVersion` 3 → 4, migration in the same commit):**
+- `SoundingRocketId`, `SoundingChecklistItemId`, `SoundingMissionState` (new) — mirrors
+  `PadMissionState`'s shape (`confidence`, `committedRoll: number | null` drawn at
+  checklist completion per rule 12) but simplified to 3-4 items. `MissionState` gains
+  `sounding: SoundingMissionState | null` (current attempt; one at a time, same "single
+  in-progress slot" precedent as research/certification) and `soundingHalfDurationNext:
+  Partial<Record<SoundingRocketId, boolean>>` (GDD §7b's re-integration bonus, which
+  must survive the mission-slot reset that happens on every resolution).
+- `LaunchRecord.padId` widened to `PadId | null` (sondas launch from the Launch Rail, not
+  a Complex D pad — safe since nothing had ever produced a `LaunchRecord` yet); gained
+  optional `contractId` (additive, rule 5).
+- `ActiveContract` gained optional `deadlineMissed` (additive, rule 5) so the missed-
+  deadline tick check never double-penalizes the same contract.
+- `RecordId` (new): the 6 ECONOMY §8b records, as a plain `string[]` push into the
+  existing `records` field (no dedicated array type, matching `research.completed`'s own
+  shape).
+- `v3ToV4` migration: `mission.sounding: null`, `mission.soundingHalfDurationNext: {}`.
+
+**Judgment calls (numbers are exact; the interaction model connecting them is inferred):**
+1. **Checklist item mechanics.** §7a lists 3 items (Assembled/Propellant/Weather window)
+   with a duration for assembly but *no* duration for "Propellant" — read as the signal
+   that it isn't a timed step: it's a **live check** (`propellant.amount >= required`,
+   recomputed every tick, never a stored one-shot flag), deducted only at the actual
+   launch — confirmed directly by §7a's own column header, "**Launch** consumes." Weather
+   window is a timed process with a **random** uniform(2,5) min duration per §11 (BACKLOG
+   confirms variable weather *quality* is v2 — v1 weather is binary resolved/not,
+   justifying the sonda formula's unconditional "+5 optimal weather," since the checklist
+   makes the window mandatory, unlike the full 8-item formula's "0 if launched early"
+   phrasing for a skippable step). S-2's extra "flight review" (§7) is an instant
+   Research spend, matching the doc's own word choice ("spend," not "load").
+2. **Failure resolution applies program-wide, not just to Aurora I.** GDD §7b's package
+   (60% Hardware recovery, 80% XP, 60% Flight Data, half-duration re-integration, no Rep,
+   no payout) is written under the generic "Launch Confidence" heading, and its numbers
+   are independently confirmed by Sprint 5's own scripted-failure reward: 6 of 10 H
+   recovered = exactly 60%. Applied identically to sonda failures.
+3. **Tier-0 contract cost is folded into the linked flight's own steps**, not a separate
+   charge: §10's "10 H + 40 P = the standard S-1 (8H+30P) + client payload integration
+   (2H+10P)" is modeled as +2 Hardware at assembly and +10 Propellant at launch, only when
+   `contractId` is set (S-1 only — tier-0 never flies an S-2).
+4. **Real gap caught by cross-checking `sim/run.ts`'s own `CONTRACT_REWARDS` table**
+   (built in Sprint 0, never wired into real code until now): ECONOMY §8's "Contract
+   fulfilled" row pays its own Flight XP (+40) and Flight Data (+450) for tier-0, **on
+   top of** the underlying S-1 flight's own reward (15 XP/200 Flight Data) — no
+   cross-reference to §10 the way its Reputation column has, so it isn't a restatement.
+   Missed on the first pass; caught before writing tests, not after.
+5. **"First flight"/"Kármán line" gate on a *successful* flight, not a mere attempt** —
+   unlike "First ignition," which explicitly carves out "(even the scripted failure)."
+   The presence of that carve-out on only one record implies the others default to
+   success-gated; N-08b/N-08c's own narrative text ("Your first rocket flew... the lab
+   already wants a second flight") only makes sense as a success beat. (`sim/run.ts`'s
+   own comment reasoned the opposite way for its pacing-only bot; not followed here since
+   the sim never actually models sonda failure, so it never had to resolve the tension.)
+
+**Built:**
+- `data/soundingRockets.ts`, `data/contracts.ts` (new): S-1/S-2 defs, tier-0 templates
+  (client list from NARRATIVE §4), failure-resolution rate constants, the simplified
+  Confidence formula's terms.
+- `core/soundingMission.ts` (new): `computeSondaConfidence`, `isSoundingRocketUnlocked`,
+  `startSoundingAssembly` (pays Hardware, opens the mission slot, applies the pending
+  half-duration bonus and consumes it), `startSoundingWeatherCheck`,
+  `paySoundingFlightReview`, `applyCompletedSoundingProcesses` (flips checklist items
+  when their backing process resolves — same dispatcher pattern as `applyCompletedProcesses`
+  for staff), `resolveSoundingChecklist` (tick-time: live propellant check, roll
+  commitment), `launchSoundingMission` (resolves the already-committed roll, applies
+  rewards or failure resolution, fulfills a linked contract on success, logs a
+  `LaunchRecord`, resets the mission slot).
+- `core/contracts.ts` (new): `maybeGenerateTierZeroOffer` (regenerates whenever no tier-0
+  offer is pending — expired or just-accepted are the same "slot freed" event),
+  `acceptContract`, `resolveContractDeadlines` (−15 Rep floor 0, tick-driven, idempotent
+  via `deadlineMissed`), `activePendingContracts`. Written to extend cleanly when Sprint
+  9 adds tiers 1/2 (`CONTRACT_TIERS` already lists all three).
+- `core/records.ts` (new): generic, tick-driven — every trigger reads a **durable** state
+  signal (`certifications.engines.probe1.attempted`, `mission.launches`,
+  `contracts.active`), so a record needs no imperative call site anywhere and correctly
+  backfills retroactively (verified live: "First ignition" fires on the very first tick
+  of a save where Probe-1 was already attempted before this system existed).
+- Sounding/certification processes both live in the generic `processes: Process[]` array
+  (kinds `integration`/`weather_window`, tagged `payload.missionKind: 'sounding'`) — this
+  is what lets the *existing* warp-shift logic in `applyTick` cover them for free, no new
+  time-warp code needed.
+- `state/persistStore.ts`: new `resolveSoundingContractsAndRecords` helper, shared by
+  `applyTick` and `computeBootOffline` (rule 6) — advances checklist/roll, rotates the
+  tier-0 offer, resolves deadlines, grants records. New actions:
+  `startSoundingMission`, `startWeatherCheck`, `payFlightReview`, `launchSounding`,
+  `acceptContractOffer`. **Real gap fixed while wiring this (same class as Sprint 5's
+  away-summary miss): `fundingGained`/`researchGained` in the away-summary were still
+  reading pre-sounding-resolution resources — a Program Record or contract fulfillment
+  resolving during an offline gap would have been silently missing from "While you were
+  away."**
+- `ui/SoundingMissionPanel.tsx`, `ui/ContractsPanel.tsx` (new), both in the Testing tab
+  once Test Stand + Launch Rail are built. `ui/MissionLog.tsx` gains a Log/Records tab
+  switcher (UI_SPEC: "Records board lives as a tab inside this panel") — earned records
+  show fully, unearned ones render as a dimmed "———" placeholder (UI_SPEC §2b). Rocket
+  cards get full disclosure (cost, duration, effect) per UI_SPEC §4 — this is a player
+  CHOICE, not Probe-1's scripted-test carve-out. `ui/ActiveProcessStrip.tsx` extended for
+  the `integration`/`weather_window` kinds it was already structured to grow into.
+- `sim/run.ts`: `S1_*`/`S2_*`/`TIER0_*`/`RECORDS` constants now import from the real data
+  files instead of keeping a second hardcoded copy (per the file's own header note,
+  same pattern Sprint 4 set for the research tree). Bot policy/approximations
+  (guaranteed-success assumption, contract build folded into one timer) left untouched —
+  still documented sim-only simplifications, not a spec for the real game.
+
+**Verification:**
+- 264 tests passing (up from 210), all new modules covered before any UI was written
+  (rule 7). Typecheck/lint/build clean, dev tooling still excluded from the production
+  bundle. `sim/run.ts --days=45` re-run: human-profile salary ratio (55%), sonda-era
+  Flight Data share (23.7%) and satellite-era share (24.7%) all match the last-recorded
+  figures exactly — confirming the constant-import swap changed nothing numerically —
+  and the pacing floor (Aurora I not before day 5) still passes.
+- Playwright, through a real browser, driving the actual mechanic live (injection only
+  for the unrelated grind — building Test Stand/Launch Rail, researching probe1Engine,
+  certifying Probe-1 — already covered by Sprint 5's own verification): assembled an
+  S-1, ran its weather check in parallel, confirmed all 3 checklist items complete and
+  the roll commits automatically (no button press) at exactly the moment they do,
+  confirmed "First ignition" is correctly backfilled from a pre-existing `attempted:
+  true` state on the very first tick, launched at a **guaranteed 100%** Confidence
+  (extended-certified Probe-1 — the failure/re-integration branch is covered
+  deterministically by `soundingMission.test.ts` instead, since re-proving RNG live would
+  make the script flaky for no benefit), confirmed N-08b narrates and "First flight"
+  earns; accepted a tier-0 offer, flew a contract-linked S-1, confirmed the contract
+  fulfills (a fresh offer regenerates moments later, matching the "1 offer" rotation
+  rule) and "First customer"/"First delivery" both earn; flew an S-2 (confirmed its extra
+  Flight Review checklist item, paid it, launched), confirmed N-08c narrates and "Past
+  the Kármán line" earns. Zero console errors. Screenshots `29`–`34` under
+  `sprint6-*.png`, including the Records board showing three earned records, a correctly
+  dimmed unearned "———" placeholder for "First orbit," and the accented "Kármán" label
+  rendering correctly.
+- One test-script correction, not a product bug: the first pass asserted a fulfilled
+  contract would show a `--done` badge in the Contracts panel — it doesn't, because
+  `activePendingContracts` (by design) drops fulfilled contracts entirely, and a fresh
+  offer regenerates in its place. Fixed the assertion to check for the absence of a
+  stale unfulfilled row instead; the real fulfillment signal ("First delivery" earning,
+  funding/reputation paid) was already correct on the first run.
+
+**Sprint 6 acceptance, verified end to end through the integrated path:** "repeatable
+S-1 campaign funds progress via tier-0 contracts; extended certification reaches 100%
+Confidence; S-2 crosses Kármán and awards its record." All four original tasks (Launch
+Rail + sonda assembly workshop, S-1 mini-checklist + simplified Confidence + roll
+commitment + countdown + results, tier-0 contracts, S-2 + Kármán record + N-08b/N-08c)
+are complete. Sprint 6 is closed. Next: Sprint 7 (VAB, Aurora I & full Launch Sequence).

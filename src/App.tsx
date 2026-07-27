@@ -12,6 +12,8 @@ import { AwayModal } from './ui/AwayModal';
 import { ActiveProcessStrip } from './ui/ActiveProcessStrip';
 import { StaffAvailabilityChip } from './ui/StaffAvailabilityChip';
 import { CertificationPanel } from './ui/CertificationPanel';
+import { SoundingMissionPanel } from './ui/SoundingMissionPanel';
+import { ContractsPanel } from './ui/ContractsPanel';
 import { MissionLog } from './ui/MissionLog';
 import { TimeWarpControl } from './ui/TimeWarpControl';
 import { DevResetButton } from './ui/DevResetButton';
@@ -95,6 +97,7 @@ function TestingPanel({ onSelectComplex }: ComplexPanelProps) {
     isUnlockConditionMet(BUILDINGS.payloadProcessing.unlockCondition, unlockContextFromState(s)),
   );
   const testStandLevel = useGameStore((s) => s.buildings.testStand.level);
+  const launchRailLevel = useGameStore((s) => s.buildings.launchRail.level);
 
   return (
     <>
@@ -105,6 +108,8 @@ function TestingPanel({ onSelectComplex }: ComplexPanelProps) {
         {payloadProcessingUnlocked && <BuildingTile buildingId="payloadProcessing" />}
       </div>
       {testStandLevel >= 1 && <CertificationPanel />}
+      {testStandLevel >= 1 && launchRailLevel >= 1 && <SoundingMissionPanel />}
+      {launchRailLevel >= 1 && <ContractsPanel />}
     </>
   );
 }
