@@ -2111,5 +2111,101 @@ the onboarding path the tooltips now reinforce; not treated as a gap.
   zero console errors, zero layout overflow (`max-height: 80vh` + scroll added
   defensively for a save with many simultaneous completions).
 
-Next within Sprint 8: Settings screen (save export/import, manual save, hard reset,
-sound/motion toggles), save/load + offline regression QA, private itch.io playtest build.
+### Settings screen (SPRINTS.md task 4 / UI_SPEC §6)
+
+Built the five items SPRINTS.md's task 4 explicitly lists. Two items live in UI_SPEC §6's
+own fuller description but not in SPRINTS' task-4 enumeration — **deliberately left out,
+flagged rather than silently built or silently dropped:**
+- **Telemetry opt-in checkbox:** UI_SPEC §6 itself marks this "(Sprint 12)" — out of
+  scope by the doc's own words.
+- **Number notation (suffix/scientific) toggle:** no alternate format is defined
+  anywhere in ECONOMY_MODEL §12 (which specifies exactly one notation, the suffix
+  style already used everywhere) — building a toggle would mean inventing what
+  "scientific" looks like in this game, a real rule-1 trigger. Left out; worth a doc
+  addition first if this is wanted.
+
+**Built:**
+- Gear icon in the ticker (`Ticker.tsx` gained an optional `onOpenSettings` prop, so the
+  existing `Ticker.test.tsx` calls that render it without one keep working) opens a new
+  `SettingsScreen.tsx` modal, state owned by `App.tsx` (same "App owns the open/closed
+  flag" pattern as the complex-tab/dismissed-tips state already there).
+- **Save export/import:** `state/persistStore.ts` gains `importSave(raw, reload?)` —
+  validates JSON parse, requires a numeric `schemaVersion`, and explicitly rejects a
+  save NEWER than `CURRENT_SCHEMA_VERSION` with a clear message (a real gap in
+  `migrate()`'s own contract: it only ever walks FORWARD from an older version — handed
+  a newer one, its loop simply never runs and it silently passes the state through
+  unchanged. Fine for `loadGame()`'s existing "never crash on boot" fallback, wrong for
+  an explicit import, which is exactly the path a save from a different install/version
+  could arrive by). On success, sets the same `resetInProgress` guard `hardResetSave`
+  already uses (so the autosave's `beforeunload` handler can't clobber the freshly
+  imported save mid-reload — Sprint 3.5's race, same fix) and reloads. `reload` is
+  injectable (defaults to the real `window.location.reload`) purely so tests don't have
+  to invoke it for real — see Verification below for why that specifically matters.
+  `SettingsScreen` offers both a textarea (copy-paste string) and file download/upload
+  (`Blob`+`<a download>` / `FileReader`), both funneling into the same `importSave`.
+- **Manual save + last-saved timestamp:** reuses the existing `saveGame`; timestamp reads
+  `state.lastSeenAt` directly (already stamped by every save, manual or auto) rather than
+  tracking a second "last manual save" value.
+- **Hard reset, double confirm:** reuses the existing `hardResetSave` (built dev-only in
+  Sprint 3.5, specifically anticipating this screen); the production button adds a real
+  two-step confirm using local component state (not a native `window.confirm()`) — same
+  "reads as reversible-feeling" pattern Sprint 7.5's staff-release confirm already
+  established, not a new convention.
+- **Sound/motion toggles:** new `state/settings.ts` (`useSettings`) — a small store
+  outside `GameState`, same shape as `state/devTools.ts`'s time-warp store, but
+  **persisted** (own `localStorage` key, separate from the save — a presentation
+  preference, not economy data, shouldn't round-trip through save export/import or grow
+  the save schema). Sound has no real effect yet — there's no sound *system* at all
+  until Sprint 11 (SPRINTS.md's own words: "minimal optional sound"); the toggle exists
+  as infrastructure Sprint 11 reads, same "infra now, content later" restraint already
+  used for `ProcessProgress` (Sprint 2) and `minHardwareTier` (Sprint 3). Reduced motion
+  DOES have a real effect now: `App.tsx` mirrors it onto
+  `document.documentElement.dataset.reducedMotion`, and `index.css` overrides every
+  DECORATIVE keyframe animation (tier-toast/milestone-callout fade, the manual-action
+  shake, the pitch "+N" float, the research-node pulse) when set. Deliberately does
+  **not** touch `.manual-action-button__recharge` (the cooldown fill) — that's a
+  functional progress indicator, not a "pulse"; disabling its animation would leave it
+  stuck at full width, permanently looking mid-cooldown, a real regression rather than
+  an accessibility improvement.
+
+**A genuine multi-round test-methodology investigation, not app bugs** (worth recording
+since the same traps will recur): writing `importSave`'s tests surfaced that a
+*successful* import flips the same module-level `resetInProgress` guard `hardResetSave`
+already flips — with no reset hook (by design; only a real page reload clears it in
+production). `hardResetSave`'s own test already carried a comment enforcing "must be the
+last describe block in this file" for exactly this reason; the new `importSave` tests
+needed the same treatment, moved to sit immediately before it, with `hardResetSave`'s own
+setup switched from going through `saveGame()` to seeding `localStorage` directly (since
+by the time it runs, the guard is already permanently flipped by the tests before it, and
+what's under test there is the reset+guard, not `saveGame`'s write path, already covered
+elsewhere). Separately, jsdom's `window.location.reload` is non-configurable — `vi.spyOn`
+can't stub it, and actually letting it fire for real (even via `vi.stubGlobal`-adjacent
+tricks) was found to corrupt jsdom's shared localStorage state for every later test in
+the file — resolved by making `reload` an injectable parameter instead of intercepting
+the global at all. The exact same class of bug then reappeared in the *Playwright* pass
+(a different tool, same root cause): the check script's own `page.addInitScript(() =>
+localStorage.clear())`, meant to reset state once before the first navigation, silently
+re-fired on every reload the app triggered internally (hard reset, import) — wiping the
+data those actions had just written before the reloaded page could read it back, making
+a working import look broken. Fixed by clearing once via `page.evaluate` + a single
+explicit `page.reload()` instead of `addInitScript`.
+
+**Verification:**
+- 380 tests passing (up from 375 — 5 new in `persistStore.test.ts`'s `importSave` block:
+  invalid JSON, missing version, newer-than-supported version, valid current-version
+  import, and older-version import through the same migration path `loadGame` uses).
+  Typecheck, lint, production build all clean.
+- Playwright, through a real browser, one continuous pass: pitched to a known non-zero
+  Funding value; manual-saved and confirmed the "Saved!" confirmation text; exported as
+  text (4,158-char valid JSON); toggled Sound off and Reduced motion on, confirmed
+  `document.documentElement`'s attribute flipped live AND the values round-tripped
+  through `localStorage` (`{"soundEnabled":false,"reducedMotion":true}`) after closing
+  and reopening the panel; hard-reset with the double-confirm step (verified the
+  intermediate "Are you sure?" text appears, and Funding actually goes to 0/500 after
+  confirming); imported the earlier export string back — **Funding read exactly 30/500
+  again, matching the pre-export value precisely** — the full export → wipe → import
+  round-trip, live; fed garbage text to the importer and got the correct "not valid
+  JSON" error message, save left untouched. Zero console errors across the entire pass.
+
+Next within Sprint 8: save/load + offline regression QA across every process kind,
+private itch.io playtest build.

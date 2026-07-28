@@ -95,6 +95,70 @@ export function saveGame(state: GameState): void {
   );
 }
 
+export interface ImportSaveResult {
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * UI_SPEC §6: Settings screen save import (string or file — the caller reads a file
+ * into a string before calling this either way). "Export string is versioned and
+ * validated on import with a clear error for corrupt/newer-version saves." Unlike
+ * `loadGame()`'s silent boot-time fallback (a corrupt AUTO-load must never crash the
+ * app), an explicit import failure needs to say so — a player pasting the wrong thing
+ * should get an error, not a silently-reset game.
+ *
+ * `migrate()` only walks FORWARD from an older schemaVersion; it has no guard against
+ * fromVersion being newer than CURRENT_SCHEMA_VERSION (a save from a future build) — its
+ * loop condition simply never runs, silently passing the newer state through unchanged.
+ * That's fine for `migrate()`'s own contract (nothing calls it with a newer version
+ * today), but import is exactly the path where an incompatible newer save could arrive,
+ * so it's checked explicitly here.
+ *
+ * On success, reloads the page so the normal boot path (computeBootOffline/loadGame)
+ * picks up the freshly written save — same `resetInProgress` guard hardResetSave uses,
+ * so the autosave's beforeunload handler can't clobber the import with stale in-memory
+ * state during the reload (Sprint 3.5's race, same class, same fix).
+ *
+ * `reload` is injectable (defaults to the real `window.location.reload`) purely for
+ * testability: jsdom's `location.reload` is non-configurable, so it can't be
+ * `vi.spyOn`-ed, and actually invoking it mid-test-suite was found to corrupt jsdom's
+ * shared localStorage/navigation state for every test that ran afterward in the same
+ * file — a real footgun discovered while writing this function's own tests, not a
+ * hypothetical one.
+ */
+export function importSave(raw: string, reload: () => void = () => window.location.reload()): ImportSaveResult {
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    return { ok: false, error: "That doesn't look like a valid Aurora Program save (not valid JSON)." };
+  }
+  if (typeof parsed !== 'object' || parsed === null || typeof parsed.schemaVersion !== 'number') {
+    return { ok: false, error: "That doesn't look like a valid Aurora Program save (missing version info)." };
+  }
+
+  const fromVersion = parsed.schemaVersion;
+  if (fromVersion > CURRENT_SCHEMA_VERSION) {
+    return {
+      ok: false,
+      error: 'This save is from a newer version of Aurora Program than this build supports.',
+    };
+  }
+
+  try {
+    const migrated = fromVersion === CURRENT_SCHEMA_VERSION ? parsed : migrate(parsed, fromVersion);
+    // Import restores everything verbatim, including any committed launch roll — saves
+    // are deterministic snapshots (UI_SPEC §6's own note), so no special-casing needed.
+    resetInProgress = true;
+    localStorage.setItem(SAVE_KEY, JSON.stringify(migrated));
+    reload();
+    return { ok: true };
+  } catch {
+    return { ok: false, error: 'Could not load this save — it may be corrupted.' };
+  }
+}
+
 /** Dev-only (CLAUDE.md rule 11, gated at the call site like TimeWarpControl): wipes the
  * save and reloads, for manual testing ahead of Sprint 8's real hard-reset UI. */
 export function hardResetSave(): void {

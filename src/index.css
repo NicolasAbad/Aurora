@@ -28,12 +28,31 @@ body {
 }
 
 .ticker {
+  position: relative;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
   padding: 12px 16px;
   display: flex;
   flex-direction: column;
   gap: 6px;
+}
+
+/* UI_SPEC §6: "Accessed from a gear icon in the ticker." */
+.ticker__settings-button {
+  position: absolute;
+  top: 8px;
+  right: 12px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.3em;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.ticker__settings-button:hover {
+  color: var(--text);
 }
 
 .ticker__row {
@@ -1269,4 +1288,161 @@ body {
 .launch-result__detail {
   color: var(--text-dim);
   font-size: 0.9em;
+}
+
+/* UI_SPEC §6: Settings screen. */
+.settings-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+}
+
+.settings-screen {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 20px 24px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.settings-screen__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings-screen__header h2 {
+  margin: 0;
+}
+
+.settings-screen__header button {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.3em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.settings-screen__header button:hover {
+  color: var(--text);
+}
+
+.settings-section {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settings-section h3 {
+  margin: 0;
+  font-size: 0.95em;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.settings-hint {
+  color: var(--text-dim);
+  font-size: 0.85em;
+}
+
+.settings-note {
+  color: var(--text-dim);
+  font-size: 0.85em;
+  margin: 0;
+}
+
+.settings-textarea {
+  width: 100%;
+  min-height: 80px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px;
+  font: inherit;
+  font-size: 0.8em;
+  resize: vertical;
+}
+
+.settings-error {
+  color: #e05c3c;
+  font-size: 0.85em;
+}
+
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.settings-file-label {
+  position: relative;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+.settings-file-label:hover {
+  border-color: var(--accent);
+}
+
+.settings-file-input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.settings-section--danger {
+  border-top-color: #e05c3c;
+}
+
+.settings-danger-button {
+  background: #e05c3c;
+  color: #1a0e0a;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 16px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+/* UI_SPEC §7: "reduced-motion setting disables rolling numbers and pulses." Overrides
+ * every DECORATIVE keyframe animation in this file — content still appears/updates,
+ * just without the transition. `.manual-action-button__recharge` is deliberately NOT
+ * included: it's the cooldown fill itself (functional progress, not a "pulse"), and
+ * removing its animation would leave it stuck at scaleX(1) — permanently LOOKING like
+ * the button is mid-cooldown, a real regression, not an accessibility improvement.
+ * Applied via a root data attribute (App.tsx), not a class per element, so this stays a
+ * single override point rather than threading a prop through every animated component. */
+:root[data-reduced-motion='true'] .tier-toast,
+:root[data-reduced-motion='true'] .milestone-callout,
+:root[data-reduced-motion='true'] .manual-action-button--shake,
+:root[data-reduced-motion='true'] .manual-action-feedback,
+:root[data-reduced-motion='true'] .research-tree__node--available {
+  animation: none !important;
 }

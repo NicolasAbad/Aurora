@@ -37,7 +37,13 @@ function buildingsThatRaiseCap(id: ResourceId): string[] {
     .map((def) => def.name);
 }
 
-export function Ticker() {
+interface TickerProps {
+  // UI_SPEC §6: "Accessed from a gear icon in the ticker." Optional so existing tests
+  // that render <Ticker /> without it (no Settings screen involved) keep working.
+  onOpenSettings?: () => void;
+}
+
+export function Ticker({ onOpenSettings }: TickerProps = {}) {
   const resources = useGameStore(useShallow((s) => s.resources));
   const production = useGameStore(
     useShallow((s) => ({ buildings: s.buildings, staff: s.staff })),
@@ -49,6 +55,17 @@ export function Ticker() {
 
   return (
     <header className="ticker">
+      {onOpenSettings && (
+        <button
+          type="button"
+          className="ticker__settings-button"
+          aria-label="Settings"
+          title="Settings"
+          onClick={onOpenSettings}
+        >
+          ⚙
+        </button>
+      )}
       <div className="ticker__row ticker__row--primary">
         {visiblePrimary.map(({ id, label }) => {
           const res = resources[id];

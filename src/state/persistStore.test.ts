@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createInitialState } from '../data/initialState';
 import { launchAuroraMission, resolveAuroraChecklist } from '../core/auroraMission';
-import { hardResetSave, loadGame, saveGame, SAVE_KEY, useGameStore } from './persistStore';
+import { hardResetSave, importSave, loadGame, saveGame, SAVE_KEY, useGameStore } from './persistStore';
 import { CURRENT_SCHEMA_VERSION } from './migrations';
 import type { Process } from '../core/types';
 
@@ -502,13 +502,84 @@ describe('roll commitment survives export/import (Sprint 7 regression test, rule
 
 // Sprint 3.5: hardResetSave found a real race — removeItem() + reload() isn't enough,
 // because reload() fires `beforeunload`, and the autosave handler re-saves the CURRENT
+// UI_SPEC §6 (Settings screen import): unlike loadGame()'s silent boot-time fallback
+// (tested at the top of this file — never crash, just fall back), an explicit import
+// must say clearly why it refused, and must never silently accept a save loadGame would
+// just shrug at. Placed here (immediately before hardResetSave, not near loadGame where
+// it was first written) for the exact same reason hardResetSave itself must be last:
+// a SUCCESSFUL import also flips the module-level `resetInProgress` guard with no reset
+// hook, so it would break every subsequent saveGame() call in this file if it ran
+// earlier — discovered live when adding these tests broke four unrelated ones below.
+describe('importSave', () => {
+  it('rejects invalid JSON with a clear error, without touching the existing save', () => {
+    const existing = createInitialState();
+    existing.resources.funding.amount = 42;
+    saveGame(existing);
+
+    const result = importSave('not json at all {{{');
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/valid JSON/i);
+    expect(loadGame().resources.funding.amount).toBe(42); // untouched
+  });
+
+  it('rejects an object with no schemaVersion', () => {
+    const result = importSave(JSON.stringify({ resources: {} }));
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/version info/i);
+  });
+
+  it('rejects a save from a newer schema version than this build supports', () => {
+    const future = { ...createInitialState(), schemaVersion: CURRENT_SCHEMA_VERSION + 1 };
+    const result = importSave(JSON.stringify(future));
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/newer version/i);
+  });
+
+  // importSave's `reload` param is injectable specifically so tests never have to
+  // invoke the real window.location.reload() — jsdom's version is non-configurable
+  // (vi.spyOn can't touch it) and, discovered live, actually corrupts jsdom's shared
+  // localStorage/navigation state for every later test if it fires for real. A no-op
+  // stub here plus an explicit assertion that it was called is both safer and more
+  // precise than trying to intercept the real global.
+  it('accepts a valid current-version save, migrates it into place, and reloads', () => {
+    const reload = vi.fn();
+    const toImport = createInitialState();
+    toImport.resources.funding.amount = 999;
+    const result = importSave(JSON.stringify(toImport), reload);
+
+    expect(result.ok).toBe(true);
+    expect(reload).toHaveBeenCalledOnce();
+    expect(loadGame().resources.funding.amount).toBe(999);
+  });
+
+  it('migrates an older-version save on import, same as loadGame would', () => {
+    const older = createInitialState();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deliberately malformed pre-v2 shape for the migration test
+    const raw: any = { ...older, schemaVersion: 1 };
+    delete raw.buildings.offices.starvedIndicator;
+    delete raw.buildings.offices.fedStreakMs;
+
+    const result = importSave(JSON.stringify(raw), vi.fn());
+    expect(result.ok).toBe(true);
+    expect(loadGame().schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(loadGame().buildings.offices.starvedIndicator).toBe(false);
+  });
+});
+
 // in-memory state right after the key was cleared, before the reloaded page ever reads
 // it. Placed last in this file: hardResetSave permanently flips a module-level guard
 // with no reset hook (mirroring what only a real page reload undoes in production), so
-// it would break every subsequent saveGame() call in this test file if it ran earlier.
+// it would break every subsequent saveGame() call in this test file if it ran earlier —
+// the same reason the importSave block right above also has to sit this late (its
+// successful-import tests flip the same guard).
 describe('hardResetSave (Sprint 3.5) — must be the last describe block in this file', () => {
   it('clears the save and makes a subsequent saveGame() (simulating the beforeunload race) a no-op', () => {
-    saveGame(createInitialState());
+    // Seeded directly, not via saveGame() — by the time this runs, importSave's own
+    // successful-import tests (immediately above) have already flipped the module-level
+    // resetInProgress guard, which would make a saveGame() call here silently no-op.
+    // What's under test is hardResetSave's own clear + guard, not saveGame's write path
+    // (already covered by the 'saveGame' describe block earlier in this file).
+    localStorage.setItem(SAVE_KEY, JSON.stringify(createInitialState()));
     expect(localStorage.getItem(SAVE_KEY)).not.toBeNull();
 
     const reload = vi.fn();

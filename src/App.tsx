@@ -19,7 +19,9 @@ import { LaunchSequencePanel } from './ui/LaunchSequencePanel';
 import { MissionLog } from './ui/MissionLog';
 import { TimeWarpControl } from './ui/TimeWarpControl';
 import { DevResetButton } from './ui/DevResetButton';
+import { SettingsScreen } from './ui/SettingsScreen';
 import { useGameStore } from './state/persistStore';
+import { useSettings } from './state/settings';
 import { formatCost } from './core/format';
 import { isUnlockConditionMet, unlockContextFromState } from './core/unlockConditions';
 import { nextFtueTooltip } from './core/ftue';
@@ -290,19 +292,30 @@ export function App() {
   const [activeComplex, setActiveComplex] = useState<ComplexId>('campus');
   const [dismissedTips, setDismissedTips] = useState<Set<string>>(new Set());
   const dismissTip = (id: string) => setDismissedTips((prev) => new Set(prev).add(id));
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
+  // UI_SPEC §7: "reduced-motion setting disables rolling numbers and pulses." Applied
+  // as a root-level data attribute so index.css can override every animation in one
+  // place (tier-toast/milestone-callout fade, manual-action recharge/shake, pitch
+  // feedback float, research-node pulse) rather than threading a prop through each.
+  const reducedMotion = useSettings((s) => s.reducedMotion);
+  useEffect(() => {
+    document.documentElement.dataset.reducedMotion = String(reducedMotion);
+  }, [reducedMotion]);
 
   return (
     <div className="app">
       <AwayModal />
       <TierChangeToast />
       <MilestoneCallout />
+      {settingsOpen && <SettingsScreen onClose={() => setSettingsOpen(false)} />}
       {__DEV_TOOLS__ && (
         <div className="dev-tools-row">
           <TimeWarpControl />
           <DevResetButton />
         </div>
       )}
-      <Ticker />
+      <Ticker onOpenSettings={() => setSettingsOpen(true)} />
       <ActiveProcessStrip onSelectComplex={setActiveComplex} />
       <PayrollBanner />
       <GlobalFtueTooltip dismissed={dismissedTips} onDismiss={dismissTip} />
