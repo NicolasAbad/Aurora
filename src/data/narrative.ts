@@ -37,6 +37,14 @@ export const NARRATIVE_TEXT: Record<string, string> = {
   'U-07': 'More ground antennas, more telemetry recovered. +25% Flight Experience from every flight.',
   'U-08': 'Your own forecasting. Launch weather windows open every 2 minutes instead of 2–5.',
   'U-09': 'A contamination-controlled bay. Required to accept constellation-batch contracts — the program’s most lucrative clients.',
+  // v3.6 (Sprint 8 economy unlock) — Campus/Production internal upgrades
+  'U-10': 'A dedicated desk chasing grant money. +1 Technician slot at Finance.',
+  'U-11': 'Organized records of every experiment run here. +1 Scientist slot at the R&D Lab.',
+  'U-12': 'A second bench, a second project. Run two research nodes at once instead of queueing them.',
+  'U-13': 'Standing orders with your material suppliers. +1 Technician slot at Supply Depot.',
+  'U-14': 'Reclaims runoff from the refining process. Materials consumed per Propellant drop 10%.',
+  'U-15': 'Catches bad stock before it’s machined. Materials consumed per Hardware drop 15%.',
+  'U-16': 'Denser shelving, better tracking. Every future Warehouse level stores 25% more.',
   // §7 — staff & slot copy (the idle-staff trap)
   'T-10': 'Open slots across the program: {n}',
   'T-11':
@@ -46,7 +54,7 @@ export const NARRATIVE_TEXT: Record<string, string> = {
   // researchTree.ts) rather than a T-/N-/U- id: §8's table has no separate ID column,
   // and every node id is already a stable, unique key — reusing it is the natural
   // "referenced by ID" reading (rule 9) rather than inventing a parallel namespace.
-  aluminum: 'Certifying aluminum stock for flight hardware. No other effect — unlocks Titanium research.',
+  aluminum: 'Certifying aluminum stock for flight hardware. Fabrication wastes 10% less Material per Hardware — and unlocks Titanium research.',
   titanium: 'Unlocks Titanium-tier Hardware. Fabrication starts producing at this tier automatically — no switch to flip.',
   soundingRockets: 'Groundwork for suborbital flight. No other effect — unlocks Probe-1 engine certification at the Test Stand.',
   probe1Engine: 'Certify the engine that powers your S-1 and S-2 sounding rockets.',

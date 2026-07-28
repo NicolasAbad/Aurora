@@ -200,6 +200,7 @@ function computeBootOffline(): { initialState: GameState; awaySummary: AwaySumma
     now,
     offlineCapMs,
     loaded.economyFlags.payrollUnpaid,
+    loaded.modifiers,
   );
 
   // Research has its own dedicated slot (not the generic processes array) — resolved
@@ -415,7 +416,14 @@ export const useGameStore = create<Store>()((set, get) => ({
 
   assign: (role, buildingId, delta) => {
     const state = get();
-    const staff = adjustStaffAssignment(state.staff, role, buildingId, delta, state.buildings[buildingId].level);
+    const staff = adjustStaffAssignment(
+      state.staff,
+      role,
+      buildingId,
+      delta,
+      state.buildings[buildingId].level,
+      state.buildings[buildingId].upgrades,
+    );
     if (staff) set({ staff });
   },
 
@@ -427,7 +435,8 @@ export const useGameStore = create<Store>()((set, get) => ({
 
   startResearchNode: (nodeId) => {
     const state = get();
-    const result = startResearch(state.resources, state.research, nodeId, Date.now());
+    const secondTrackUnlocked = state.buildings.rndLab.upgrades.includes('secondResearchTrack');
+    const result = startResearch(state.resources, state.research, nodeId, Date.now(), secondTrackUnlocked);
     if (result) {
       set({ ...result, telemetry: trackFirstOccurrence(state.telemetry, 'first_research_started', { nodeId }) });
     }
@@ -574,6 +583,9 @@ export const useGameStore = create<Store>()((set, get) => ({
       state.staff,
       state.research.completed,
       deltaMs * warp,
+      1,
+      state.modifiers,
+      Date.now(),
     );
 
     // Time-warp applies "at the timestamp layer" (SPRINTS.md Sprint 2 task 3), not by
@@ -595,14 +607,20 @@ export const useGameStore = create<Store>()((set, get) => ({
     );
     const staffAfterCompletions = applyCompletedProcesses(state.staff, completedProcesses);
 
-    // Research has its own dedicated slot, not the generic processes array, but is
+    // Research has its own dedicated slot(s), not the generic processes array, but is
     // otherwise timestamp-based the same way — the same warp-shift, the same
-    // resolveResearch call offline resolution makes.
+    // resolveResearch call offline resolution makes. Second track (ECONOMY §4 v3.6)
+    // shifts independently — either, neither, or both slots may be occupied.
     const shiftedResearch =
-      warpBonusMs > 0 && state.research.inProgress
+      warpBonusMs > 0
         ? {
             ...state.research,
-            inProgress: { ...state.research.inProgress, startedAt: state.research.inProgress.startedAt - warpBonusMs },
+            inProgress: state.research.inProgress
+              ? { ...state.research.inProgress, startedAt: state.research.inProgress.startedAt - warpBonusMs }
+              : state.research.inProgress,
+            secondInProgress: state.research.secondInProgress
+              ? { ...state.research.secondInProgress, startedAt: state.research.secondInProgress.startedAt - warpBonusMs }
+              : state.research.secondInProgress,
           }
         : state.research;
     const researchResolution = resolveResearch(shiftedResearch, state.modifiers, Date.now());
@@ -662,7 +680,7 @@ export const useGameStore = create<Store>()((set, get) => ({
     if (Object.values(missionsResolution.mission.pads).some((pad) => pad?.checklist.rocketIntegrated)) {
       seen = markSeen(seen, 'N-09'); // Aurora I integrated
     }
-    if (researchResolution.justCompleted === 'orbitalFlight') {
+    if (researchResolution.justCompletedIds.includes('orbitalFlight')) {
       seen = markSeen(seen, 'N-15'); // Orbital flight tech
     }
 

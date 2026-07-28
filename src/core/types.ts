@@ -320,7 +320,10 @@ export interface GameState {
   };
   staff: StaffState;
   buildings: Record<BuildingId, BuildingState>;
-  research: { completed: string[]; inProgress: Process | null };
+  // secondInProgress (ECONOMY §4 v3.6, R&D Lab's "Second research track" upgrade):
+  // additive optional (CLAUDE.md rule 5) — absent/undefined means exactly the pre-v3.6
+  // single-track behavior, no migration needed.
+  research: { completed: string[]; inProgress: Process | null; secondInProgress?: Process | null };
   // Sprint 5 (ECONOMY §6): same shape as `research` above — one test in progress at a
   // time, permanent per-engine progress that survives save/load.
   certifications: { engines: Record<EngineId, EngineCertificationState>; inProgress: Process | null };

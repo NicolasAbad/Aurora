@@ -74,6 +74,16 @@
 //   - Per instruction: this reconciliation pass does NOT change any ECONOMY_MODEL value.
 //     If the numbers look off, that's the finding to report, not something to quietly fix
 //     here — see docs/PROGRESS.md's decision-rule note.
+//   - ECONOMY §4/§5 v3.6 (Sprint 8 economy unlock): the bot does NOT buy any of the new
+//     Campus/Production internal upgrades (Grants desk, Technical archive, Second
+//     research track, Bulk contracts, Recovery loop, QA station, Inventory system) —
+//     same documented restraint as Instrumentation/Cafeteria/Extended-Rail-adjacent
+//     upgrades before it (the bot only ever buys Extended Rail and Classroom). Aluminum
+//     alloys' new -10% Fabrication-consumption effect IS modeled (it's a research node
+//     the bot already researches on schedule, not an optional purchase). This makes the
+//     sim a conservative lower bound on real achievable pacing once a player starts
+//     buying these upgrades, the same direction every other unmodeled upgrade already
+//     biases it.
 
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -1237,7 +1247,11 @@ function tick(state: SimState, profile: Profile): void {
         productionPerSecond(BUILDINGS.fabrication.production!.basePerSec, fabLevel, 1) *
         dtSec *
         rateMultiplier;
-      const materialsNeeded = hardwareAmount * 2; // consumes 2 M per Hardware, ECONOMY §4
+      // ECONOMY §5 v3.6: Aluminum alloys' -10% Materials-per-Hardware IS modeled — it's a
+      // research node the bot completes on its normal RESEARCH_PRIORITY schedule, not an
+      // optional purchase (unlike QA station, deliberately NOT modeled — see header note).
+      const materialsPerHardware = 2 * (state.techCompleted.has('aluminum') ? 0.9 : 1);
+      const materialsNeeded = hardwareAmount * materialsPerHardware;
       if (state.resources.materials >= materialsNeeded) {
         state.resources.materials -= materialsNeeded;
         grant(state, 'hardware', hardwareAmount, false);

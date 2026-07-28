@@ -5,7 +5,12 @@ import { BUILDINGS } from '../data/buildings';
 import { RESOURCE_NAME } from '../data/resourceNames';
 import { ROLE_LABEL } from '../data/roles';
 import { narrativeText } from '../data/narrative';
-import { costAtLevel, productionPerSecond } from '../core/economy';
+import {
+  costAtLevel,
+  fabricationConsumeMultiplier,
+  productionPerSecond,
+  refineryConsumeMultiplier,
+} from '../core/economy';
 import { formatRate } from '../core/format';
 import {
   assignedToBuilding,
@@ -27,6 +32,7 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
   const level = useGameStore((s) => s.buildings[buildingId].level);
   const starvedIndicator = useGameStore((s) => s.buildings[buildingId].starvedIndicator);
   const ownedUpgrades = useGameStore((s) => s.buildings[buildingId].upgrades);
+  const modifiers = useGameStore(useShallow((s) => s.modifiers));
   const resources = useGameStore(useShallow((s) => s.resources));
   const staff = useGameStore(useShallow((s) => s.staff));
   const buyBuilding = useGameStore((s) => s.buyBuilding);
@@ -51,7 +57,7 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
   // UI_SPEC §4 (v3.5): leveled buildings preview the next level's delta on the Upgrade
   // button itself, "every level, forever" — one-time buildings have no "next level".
   const deltaPreview = !isLocked && !isOneTime
-    ? upgradeDeltaPreview(buildingId, level, buildingStaffRatio(staff, buildingId, level))
+    ? upgradeDeltaPreview(buildingId, level, buildingStaffRatio(staff, buildingId, level, ownedUpgrades), ownedUpgrades)
     : null;
 
   return (
@@ -71,7 +77,7 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
             productionPerSecond(
               def.production.basePerSec,
               level,
-              buildingStaffRatio(staff, buildingId, level),
+              buildingStaffRatio(staff, buildingId, level, ownedUpgrades),
             ),
           )}
           /s {RESOURCE_NAME[def.production.resource]}
@@ -82,16 +88,33 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
       )}
 
       {/* UI_SPEC §4 (v3.5): "Every consuming building shows its inputs, not just its
-          output" — its own line beside the production line, not folded into it. */}
-      {def.production?.consumes && (
-        <div className="building-tile__consumes">
-          Consumes: <CostLabel cost={def.production.consumes} /> per {RESOURCE_NAME[def.production.resource]}
-        </div>
-      )}
+          output" — its own line beside the production line, not folded into it.
+          ECONOMY §4 v3.6: reflects the REAL effective rate (QA station/Recovery
+          loop/Aluminum alloys), not the static base — a stale number here would fail
+          the same "states its effect" bar Test Stand leveling/Auto-refuel were held to. */}
+      {def.production?.consumes && (() => {
+        const consumeMultiplier =
+          buildingId === 'fabrication'
+            ? fabricationConsumeMultiplier(ownedUpgrades.includes('qaStation'), modifiers, Date.now())
+            : buildingId === 'refinery'
+              ? refineryConsumeMultiplier(ownedUpgrades.includes('recoveryLoop'))
+              : 1;
+        const effectiveConsumes = Object.fromEntries(
+          (Object.entries(def.production!.consumes!) as [ResourceId, number][]).map(([id, amount]) => [
+            id,
+            amount * consumeMultiplier,
+          ]),
+        );
+        return (
+          <div className="building-tile__consumes">
+            Consumes: <CostLabel cost={effectiveConsumes} precise /> per {RESOURCE_NAME[def.production!.resource]}
+          </div>
+        );
+      })()}
 
       {roles.map((role) => {
         const assigned = assignedToBuilding(staff, role, buildingId);
-        const slots = buildingSlotCount(buildingId, role, level);
+        const slots = buildingSlotCount(buildingId, role, level, ownedUpgrades);
         const canAssign = assigned < slots && unassignedCount(staff, role) > 0;
         const fullyStaffed = slots > 0 && assigned === slots;
         return (

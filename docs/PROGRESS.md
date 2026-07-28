@@ -1818,3 +1818,158 @@ pad-transfer stage is only 5 minutes against a multi-day arc, so a 25% cut to it
 move day-level pacing metrics measurably. No ECONOMY_MODEL value was changed by this run
 — reporting only, per standing instruction. Next: Sprint 8 (FTUE & Phase 1 close), per
 SPRINTS.md — **holding per explicit instruction, not starting yet.**
+
+## Sprint 8 — in progress (2026-07-27)
+
+FTUE & Phase 1 close. Two pieces done so far: the `casual` sim profile (a real gap
+carried since Sprint 0, flagged repeatedly through the Sprint 7.5 follow-up) and the
+economy-unlock pricing pass (SPRINTS.md task 5). Both closed out and sim-verified before
+moving to the remaining FTUE/Settings/QA/deploy tasks.
+
+### Casual sim profile (SPRINTS.md Sprint 0, task 5 — built now, per instruction)
+
+`sim/run.ts` gains a third bot profile: one ~30 min session/day (fixed at hour 19, a
+sim-only scheduling assumption same as human's 7/14/21). Per spec, this profile carries
+**no** salary-band/Flight-Data/pacing-floor-or-ceiling target — those are stated against
+`human` only. It exists purely as instrumentation, reporting how much time and passive
+income is lost to the offline cap: a ~23.5h daily gap always exceeds even the Remote-Ops
+16h cap, so this profile hits the ceiling every single day by construction.
+
+**Result (seed 42, 30 days):** Aurora I on day 12 (informational only, no target — the
+coincidence that this lands exactly on human's day-12 ceiling is just that, a
+coincidence; nothing enforces it for casual). Average 9.3h/day lost to the offline cap;
+~281h lost over the 30-day run; estimated foregone passive income ≈5.31M Funding /
+72.7K Research had the cap not applied — large numbers because late-game production
+rates are high by the time this accumulates, not a claim about early-game stakes.
+
+Implementation: `isInSession` generalized to take the profile and pick the right
+schedule; `rndLabRate()` factored out of the inline passive-production calc so the new
+lost-estimate branch can reuse the exact rate the real grant uses; new
+`lostProductionMs`/`lostFundingEstimate`/`lostResearchEstimate` day-accumulator fields,
+surfaced in the CSV and a profile-specific "Lost production" report section. `main()`
+now runs and prints all three profiles.
+
+**No ECONOMY_MODEL value touched** — this is simulator instrumentation only, same
+restraint as every prior sim change. Commit `d439beb`.
+
+### Economy unlock: Campus/Production internal upgrades priced (ECONOMY_MODEL v3.6)
+
+SPRINTS.md task 5's parked upgrade set (BACKLOG.md, "values provisional — Sprint 8 must
+price them"). Per the owner's explicit process — same as Sprint 7.5's Test
+Stand/Auto-refuel/basicLogistics SCOPED UNLOCKs — prices were proposed against existing
+internal-upgrade cost bands, written into ECONOMY_MODEL.md as a version bump, implemented,
+sim-swept, and are reported here for sign-off rather than pre-approved before coding.
+
+**Prices applied (ECONOMY §4 v3.6):**
+
+| Building | Upgrade | Cost | Effect |
+|---|---|---|---|
+| Finance | Grants desk | 350 F | +1 Technician slot |
+| R&D Lab | Technical archive | 500 F | +1 Scientist slot |
+| R&D Lab | Second research track | 1,000 F | Two research nodes run in parallel (the depth item) |
+| Supply Depot | Bulk contracts | 350 F | +1 Technician slot |
+| Refinery | Recovery loop | 550 F | −10% Materials per Propellant |
+| Fabrication | QA station | 600 F + 100 M | −15% Materials per Hardware (stacks with Aluminum alloys) |
+| Warehouse | Inventory system | 700 F + 150 M | +25% to each *future* level's cap bonus (not retroactive) |
+
+Slot-adders (Grants desk/Bulk contracts) priced identically at 350 F — same role
+(Technician), same tier. Technical archive priced higher (500 F) since Scientists are
+the scarcer, costlier role and the Research bottleneck matters most. Second research
+track priced as a real investment (1,000 F, Funding-only like every other Campus
+upgrade) rather than a throwaway, per explicit owner guidance. Recovery
+loop/QA station/Inventory system anchored to Cafeteria's existing −10%-effect price
+(700 F) and scaled by each building's own base-cost tier and the size of the % effect.
+
+**Aluminum alloys (ECONOMY §5 v3.6):** the BACKLOG contingency ("Materials branch felt
+thin") is met — the node gains a real effect, −10% Materials consumed per Hardware at
+Fabrication, stacking multiplicatively with QA station. Its "no production effect in
+v1" line and NARRATIVE_EVENTS text are both updated; a fresh, no-effect-node UI test
+case was needed for `resolveResearch`'s "no modifier registered" test, which had been
+using `aluminum` as its example — moved to `soundingRockets` (still a pure gate) and
+added a dedicated test confirming aluminum's new modifier.
+
+**Implementation, briefly (full detail in code comments, not repeated here):**
+- `core/staff.ts`: `buildingSlotCount`/`staffRatioForBuilding`/`buildingStaffRatio` gain
+  an optional `upgrades: string[]` parameter (default `[]`, every existing call site
+  unaffected) and a small `SLOT_UPGRADE_BONUS` lookup table for the three slot-adders.
+- `core/actions.ts`: `adjustStaffAssignment` threads `upgrades` through the same way;
+  `buyBuildingUpgrade` gained `capBonusMultiplier` (Inventory system, applied only to
+  the level being purchased now — never retroactive, same precedent as Sprint 7.5's
+  Auto-refuel/Test-Stand); `startResearch` gained `secondTrackUnlocked` — fills the
+  primary slot first always, only uses `secondInProgress` once both the upgrade is owned
+  and the primary slot is occupied.
+- `core/research.ts`: `ResearchState.secondInProgress?: Process | null` — additive
+  optional (rule 5, no migration); `resolveResearch` resolves both slots independently
+  in one pass, returning `justCompletedIds: string[]` (renamed from the old
+  `justCompleted: string | null`, since both slots can complete in the same offline gap
+  or warp jump). `core/types.ts`'s `GameState.research` updated to match.
+- `core/economy.ts`: `resolveEconomyTick` gained optional `modifiers`/`now` parameters
+  (default `[]`/`0`, every pre-v3.6 call site unaffected) so Aluminum alloys' modifier
+  can be queried; `fabricationConsumeMultiplier`/`refineryConsumeMultiplier` (exported —
+  also used by BuildingTile for its live display, see below) combine the upgrade-owned
+  boolean check (QA station/Recovery loop, same direct-check pattern as
+  Instrumentation×Test-Stand) with the modifier-registry check (Aluminum alloys, same
+  pattern as basicLogistics/remoteOps).
+- `state/persistStore.ts`: both real call sites of `resolveEconomyTick`
+  (`applyTick`/`computeBootOffline`'s underlying `resolveOffline`) now pass real
+  `modifiers`/`now`; `resolveOffline` gained a `modifiers` parameter threaded to every
+  offline chunk; the dev-time-warp shift block now shifts `secondInProgress.startedAt`
+  independently of `inProgress`, same as the offline/online split already did for the
+  primary slot; `startResearchNode` reads `rndLab.upgrades.includes('secondResearchTrack')`
+  and passes it through; the one `justCompleted === 'orbitalFlight'` call site (N-15)
+  updated to `justCompletedIds.includes(...)`.
+- UI: `BuildingTile` passes `ownedUpgrades` into every slot/ratio call and the delta
+  preview; `ResearchPanel` shows both in-progress nodes in its header and lets a second
+  Start click land in the second slot once unlocked; `ActiveProcessStrip` gets a second
+  research chip (UI_SPEC §2c: "no process may exist without a chip" — same rule Sprint 6
+  and Sprint 7 each had to retrofit for their own new process kinds, this time built in
+  from the start). `core/upgradePreview.ts`'s cap-bonus branch now applies the same
+  `capBonusMultiplier` so the "next level" preview matches what a purchase will actually
+  grant.
+
+**A real display bug caught during live verification, not by a unit test:** the
+Fabrication/Refinery "Consumes: X per Y" line reused `CostLabel`, which floors
+sub-10,000 values to integers (correct for one-time purchase costs — never understate
+what you'll pay). Once a reduction upgrade made the value fractional (2 → 1.7, 1 → 0.9),
+flooring displayed "Consumes: 0 per Propellant" — reads as free production, which it
+isn't; the underlying math was already correct (confirmed by the economy.test.ts cases
+below), only the display lied. Fixed with a `precise` prop on `CostLabel` (up to 2
+decimals, trailing zeros stripped) used only for this per-unit-rate case — one-time
+costs elsewhere keep the original floor behavior unchanged. Caught by the Playwright
+pass itself (build → look at the tile → notice "0" reads as free), the exact reason
+CLAUDE.md's step 5 asks for a rendered check on every UI-touching sprint.
+
+**Verification:**
+- 347 tests passing (up from 327 before this sprint's two pieces — 15 new: 5 in
+  `research.test.ts` for aluminum's modifier + dual-slot resolution, 5 in
+  `staff.test.ts` for the slot-upgrade bonuses, 6 in `actions.test.ts` for
+  second-track start/refuse cases + Inventory system's cap scaling, 4 in
+  `economy.test.ts` for the two consumption-reduction paths and their stacking).
+  Typecheck (`tsc -b`), lint, production build all clean.
+- `npm run sim` (all three profiles, seed 42): human day-5 pacing floor still **PASS**,
+  salary ratio unchanged (54.2%→55.0%), Flight Data shares unchanged (sonda 24.4%,
+  satellite 25.0%) — expected, since the bot doesn't buy any of the new optional
+  upgrades (documented restraint, same as every upgrade before it) and Aluminum alloys'
+  effect only touches Materials consumption, invisible at day-level pacing granularity.
+  `npm run sim -- --sweep=true --days=45` (human, seeds 1-10): median 5.0 days to
+  Aurora I (unchanged), Flight Data 24.4%/24.7% sonda/satellite (unchanged) — identical
+  to the pre-pass numbers to the decimal. **No ECONOMY_MODEL value was changed by either
+  run — ratifying the proposed prices, not tuning them.**
+- Playwright, through a real browser, a single injected save (Funding/Materials/
+  Research/staff/buildings pre-set to skip the early-game grind — the mechanic under
+  test is the upgrades, not the grind to afford them, same restraint as every prior
+  sprint's injected-save passes): bought all 7 new upgrades live. Confirmed Finance's
+  Technician row goes from "0/2" to "0/3" after Grants desk; R&D Lab's Scientist row
+  "0/2" → "0/3" after Technical archive; Supply Depot's Technician row "0/2" → "0/3"
+  after Bulk contracts; Refinery's Consumes line "📦 1 per Propellant" → "📦 0.9 per
+  Propellant" after Recovery loop; Fabrication's "📦 2 per Hardware" → "📦 1.7 per
+  Hardware" after QA station; Warehouse's next-level preview read "+625 Funding cap,
+  +375 Materials cap, +94 Hardware cap" (exactly 1.25× the 500/300/75 base) after
+  Inventory system. Started Aluminum alloys in the primary research slot, then Sounding
+  rockets in the second — the panel header showed both live countdowns simultaneously,
+  the active-process strip showed both as separate chips (4 total "Researching:"
+  mentions on the page: 2 header + 2 strip). Zero console errors throughout.
+
+Next within Sprint 8: opening sequence + contextual tooltips, locked-complex call-outs,
+away-modal polish, Settings screen, save/load + offline regression QA, private itch.io
+playtest build.

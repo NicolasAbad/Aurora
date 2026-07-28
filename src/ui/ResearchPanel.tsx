@@ -51,8 +51,11 @@ type NodeState = 'locked' | 'available' | 'in-progress' | 'done';
 function useNodeState(node: ResearchNode): NodeState {
   const completed = useGameStore((s) => s.research.completed);
   const inProgressProcess = useGameStore((s) => s.research.inProgress);
+  const secondInProgressProcess = useGameStore((s) => s.research.secondInProgress);
   const isDone = completed.includes(node.id);
-  const isInProgress = inProgressProcess?.payload.nodeId === node.id;
+  // ECONOMY §4 v3.6: a node can be running in either slot once Second research track is owned.
+  const isInProgress =
+    inProgressProcess?.payload.nodeId === node.id || secondInProgressProcess?.payload.nodeId === node.id;
   const isAvailable = !isDone && !isInProgress && isNodeAvailable(node, completed);
   return isDone ? 'done' : isInProgress ? 'in-progress' : isAvailable ? 'available' : 'locked';
 }
@@ -85,12 +88,23 @@ function TreeNode({ node, selected, onSelect }: { node: ResearchNode; selected: 
 
 function NodeDetail({ node, onClose }: { node: ResearchNode; onClose: () => void }) {
   const inProgressProcess = useGameStore((s) => s.research.inProgress);
+  const secondInProgressProcess = useGameStore((s) => s.research.secondInProgress);
+  const secondTrackUnlocked = useGameStore((s) => s.buildings.rndLab.upgrades.includes('secondResearchTrack'));
   const researchAmount = useGameStore((s) => s.resources.research.amount);
   const startResearchNode = useGameStore((s) => s.startResearchNode);
   const state = useNodeState(node);
 
   const isAvailable = state === 'available';
-  const canStart = isAvailable && !inProgressProcess && researchAmount >= node.costR;
+  // ECONOMY §4 v3.6: a slot is free if the primary is empty, or the second track is
+  // owned and its own slot is empty — mirrors core/actions.ts's startResearch exactly.
+  const hasFreeSlot = !inProgressProcess || (secondTrackUnlocked && !secondInProgressProcess);
+  const canStart = isAvailable && hasFreeSlot && researchAmount >= node.costR;
+  const activeProcess =
+    inProgressProcess?.payload.nodeId === node.id
+      ? inProgressProcess
+      : secondInProgressProcess?.payload.nodeId === node.id
+        ? secondInProgressProcess
+        : null;
 
   return (
     <div className="research-detail">
@@ -113,7 +127,7 @@ function NodeDetail({ node, onClose }: { node: ResearchNode; onClose: () => void
           NARRATIVE §8's own text already states the zero-effect ones plainly. */}
       <div className="research-node__description">{narrativeText(node.id)}</div>
 
-      {state === 'in-progress' && inProgressProcess && <ResearchRing process={inProgressProcess} />}
+      {state === 'in-progress' && activeProcess && <ResearchRing process={activeProcess} />}
 
       {isAvailable && (
         <button type="button" className="upgrade-button" disabled={!canStart} onClick={() => startResearchNode(node.id)}>
@@ -128,14 +142,21 @@ function NodeDetail({ node, onClose }: { node: ResearchNode; onClose: () => void
 
 export function ResearchPanel() {
   const inProgressProcess = useGameStore((s) => s.research.inProgress);
+  const secondInProgressProcess = useGameStore((s) => s.research.secondInProgress);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selectedNode = selectedId ? RESEARCH_TREE.find((n) => n.id === selectedId) : undefined;
 
   return (
     <div className="research-panel">
       <div className="research-panel__header">
-        {inProgressProcess ? (
-          <ActiveResearchCountdown process={inProgressProcess} />
+        {/* ECONOMY §4 v3.6: Second research track — both slots render independently
+            when both are running, same "no process may exist without visible tracking"
+            spirit as the active-process strip (UI_SPEC §2c). */}
+        {inProgressProcess || secondInProgressProcess ? (
+          <>
+            {inProgressProcess && <div><ActiveResearchCountdown process={inProgressProcess} /></div>}
+            {secondInProgressProcess && <div><ActiveResearchCountdown process={secondInProgressProcess} /></div>}
+          </>
         ) : (
           <span className="research-panel__header--idle">No active research</span>
         )}

@@ -5,6 +5,11 @@ import type { Modifier, Process } from './types';
 export interface ResearchState {
   completed: string[];
   inProgress: Process | null;
+  // ECONOMY §4 v3.6 (Sprint 8 economy unlock): R&D Lab's "Second research track"
+  // upgrade. Additive optional (CLAUDE.md rule 5 — absent/undefined means exactly the
+  // pre-v3.6 single-track behavior, no migration needed). Only ever populated once
+  // `inProgress` is already occupied — see core/actions.ts's startResearch.
+  secondInProgress?: Process | null;
 }
 
 /** Deps met and not already completed — the node could be started right now. */
@@ -30,32 +35,50 @@ export function isNodeVisible(node: ResearchNode, completed: string[]): boolean 
 export interface ResearchResolution {
   research: ResearchState;
   modifiers: Modifier[];
-  justCompleted: string | null;
+  // One id per node completed this call — up to 2 when both tracks (ECONOMY §4 v3.6)
+  // finish in the same offline gap. Empty array = nothing completed (not null: a plain
+  // array lets every call site `.includes(...)`/`.length` without a null check).
+  justCompletedIds: string[];
 }
 
 /**
  * Timestamp-based (CLAUDE.md rule 6): a node is done once `startedAt + durationMs <=
  * now`, checked against the real clock — the same call online and offline resolution
  * both make. "One node at a time in v1" means this never auto-starts the next node even
- * if the offline gap runs well past this one's duration; `inProgress` just goes null.
+ * if the offline gap runs well past this one's duration; the slot just goes null.
+ * Resolves the primary and (if present) second-track (v3.6) slots independently — either,
+ * neither, or both may complete in a single call.
  */
 export function resolveResearch(
   research: ResearchState,
   modifiers: Modifier[],
   now: number,
 ): ResearchResolution {
-  const process = research.inProgress;
-  if (!process || now < process.startedAt + process.durationMs) {
-    return { research, modifiers, justCompleted: null };
+  let nextCompleted = research.completed;
+  let nextModifiers = modifiers;
+  const justCompletedIds: string[] = [];
+
+  function resolveSlot(process: Process | null | undefined): Process | null {
+    if (!process || now < process.startedAt + process.durationMs) return process ?? null;
+    const nodeId = process.payload.nodeId as string;
+    const node = RESEARCH_BY_ID.get(nodeId);
+    const modifier = node ? modifierForNode(node) : null;
+    nextCompleted = [...nextCompleted, nodeId];
+    nextModifiers = modifier ? registerModifier(nextModifiers, modifier) : nextModifiers;
+    justCompletedIds.push(nodeId);
+    return null;
   }
 
-  const nodeId = process.payload.nodeId as string;
-  const node = RESEARCH_BY_ID.get(nodeId);
-  const modifier = node ? modifierForNode(node) : null;
+  const inProgress = resolveSlot(research.inProgress);
+  const secondInProgress = resolveSlot(research.secondInProgress);
+
+  if (justCompletedIds.length === 0) {
+    return { research, modifiers, justCompletedIds };
+  }
 
   return {
-    research: { completed: [...research.completed, nodeId], inProgress: null },
-    modifiers: modifier ? registerModifier(modifiers, modifier) : modifiers,
-    justCompleted: nodeId,
+    research: { completed: nextCompleted, inProgress, secondInProgress },
+    modifiers: nextModifiers,
+    justCompletedIds,
   };
 }

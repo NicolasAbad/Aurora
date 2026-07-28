@@ -8,11 +8,17 @@
 // null rather than inventing a plausible-sounding preview.
 import { BUILDINGS } from '../data/buildings';
 import { RESOURCE_NAME } from '../data/resourceNames';
+import { capBonusMultiplier } from './actions';
 import { certificationDurationMultiplier, TEST_STAND_DURATION_REDUCTION_PER_LEVEL } from './certification';
 import { productionPerSecond } from './economy';
 import type { BuildingId, ResourceId } from './types';
 
-export function upgradeDeltaPreview(buildingId: BuildingId, level: number, staffRatio: number): string | null {
+export function upgradeDeltaPreview(
+  buildingId: BuildingId,
+  level: number,
+  staffRatio: number,
+  upgrades: string[] = [],
+): string | null {
   const def = BUILDINGS[buildingId];
 
   if (def.production) {
@@ -23,8 +29,11 @@ export function upgradeDeltaPreview(buildingId: BuildingId, level: number, staff
   }
 
   if (def.capBonus) {
+    // ECONOMY §4 v3.6: Warehouse's Inventory system scales every future level's cap
+    // bonus — the preview must match what buyBuildingUpgrade will actually grant.
+    const mult = capBonusMultiplier(upgrades);
     const parts = (Object.entries(def.capBonus) as [ResourceId, number][]).map(
-      ([id, amount]) => `+${amount} ${RESOURCE_NAME[id]} cap`,
+      ([id, amount]) => `+${Math.round(amount * mult)} ${RESOURCE_NAME[id]} cap`,
     );
     return `Level ${level + 1} → ${parts.join(', ')}`;
   }

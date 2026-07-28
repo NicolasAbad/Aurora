@@ -34,11 +34,13 @@ export const RESEARCH_TREE: ResearchNode[] = [
     costR: 25,
     durationMs: 5 * MIN,
     deps: [],
-    // v2.9: explicitly NO production effect — the Aluminum Hardware tier is available
-    // from the start with no tech required (ratified Sprint 3's currentHardwareTier).
-    // This node's only functions: Titanium's prerequisite, and the Materials branch's
-    // entry node (without it the branch would show a single unreachable 400 R node for
-    // the whole first era — UI_SPEC §2b's progressive disclosure would hide it entirely).
+    // v3.6 (Sprint 8 economy unlock, BACKLOG contingency met): -10% Materials consumed
+    // per Hardware at Fabrication. Stacks multiplicatively with Fabrication's QA station
+    // internal upgrade (core/economy.ts reads both — see fabricationConsumeMultiplier).
+    // The Aluminum Hardware tier itself is still available from the start with no tech
+    // required (Sprint 3's currentHardwareTier, unchanged) — this node's tier-gating and
+    // Titanium-prerequisite role is unaffected by adding a real effect on top.
+    effect: { target: 'fabrication.materialsPerHardware', op: 'mult', value: 0.9 },
   },
   {
     id: 'titanium',

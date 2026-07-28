@@ -51,6 +51,32 @@ describe('buildingSlotCount / assignment helpers', () => {
     expect(buildingSlotCount('finance', 'technician', 0)).toBe(0);
   });
 
+  // ECONOMY §4 v3.6 (Sprint 8 economy unlock): slot-adding internal upgrades.
+  describe('slot-adding internal upgrades (v3.6)', () => {
+    it('Grants desk adds +1 Technician slot at Finance, no upgrade means no change', () => {
+      expect(buildingSlotCount('finance', 'technician', 1)).toBe(2);
+      expect(buildingSlotCount('finance', 'technician', 1, ['grantsDesk'])).toBe(3);
+    });
+
+    it('Technical archive adds +1 Scientist slot at R&D Lab, does not touch Technician', () => {
+      expect(buildingSlotCount('rndLab', 'scientist', 1, ['technicalArchive'])).toBe(3);
+      expect(buildingSlotCount('rndLab', 'technician', 1, ['technicalArchive'])).toBe(0);
+    });
+
+    it('Bulk contracts adds +1 Technician slot at Supply Depot', () => {
+      expect(buildingSlotCount('supplyDepot', 'technician', 1)).toBe(2);
+      expect(buildingSlotCount('supplyDepot', 'technician', 1, ['bulkContracts'])).toBe(3);
+    });
+
+    it('an unrelated owned upgrade (e.g. Classroom) does not affect slot count', () => {
+      expect(buildingSlotCount('finance', 'technician', 1, ['classroom'])).toBe(2);
+    });
+
+    it('still 0 below level 1 even with the slot upgrade owned', () => {
+      expect(buildingSlotCount('finance', 'technician', 0, ['grantsDesk'])).toBe(0);
+    });
+  });
+
   it('tracks hired/assigned/unassigned correctly', () => {
     const state = createInitialState();
     state.staff.pools.technician.hired = 3;

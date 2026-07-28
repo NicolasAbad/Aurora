@@ -29,6 +29,7 @@ const MAX_VISIBLE = 4;
  */
 function useActiveChips(): Chip[] {
   const researchInProgress = useGameStore((s) => s.research.inProgress);
+  const secondResearchInProgress = useGameStore((s) => s.research.secondInProgress);
   const certInProgress = useGameStore((s) => s.certifications.inProgress);
   const processes = useGameStore(useShallow((s) => s.processes));
 
@@ -40,6 +41,18 @@ function useActiveChips(): Chip[] {
       id: researchInProgress.id,
       label: `Researching: ${node?.name ?? researchInProgress.payload.nodeId}`,
       process: researchInProgress,
+      complex: 'campus',
+    });
+  }
+
+  // ECONOMY §4 v3.6 (Second research track): a second slot, own chip — same rule as
+  // the primary one, "no process may exist without a chip."
+  if (secondResearchInProgress) {
+    const node = RESEARCH_BY_ID.get(secondResearchInProgress.payload.nodeId as string);
+    chips.push({
+      id: secondResearchInProgress.id,
+      label: `Researching: ${node?.name ?? secondResearchInProgress.payload.nodeId}`,
+      process: secondResearchInProgress,
       complex: 'campus',
     });
   }

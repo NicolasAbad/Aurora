@@ -1,7 +1,8 @@
 import { BUILDINGS } from '../data/buildings';
 import { buildingStaffRatio, totalSalaryPerSecond } from './staff';
 import { creditHardware, currentHardwareTier } from './hardware';
-import type { BuildingState, GameState, ResourceId, ResourceState, StaffState } from './types';
+import { applyModifiers } from './modifiers';
+import type { BuildingState, GameState, Modifier, ResourceId, ResourceState, StaffState } from './types';
 
 /**
  * Cost to go from `level` to `level + 1`, per ECONOMY_MODEL §4 (`base × factor^level`).
@@ -83,6 +84,34 @@ function updateStarvation(building: BuildingState, fed: boolean, deltaMs: number
   return { ...building, fedStreakMs, starvedIndicator };
 }
 
+// ECONOMY §4/§5 v3.6 (Sprint 8 economy unlock): two independent, stackable reductions to
+// Materials-per-Hardware at Fabrication — QA station (an internal upgrade, checked
+// directly by ownership, same pattern as Instrumentation × Test Stand leveling) and
+// Aluminum alloys (a research node, going through the modifier registry like every other
+// research effect, CLAUDE.md rule 4). Combined here since both bear on the same
+// consumePerUnit figure; `modifiers`/`now` default to `[]`/`0` so every pre-v3.6 call
+// site (no modifiers passed) gets exactly the old behavior (multiplier 1).
+const QA_STATION_REDUCTION = 0.15;
+// Exported: BuildingTile.tsx uses the same function to show the real effective
+// consumption rate on Fabrication's tile (UI_SPEC §4's clarity rule — a rate the player
+// can no longer verify by eye once an upgrade changes it stops counting as "stating the
+// effect"), not just this module's own resolution path.
+export function fabricationConsumeMultiplier(
+  qaStationBought: boolean,
+  modifiers: Modifier[],
+  now: number,
+): number {
+  const base = applyModifiers(1, modifiers, 'fabrication.materialsPerHardware', now);
+  return qaStationBought ? base * (1 - QA_STATION_REDUCTION) : base;
+}
+
+// Refinery's Recovery loop: -10% Materials per Propellant. No research-node source shares
+// this target (unlike Fabrication's pair above), so no modifier registry involved.
+const RECOVERY_LOOP_REDUCTION = 0.1;
+export function refineryConsumeMultiplier(recoveryLoopBought: boolean): number {
+  return recoveryLoopBought ? 1 - RECOVERY_LOOP_REDUCTION : 1;
+}
+
 /**
  * Resolves a consumption-based producer (Fabrication, Refinery — ECONOMY §4b step 3):
  * claims its full tick's Materials requirement or produces nothing this tick (binary
@@ -90,7 +119,7 @@ function updateStarvation(building: BuildingState, fed: boolean, deltaMs: number
  * per-building instead of global). An unstaffed/level-0 building has zero desired
  * output, which counts as trivially "fed" (not starved) — GDD's "staffing IS the
  * priority lever" note: nobody assigned means it isn't trying to claim anything, so it
- * shouldn't show as blocked.
+ * shouldn't show as blocked. `consumeMultiplier` (default 1): see the two functions above.
  */
 function resolveConsumer(
   buildingId: 'fabrication' | 'refinery',
@@ -99,12 +128,13 @@ function resolveConsumer(
   materials: ResourceState,
   deltaSec: number,
   deltaMs: number,
+  consumeMultiplier = 1,
 ): { buildingState: BuildingState; materials: ResourceState; producedAmount: number } {
   const def = BUILDINGS[buildingId];
   const ratio = buildingStaffRatio(staff, buildingId, buildingState.level);
   const desiredOutput =
     productionPerSecond(def.production!.basePerSec, buildingState.level, ratio) * deltaSec;
-  const consumePerUnit = def.production!.consumes!.materials!;
+  const consumePerUnit = def.production!.consumes!.materials! * consumeMultiplier;
   const desiredConsume = desiredOutput * consumePerUnit;
   const fed = desiredOutput <= 0 || materials.amount >= desiredConsume;
 
@@ -130,6 +160,10 @@ function resolveConsumer(
  * both the online game loop and core/offlineResolution.ts call, so offline genuinely
  * "reuses the exact same resolution logic as online" (CLAUDE.md rule 6), starvation
  * included (ECONOMY §4b: "offline resolution uses these exact same rules").
+ *
+ * `modifiers`/`now` (default `[]`/`0`, ECONOMY §4/§5 v3.6): only consulted for Aluminum
+ * alloys' Fabrication-consumption modifier — every pre-v3.6 call site that omits them
+ * keeps the exact old behavior (no modifiers means no filtering ever matters).
  */
 export function resolveEconomyTick(
   resources: GameState['resources'],
@@ -138,6 +172,8 @@ export function resolveEconomyTick(
   completedTech: string[],
   deltaMs: number,
   rateMultiplier = 1,
+  modifiers: Modifier[] = [],
+  now = 0,
 ): EconomyTickResult {
   const deltaSec = (deltaMs / 1000) * rateMultiplier;
   const salaryCost = totalSalaryPerSecond(staff) * deltaSec;
@@ -157,7 +193,7 @@ export function resolveEconomyTick(
     productionPerSecond(
       BUILDINGS.finance.production!.basePerSec,
       buildings.finance.level,
-      buildingStaffRatio(staff, 'finance', buildings.finance.level),
+      buildingStaffRatio(staff, 'finance', buildings.finance.level, buildings.finance.upgrades),
     ) * deltaSec;
   funding = applyGrant(funding, financeAmount, false);
 
@@ -165,7 +201,7 @@ export function resolveEconomyTick(
     productionPerSecond(
       BUILDINGS.supplyDepot.production!.basePerSec,
       buildings.supplyDepot.level,
-      buildingStaffRatio(staff, 'supplyDepot', buildings.supplyDepot.level),
+      buildingStaffRatio(staff, 'supplyDepot', buildings.supplyDepot.level, buildings.supplyDepot.upgrades),
     ) * deltaSec;
   let materials = applyGrant(resources.materials, supplyDepotAmount, false);
 
@@ -173,16 +209,30 @@ export function resolveEconomyTick(
     productionPerSecond(
       BUILDINGS.rndLab.production!.basePerSec,
       buildings.rndLab.level,
-      buildingStaffRatio(staff, 'rndLab', buildings.rndLab.level),
+      buildingStaffRatio(staff, 'rndLab', buildings.rndLab.level, buildings.rndLab.upgrades),
     ) * deltaSec;
   const research = applyGrant(resources.research, rndAmount, false);
 
   // --- Consumers (§4b step 3): fixed order, Fabrication then Refinery ---
-  const fab = resolveConsumer('fabrication', buildings.fabrication, staff, materials, deltaSec, deltaMs);
+  const fabConsumeMult = fabricationConsumeMultiplier(
+    buildings.fabrication.upgrades.includes('qaStation'),
+    modifiers,
+    now,
+  );
+  const fab = resolveConsumer(
+    'fabrication',
+    buildings.fabrication,
+    staff,
+    materials,
+    deltaSec,
+    deltaMs,
+    fabConsumeMult,
+  );
   materials = fab.materials;
   const hardware = creditHardware(resources.hardware, fab.producedAmount, currentHardwareTier(completedTech));
 
-  const ref = resolveConsumer('refinery', buildings.refinery, staff, materials, deltaSec, deltaMs);
+  const refConsumeMult = refineryConsumeMultiplier(buildings.refinery.upgrades.includes('recoveryLoop'));
+  const ref = resolveConsumer('refinery', buildings.refinery, staff, materials, deltaSec, deltaMs, refConsumeMult);
   materials = ref.materials;
   const propellant = applyGrant(resources.propellant, ref.producedAmount, false);
 

@@ -251,3 +251,65 @@ describe('resolveEconomyTick — Complex B consumers (ECONOMY §4b)', () => {
     expect(state.resources.propellant.amount).toBe(0); // Refinery never got a single tick's worth
   });
 });
+
+// ECONOMY §4/§5 v3.6 (Sprint 8 economy unlock): QA station and Aluminum alloys both
+// reduce Fabrication's Materials-per-Hardware, stacking multiplicatively; Recovery loop
+// reduces Refinery's Materials-per-Propellant. All three default to no-op when absent
+// (every pre-v3.6 test above passes unmodified, with modifiers/now omitted).
+describe('resolveEconomyTick — Materials-consumption reductions (v3.6)', () => {
+  function fabricationState(materialsAmount: number) {
+    const state = createInitialState();
+    state.buildings.fabrication.level = 1;
+    state.staff.pools.engineer.hired = 1;
+    state.staff.pools.technician.hired = 1;
+    state.staff.pools.engineer.assigned.fabrication = 1;
+    state.staff.pools.technician.assigned.fabrication = 1;
+    state.resources.materials.amount = materialsAmount;
+    state.resources.materials.cap = null;
+    state.resources.funding.amount = 10_000;
+    state.resources.funding.cap = null;
+    return state;
+  }
+
+  it('QA station alone cuts Materials-per-Hardware by 15%', () => {
+    const state = fabricationState(10);
+    state.buildings.fabrication.upgrades = ['qaStation'];
+    const result = resolveEconomyTick(state.resources, state.buildings, state.staff, [], 1000);
+    // Base: 0.3 H produced, consumes 2 M/H = 0.6 M. QA station: 0.6 * 0.85 = 0.51 M.
+    expect(result.resources.materials.amount).toBeCloseTo(10 - 0.51);
+  });
+
+  it('Aluminum alloys alone (via the modifier registry) cuts it by 10%', () => {
+    const state = fabricationState(10);
+    const modifiers = [
+      { id: 'research:aluminum', source: 'aluminum', target: 'fabrication.materialsPerHardware', op: 'mult' as const, value: 0.9 },
+    ];
+    const result = resolveEconomyTick(state.resources, state.buildings, state.staff, [], 1000, 1, modifiers, Date.now());
+    expect(result.resources.materials.amount).toBeCloseTo(10 - 0.54); // 0.6 * 0.9
+  });
+
+  it('QA station and Aluminum alloys stack multiplicatively', () => {
+    const state = fabricationState(10);
+    state.buildings.fabrication.upgrades = ['qaStation'];
+    const modifiers = [
+      { id: 'research:aluminum', source: 'aluminum', target: 'fabrication.materialsPerHardware', op: 'mult' as const, value: 0.9 },
+    ];
+    const result = resolveEconomyTick(state.resources, state.buildings, state.staff, [], 1000, 1, modifiers, Date.now());
+    expect(result.resources.materials.amount).toBeCloseTo(10 - 0.6 * 0.85 * 0.9); // 10 - 0.459
+  });
+
+  it('Recovery loop cuts Refinery Materials-per-Propellant by 10%, independent of Fabrication', () => {
+    const state = createInitialState();
+    state.buildings.refinery.level = 1;
+    state.buildings.refinery.upgrades = ['recoveryLoop'];
+    state.staff.pools.engineer.hired = 1;
+    state.staff.pools.engineer.assigned.refinery = 1;
+    state.resources.materials.amount = 10;
+    state.resources.materials.cap = null;
+    state.resources.funding.amount = 10_000;
+    state.resources.funding.cap = null;
+    const result = resolveEconomyTick(state.resources, state.buildings, state.staff, [], 1000);
+    // Base: 0.5 Propellant produced, consumes 1 M/P = 0.5 M. Recovery loop: 0.5 * 0.9 = 0.45 M.
+    expect(result.resources.materials.amount).toBeCloseTo(10 - 0.45);
+  });
+});

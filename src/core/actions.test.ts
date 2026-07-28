@@ -100,6 +100,27 @@ describe('buyBuildingUpgrade', () => {
     state.buildings.launchRail.level = 1; // already built (one-time)
     expect(buyBuildingUpgrade(state.resources, state.buildings, 'launchRail')).toBeNull();
   });
+
+  // ECONOMY §4 v3.6: Warehouse's Inventory system multiplies cap bonus 1.25x, but only
+  // for levels bought AFTER it's owned — never retroactive.
+  it('applies capBonus normally without Inventory system', () => {
+    const state = createInitialState();
+    state.resources.funding.amount = 10_000;
+    state.resources.materials.amount = 10_000;
+    const result = buyBuildingUpgrade(state.resources, state.buildings, 'warehouse');
+    expect(result!.resources.funding.cap).toBe(1000); // 500 base + 500 bonus
+    expect(result!.resources.materials.cap).toBe(500); // 200 base + 300 bonus
+  });
+
+  it('scales capBonus 1.25x once Inventory system is owned', () => {
+    const state = createInitialState();
+    state.resources.funding.amount = 10_000;
+    state.resources.materials.amount = 10_000;
+    state.buildings.warehouse.upgrades = ['inventorySystem'];
+    const result = buyBuildingUpgrade(state.resources, state.buildings, 'warehouse');
+    expect(result!.resources.funding.cap).toBe(1125); // 500 base + 500*1.25 bonus
+    expect(result!.resources.materials.cap).toBe(575); // 200 base + 300*1.25 bonus
+  });
 });
 
 describe('hireStaff', () => {
@@ -183,6 +204,18 @@ describe('adjustStaffAssignment', () => {
     state.staff.pools.technician.hired = 1; // finance.level stays 0 (default, unbuilt)
     expect(adjustStaffAssignment(state.staff, 'technician', 'finance', 1, 0)).toBeNull();
   });
+
+  // ECONOMY §4 v3.6: Grants desk raises Finance's Technician slot count from 2 to 3.
+  it('allows assigning into the extra slot a slot-adding upgrade grants', () => {
+    const state = createInitialState();
+    state.staff.pools.technician.hired = 3;
+    state.staff.pools.technician.assigned.finance = 2;
+    state.buildings.finance.level = 1;
+    expect(adjustStaffAssignment(state.staff, 'technician', 'finance', 1, 1)).toBeNull(); // no upgrade: still capped at 2
+    const staff = adjustStaffAssignment(state.staff, 'technician', 'finance', 1, 1, ['grantsDesk']);
+    expect(staff).not.toBeNull();
+    expect(staff!.pools.technician.assigned.finance).toBe(3);
+  });
 });
 
 describe('releaseStaff — UI_SPEC §4b (Sprint 7.5, staff dismissal)', () => {
@@ -258,6 +291,74 @@ describe('startResearch', () => {
     const state = createInitialState();
     state.resources.research.amount = 10; // aluminum costs 25
     expect(startResearch(state.resources, state.research, 'aluminum', Date.now())).toBeNull();
+  });
+
+  // ECONOMY §4 v3.6: Second research track (R&D Lab internal upgrade).
+  describe('second research track', () => {
+    it('refuses a second node while the first is in progress, without the upgrade', () => {
+      const state = createInitialState();
+      state.resources.research.amount = 1000;
+      state.research.inProgress = {
+        id: 'x',
+        kind: 'research',
+        startedAt: Date.now(),
+        durationMs: 1000,
+        payload: { nodeId: 'soundingRockets' },
+      };
+      expect(startResearch(state.resources, state.research, 'aluminum', Date.now(), false)).toBeNull();
+    });
+
+    it('starts a second node into secondInProgress once unlocked, leaving the first untouched', () => {
+      const state = createInitialState();
+      state.resources.research.amount = 1000;
+      const first: Process = {
+        id: 'x',
+        kind: 'research',
+        startedAt: 0,
+        durationMs: 1000,
+        payload: { nodeId: 'soundingRockets' },
+      };
+      state.research.inProgress = first;
+      const now = Date.now();
+      const result = startResearch(state.resources, state.research, 'aluminum', now, true);
+      expect(result).not.toBeNull();
+      expect(result!.research.inProgress).toBe(first);
+      expect(result!.research.secondInProgress).toEqual({
+        id: 'research-aluminum',
+        kind: 'research',
+        startedAt: now,
+        durationMs: 5 * 60_000,
+        payload: { nodeId: 'aluminum' },
+      });
+    });
+
+    it('refuses a third node once both slots are occupied, even with the upgrade', () => {
+      const state = createInitialState();
+      state.resources.research.amount = 1000;
+      state.research.inProgress = {
+        id: 'x',
+        kind: 'research',
+        startedAt: 0,
+        durationMs: 1000,
+        payload: { nodeId: 'soundingRockets' },
+      };
+      state.research.secondInProgress = {
+        id: 'y',
+        kind: 'research',
+        startedAt: 0,
+        durationMs: 1000,
+        payload: { nodeId: 'aluminum' },
+      };
+      expect(startResearch(state.resources, state.research, 'basicEngineering', Date.now(), true)).toBeNull();
+    });
+
+    it('fills the primary slot first even when the upgrade is owned and both are empty', () => {
+      const state = createInitialState();
+      state.resources.research.amount = 1000;
+      const result = startResearch(state.resources, state.research, 'aluminum', Date.now(), true);
+      expect(result!.research.inProgress).not.toBeNull();
+      expect(result!.research.secondInProgress).toBeUndefined();
+    });
   });
 });
 

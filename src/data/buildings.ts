@@ -28,6 +28,9 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     production: { resource: 'funding', basePerSec: 2 },
     slots: { technician: 2 },
     unlockCondition: { kind: 'start' },
+    internalUpgrades: [
+      { id: 'grantsDesk', name: 'Grants desk', cost: { funding: 350 }, narrativeId: 'U-10' },
+    ],
   },
   rndLab: {
     id: 'rndLab',
@@ -39,6 +42,10 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     production: { resource: 'research', basePerSec: 0.03 }, // ECONOMY §4 v2.3
     slots: { scientist: 2 },
     unlockCondition: { kind: 'start' },
+    internalUpgrades: [
+      { id: 'technicalArchive', name: 'Technical archive', cost: { funding: 500 }, narrativeId: 'U-11' },
+      { id: 'secondResearchTrack', name: 'Second research track', cost: { funding: 1000 }, narrativeId: 'U-12' },
+    ],
   },
   crewQuarters: {
     id: 'crewQuarters',
@@ -77,6 +84,9 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     production: { resource: 'materials', basePerSec: 1.5 },
     slots: { technician: 2 },
     unlockCondition: { kind: 'lifetimeFunding', amount: 300 },
+    internalUpgrades: [
+      { id: 'bulkContracts', name: 'Bulk contracts', cost: { funding: 350 }, narrativeId: 'U-13' },
+    ],
   },
   fabrication: {
     id: 'fabrication',
@@ -88,6 +98,9 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     production: { resource: 'hardware', basePerSec: 0.3, consumes: { materials: 2 } },
     slots: { engineer: 1, technician: 1 },
     unlockCondition: { kind: 'lifetimeFunding', amount: 300 },
+    internalUpgrades: [
+      { id: 'qaStation', name: 'QA station', cost: { funding: 600, materials: 100 }, narrativeId: 'U-15' },
+    ],
   },
   refinery: {
     id: 'refinery',
@@ -99,6 +112,9 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     production: { resource: 'propellant', basePerSec: 0.5, consumes: { materials: 1 } },
     slots: { engineer: 1 },
     unlockCondition: { kind: 'lifetimeFunding', amount: 300 },
+    internalUpgrades: [
+      { id: 'recoveryLoop', name: 'Recovery loop', cost: { funding: 550 }, narrativeId: 'U-14' },
+    ],
   },
   warehouse: {
     id: 'warehouse',
@@ -109,6 +125,9 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     description: '+500 Funding / +300 Materials / +75 Hardware storage cap per level.',
     capBonus: { funding: 500, materials: 300, hardware: 75 },
     unlockCondition: { kind: 'lifetimeFunding', amount: 300 },
+    internalUpgrades: [
+      { id: 'inventorySystem', name: 'Inventory system', cost: { funding: 700, materials: 150 }, narrativeId: 'U-16' },
+    ],
   },
   propellantDepot: {
     id: 'propellantDepot',

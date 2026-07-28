@@ -54,21 +54,21 @@ describe('resolveResearch', () => {
 
   it('does nothing when no research is in progress', () => {
     const result = resolveResearch(makeState(), [], Date.now());
-    expect(result.justCompleted).toBeNull();
+    expect(result.justCompletedIds).toEqual([]);
   });
 
   it('does nothing before the duration has elapsed', () => {
-    const process: Process = { id: 'r1', kind: 'research', startedAt: 0, durationMs: 10 * MIN, payload: { nodeId: 'aluminum' } };
+    const process: Process = { id: 'r1', kind: 'research', startedAt: 0, durationMs: 10 * MIN, payload: { nodeId: 'soundingRockets' } };
     const result = resolveResearch(makeState({ inProgress: process }), [], 5 * MIN);
-    expect(result.justCompleted).toBeNull();
+    expect(result.justCompletedIds).toEqual([]);
     expect(result.research.inProgress).toBe(process);
   });
 
   it('completes a no-effect node: added to completed, inProgress cleared, no modifier registered', () => {
-    const process: Process = { id: 'r1', kind: 'research', startedAt: 0, durationMs: 5 * MIN, payload: { nodeId: 'aluminum' } };
-    const result = resolveResearch(makeState({ inProgress: process }), [], 5 * MIN);
-    expect(result.justCompleted).toBe('aluminum');
-    expect(result.research.completed).toEqual(['aluminum']);
+    const process: Process = { id: 'r1', kind: 'research', startedAt: 0, durationMs: 4 * MIN, payload: { nodeId: 'soundingRockets' } };
+    const result = resolveResearch(makeState({ inProgress: process }), [], 4 * MIN);
+    expect(result.justCompletedIds).toEqual(['soundingRockets']);
+    expect(result.research.completed).toEqual(['soundingRockets']);
     expect(result.research.inProgress).toBeNull();
     expect(result.modifiers).toEqual([]);
   });
@@ -88,9 +88,50 @@ describe('resolveResearch', () => {
     ]);
   });
 
-  it('is purely timestamp-based: a huge jump in `now` resolves the same as checking incrementally', () => {
+  // ECONOMY §5 v3.6: Aluminum alloys gained a real effect (Sprint 8 economy unlock,
+  // BACKLOG contingency met) — confirms it now registers like any other effect-bearing node.
+  it('completes Aluminum alloys and registers its Fabrication-consumption modifier', () => {
     const process: Process = { id: 'r1', kind: 'research', startedAt: 0, durationMs: 5 * MIN, payload: { nodeId: 'aluminum' } };
+    const result = resolveResearch(makeState({ inProgress: process }), [], 5 * MIN);
+    expect(result.justCompletedIds).toEqual(['aluminum']);
+    expect(result.modifiers).toEqual([
+      { id: 'research:aluminum', source: 'aluminum', target: 'fabrication.materialsPerHardware', op: 'mult', value: 0.9 },
+    ]);
+  });
+
+  it('is purely timestamp-based: a huge jump in `now` resolves the same as checking incrementally', () => {
+    const process: Process = { id: 'r1', kind: 'research', startedAt: 0, durationMs: 5 * MIN, payload: { nodeId: 'soundingRockets' } };
     const jumped = resolveResearch(makeState({ inProgress: process }), [], 12 * MIN);
-    expect(jumped.justCompleted).toBe('aluminum');
+    expect(jumped.justCompletedIds).toEqual(['soundingRockets']);
+  });
+
+  // ECONOMY §4 v3.6: Second research track — both slots resolve independently.
+  describe('second research track (secondInProgress)', () => {
+    it('resolves only the second slot when just it finishes', () => {
+      const first: Process = { id: 'r1', kind: 'research', startedAt: 0, durationMs: 20 * MIN, payload: { nodeId: 'soundingRockets' } };
+      const second: Process = { id: 'r2', kind: 'research', startedAt: 0, durationMs: 5 * MIN, payload: { nodeId: 'aluminum' } };
+      const result = resolveResearch(makeState({ inProgress: first, secondInProgress: second }), [], 5 * MIN);
+      expect(result.justCompletedIds).toEqual(['aluminum']);
+      expect(result.research.inProgress).toBe(first);
+      expect(result.research.secondInProgress).toBeNull();
+      expect(result.research.completed).toEqual(['aluminum']);
+    });
+
+    it('resolves both slots in the same call when both are done', () => {
+      const first: Process = { id: 'r1', kind: 'research', startedAt: 0, durationMs: 4 * MIN, payload: { nodeId: 'soundingRockets' } };
+      const second: Process = { id: 'r2', kind: 'research', startedAt: 0, durationMs: 5 * MIN, payload: { nodeId: 'aluminum' } };
+      const result = resolveResearch(makeState({ inProgress: first, secondInProgress: second }), [], 10 * MIN);
+      expect(result.justCompletedIds).toEqual(['soundingRockets', 'aluminum']);
+      expect(result.research.inProgress).toBeNull();
+      expect(result.research.secondInProgress).toBeNull();
+      expect(result.research.completed).toEqual(['soundingRockets', 'aluminum']);
+    });
+
+    it('a save with no second track (secondInProgress undefined) resolves exactly as before', () => {
+      const process: Process = { id: 'r1', kind: 'research', startedAt: 0, durationMs: 5 * MIN, payload: { nodeId: 'soundingRockets' } };
+      const result = resolveResearch(makeState({ inProgress: process }), [], 5 * MIN);
+      expect(result.justCompletedIds).toEqual(['soundingRockets']);
+      expect(result.research.secondInProgress).toBeNull();
+    });
   });
 });

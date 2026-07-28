@@ -1,6 +1,6 @@
 import { resolveEconomyTick } from './economy';
 import { resolveProcesses } from './time';
-import type { GameState, Process, StaffState } from './types';
+import type { GameState, Modifier, Process, StaffState } from './types';
 
 export const OFFLINE_RATE = 0.6; // ECONOMY §11: "resources and salaries at 60%"
 export const OFFLINE_CAP_MS = 10 * 60 * 60 * 1000; // 10h base; Remote Ops extends to 16h (Sprint 4 modifier)
@@ -42,6 +42,7 @@ export function resolveOffline(
   now: number,
   offlineCapMs: number = OFFLINE_CAP_MS,
   wasPayrollUnpaid = false,
+  modifiers: Modifier[] = [],
 ): OfflineResolution {
   const elapsedMs = Math.max(0, now - lastSeenAt);
   const appliedMs = Math.min(elapsedMs, offlineCapMs);
@@ -66,6 +67,8 @@ export function resolveOffline(
       completedTech,
       chunk,
       OFFLINE_RATE,
+      modifiers,
+      now,
     );
     currentResources = result.resources;
     currentBuildings = result.buildings;

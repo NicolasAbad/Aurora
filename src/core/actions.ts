@@ -112,6 +112,20 @@ export interface BuyBuildingResult {
   buildings: GameState['buildings'];
 }
 
+// ECONOMY §4 v3.6: Warehouse's Inventory system multiplies every FUTURE level's cap
+// bonus by 1.25x — never retroactive to levels already bought, same "computed at the
+// moment, not retroactive" precedent as Sprint 7.5's Auto-refuel/Test-Stand leveling.
+// Generic lookup (rule 3): any future cap-bonus-scaling upgrade just adds a row here.
+const CAP_BONUS_UPGRADE_MULT: Partial<Record<string, number>> = {
+  inventorySystem: 1.25,
+};
+
+// Exported: upgradePreview.ts uses the same lookup so the "next level" preview matches
+// what buyBuildingUpgrade will actually grant, rather than a second guess at the number.
+export function capBonusMultiplier(upgrades: string[]): number {
+  return upgrades.reduce((mult, id) => mult * (CAP_BONUS_UPGRADE_MULT[id] ?? 1), 1);
+}
+
 /** Buys the next level of `buildingId` (or builds a one-time building) if affordable. */
 export function buyBuildingUpgrade(
   resources: GameState['resources'],
@@ -127,11 +141,12 @@ export function buyBuildingUpgrade(
 
   let nextResources: Record<ResourceId, ResourceState> = payCost(resources, cost, def.minHardwareTier);
   if (def.capBonus) {
+    const capMult = capBonusMultiplier(current.upgrades);
     for (const [id, amount] of Object.entries(def.capBonus) as [ResourceId, number][]) {
       const resource = nextResources[id];
       nextResources = {
         ...nextResources,
-        [id]: { ...resource, cap: (resource.cap ?? 0) + amount },
+        [id]: { ...resource, cap: (resource.cap ?? 0) + amount * capMult },
       };
     }
   }
@@ -207,6 +222,8 @@ export function hireStaff(
  * gates ECONOMY §4 (v2.8): slots exist only at level >= 1, so an unbuilt building always
  * refuses assignment (buildingSlotCount returns 0) — hiring into the pool with no
  * building yet is still a legitimate, unrestricted choice (that's `hireStaff`, untouched).
+ * `upgrades` (default none, ECONOMY §4 v3.6): owned slot-adding internal upgrades for
+ * this building — see core/staff.ts's buildingSlotCount.
  */
 export function adjustStaffAssignment(
   staff: StaffState,
@@ -214,6 +231,7 @@ export function adjustStaffAssignment(
   buildingId: BuildingId,
   delta: number,
   buildingLevel: number,
+  upgrades: string[] = [],
 ): StaffState | null {
   if (delta === 0) return null;
   const pool = staff.pools[role];
@@ -221,7 +239,7 @@ export function adjustStaffAssignment(
   if (nextAssigned < 0) return null;
 
   if (delta > 0) {
-    if (nextAssigned > buildingSlotCount(buildingId, role, buildingLevel)) return null;
+    if (nextAssigned > buildingSlotCount(buildingId, role, buildingLevel, upgrades)) return null;
     if (unassignedCount(staff, role) < delta) return null;
   }
 
@@ -270,32 +288,47 @@ export interface StartResearchResult {
 /** Starts `nodeId` if it's available (deps met, not already done), nothing else is
  * already in progress ("one node at a time in v1"), and Research covers its cost —
  * paid upfront, same pattern as every other timed process in this codebase. */
+/**
+ * `secondTrackUnlocked` (default false, ECONOMY §4 v3.6): R&D Lab's "Second research
+ * track" internal upgrade — once owned, a node can start into a second, independent slot
+ * while the first is still running, rather than being refused outright. Primary slot is
+ * always filled first; the second slot is never used while the first is empty, so a
+ * player without the upgrade sees no behavior change at all.
+ */
 export function startResearch(
   resources: GameState['resources'],
   research: ResearchState,
   nodeId: string,
   now: number,
+  secondTrackUnlocked = false,
 ): StartResearchResult | null {
-  if (research.inProgress) return null;
   const node = RESEARCH_BY_ID.get(nodeId);
   if (!node || !isNodeAvailable(node, research.completed)) return null;
   if (resources.research.amount < node.costR) return null;
+
+  let targetSlot: 'inProgress' | 'secondInProgress';
+  if (!research.inProgress) {
+    targetSlot = 'inProgress';
+  } else if (secondTrackUnlocked && !research.secondInProgress) {
+    targetSlot = 'secondInProgress';
+  } else {
+    return null;
+  }
+
+  const process: Process = {
+    id: `research-${nodeId}`,
+    kind: 'research',
+    startedAt: now,
+    durationMs: node.durationMs,
+    payload: { nodeId },
+  };
 
   return {
     resources: {
       ...resources,
       research: { ...resources.research, amount: resources.research.amount - node.costR },
     },
-    research: {
-      ...research,
-      inProgress: {
-        id: `research-${nodeId}`,
-        kind: 'research',
-        startedAt: now,
-        durationMs: node.durationMs,
-        payload: { nodeId },
-      },
-    },
+    research: { ...research, [targetSlot]: process },
   };
 }
 

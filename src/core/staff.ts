@@ -22,11 +22,32 @@ export function isRoleUnlocked(role: RoleId, completedTech: string[]): boolean {
   return unlockTech === null || completedTech.includes(unlockTech);
 }
 
+// ECONOMY §4 v3.6 (Sprint 8 economy unlock): slot-adding internal upgrades. Generic
+// lookup by upgrade id — not special-cased per building (rule 3) — so any future
+// slot-adding upgrade just adds a row here.
+const SLOT_UPGRADE_BONUS: Partial<Record<string, { role: RoleId; amount: number }>> = {
+  grantsDesk: { role: 'technician', amount: 1 },
+  technicalArchive: { role: 'scientist', amount: 1 },
+  bulkContracts: { role: 'technician', amount: 1 },
+};
+
 /** ECONOMY §4 (v2.8): "slots exist only at building level >= 1" — an unbuilt building
- * has no assignment targets at all, regardless of what its BuildingDef declares. */
-export function buildingSlotCount(buildingId: BuildingId, role: RoleId, level: number): number {
+ * has no assignment targets at all, regardless of what its BuildingDef declares.
+ * `upgrades` (default none) adds any owned slot-adding internal upgrade's bonus on top —
+ * omit it for buildings that never carry one; existing call sites are unaffected. */
+export function buildingSlotCount(
+  buildingId: BuildingId,
+  role: RoleId,
+  level: number,
+  upgrades: string[] = [],
+): number {
   if (level < 1) return 0;
-  return BUILDINGS[buildingId].slots?.[role] ?? 0;
+  let slots = BUILDINGS[buildingId].slots?.[role] ?? 0;
+  for (const upgradeId of upgrades) {
+    const bonus = SLOT_UPGRADE_BONUS[upgradeId];
+    if (bonus && bonus.role === role) slots += bonus.amount;
+  }
+  return slots;
 }
 
 export function assignedToBuilding(staff: StaffState, role: RoleId, buildingId: BuildingId): number {
@@ -48,14 +69,16 @@ export function totalSalaryPerSecond(staff: StaffState): number {
   );
 }
 
-/** staffRatio for productionPerSecond: assigned/slots for a building, clamped by economy.ts. */
+/** staffRatio for productionPerSecond: assigned/slots for a building, clamped by economy.ts.
+ * `upgrades` (default none): see buildingSlotCount. */
 export function staffRatioForBuilding(
   staff: StaffState,
   buildingId: BuildingId,
   role: RoleId,
   level: number,
+  upgrades: string[] = [],
 ): number {
-  const slots = buildingSlotCount(buildingId, role, level);
+  const slots = buildingSlotCount(buildingId, role, level, upgrades);
   if (slots === 0) return 0;
   return assignedToBuilding(staff, role, buildingId) / slots;
 }
@@ -68,11 +91,17 @@ export function staffRatioForBuilding(
  * empty Engineer slot means 0 output even with a full Technician slot). Single-role
  * buildings reduce to the same value staffRatioForBuilding would give; no-slot buildings
  * (Warehouse, etc.) return 1 (ratio is irrelevant — they have no `production` to scale).
+ * `upgrades` (default none): see buildingSlotCount.
  */
-export function buildingStaffRatio(staff: StaffState, buildingId: BuildingId, level: number): number {
+export function buildingStaffRatio(
+  staff: StaffState,
+  buildingId: BuildingId,
+  level: number,
+  upgrades: string[] = [],
+): number {
   const roles = Object.keys(BUILDINGS[buildingId].slots ?? {}) as RoleId[];
   if (roles.length === 0) return 1;
-  return Math.min(...roles.map((role) => staffRatioForBuilding(staff, buildingId, role, level)));
+  return Math.min(...roles.map((role) => staffRatioForBuilding(staff, buildingId, role, level, upgrades)));
 }
 
 /** Unfilled slots for a single role across every building — what a NEW hire of that
@@ -81,7 +110,7 @@ export function buildingStaffRatio(staff: StaffState, buildingId: BuildingId, le
  * Engineer slot even if the program has open Engineer slots elsewhere). */
 export function openSlotsForRole(staff: StaffState, buildings: GameState['buildings'], role: RoleId): number {
   return (Object.keys(BUILDINGS) as BuildingId[]).reduce((sum, buildingId) => {
-    const slots = buildingSlotCount(buildingId, role, buildings[buildingId].level);
+    const slots = buildingSlotCount(buildingId, role, buildings[buildingId].level, buildings[buildingId].upgrades);
     const assigned = assignedToBuilding(staff, role, buildingId);
     return sum + Math.max(0, slots - assigned);
   }, 0);

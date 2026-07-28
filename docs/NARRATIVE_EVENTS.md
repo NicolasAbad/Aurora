@@ -1,6 +1,8 @@
 # NARRATIVE_EVENTS.md — Aurora Program — Complete v1 game text (English)
 *All game text lives here, referenced by ID. Claude Code writes no new narrative: missing beats get added here first. Tone: skeptical press slowly turning believer; dry-humored internal memos.*
 
+**v3.6 changes:** U-10..U-16 added (§6) for the Sprint 8 economy-unlock's new Campus/Production internal upgrades; Aluminum alloys' §8 description updated for its new real effect (ECONOMY §5 v3.6).
+
 **v3.5 changes:** research node descriptions (§8), UI feedback toasts (§9), and manual verb copy (§10) added — closing real content gaps (Sounding rockets, Auto-refuel, VAB queues, Rush Order all previously had no player-facing text). Sections renumbered sequentially.
 
 **v2.1 changes:** doc-ID references removed from player-facing text (N-08c, N-15); E-04 effect restated as pool + modifier (no tracked individuals); T-07 (payroll unpaid) and T-08 (propellant capacity) tooltips added.
@@ -77,6 +79,13 @@ Rule: no upgrade, building or hire may be offered without plain-language copy sa
 | U-07 | Antenna Network (Tracking Station) | "More ground antennas, more telemetry recovered. +25% Flight Experience from every flight." |
 | U-08 | Weather Station (Tracking Station) | "Your own forecasting. Launch weather windows open every 2 minutes instead of 2–5." |
 | U-09 | Clean Room (VAB) | "A contamination-controlled bay. Required to accept constellation-batch contracts — the program's most lucrative clients." |
+| U-10 | Grants desk (Finance) | "A dedicated desk chasing grant money. +1 Technician slot at Finance." |
+| U-11 | Technical archive (R&D Lab) | "Organized records of every experiment run here. +1 Scientist slot at the R&D Lab." |
+| U-12 | Second research track (R&D Lab) | "A second bench, a second project. Run two research nodes at once instead of queueing them." |
+| U-13 | Bulk contracts (Supply Depot) | "Standing orders with your material suppliers. +1 Technician slot at Supply Depot." |
+| U-14 | Recovery loop (Refinery) | "Reclaims runoff from the refining process. Materials consumed per Propellant drop 10%." |
+| U-15 | QA station (Fabrication) | "Catches bad stock before it's machined. Materials consumed per Hardware drop 15%." |
+| U-16 | Inventory system (Warehouse) | "Denser shelving, better tracking. Every future Warehouse level stores 25% more." |
 
 Rules: **v2-only upgrades (Sound Suppression, Cryogenic Stand, Heavy Crane) are NOT rendered in v1 at all** — not greyed, not teased. Every building tile likewise states what it produces or enables in plain language, never only a number.
 
@@ -89,7 +98,7 @@ Rules: **v2-only upgrades (Sound Suppression, Cryogenic Stand, Heavy Crane) are 
 ## 8. Research node descriptions (player-facing — every node states its effect, including zero-effect gates)
 | Branch | Node | Description |
 |---|---|---|
-| Materials | Aluminum alloys | "Certifying aluminum stock for flight hardware. No other effect — unlocks Titanium research." |
+| Materials | Aluminum alloys | "Certifying aluminum stock for flight hardware. Fabrication wastes 10% less Material per Hardware — and unlocks Titanium research." |
 | Materials | Titanium | "Unlocks Titanium-tier Hardware. Fabrication starts producing at this tier automatically — no switch to flip." |
 | Propulsion | Sounding rockets | "Groundwork for suborbital flight. No other effect — unlocks Probe-1 engine certification at the Test Stand." |
 | Propulsion | Probe-1 engine | "Certify the engine that powers your S-1 and S-2 sounding rockets." |
