@@ -27,7 +27,12 @@ import { acceptContract, maybeGenerateTierZeroOffer, resolveContractDeadlines } 
 import { resolveEconomyTick } from '../core/economy';
 import { applyModifiers, pruneExpiredModifiers } from '../core/modifiers';
 import { OFFLINE_CAP_MS, resolveOffline, type PayrollStoppage } from '../core/offlineResolution';
-import { contextFromState, resolveRecords } from '../core/records';
+import { contextFromState, RECORD_DEFS, resolveRecords } from '../core/records';
+import {
+  describeCompletedCertification,
+  describeCompletedProcess,
+  describeCompletedResearch,
+} from '../core/processLabel';
 import { resolveResearch } from '../core/research';
 import { totalHired, totalStaffCap } from '../core/staff';
 import {
@@ -170,6 +175,24 @@ export interface AwaySummary {
   capped: boolean;
   fundingGained: number;
   researchGained: number;
+  // SPRINTS.md Sprint 8, task 3 (away-modal polish): the other four resources reachable
+  // by Sprint 8 (Materials/Hardware/Propellant weren't offline-relevant back when this
+  // was Funding/Research-only, per Sprint 2's own scope note; Reputation/Flight XP
+  // weren't either, before certifications/missions existed).
+  materialsGained: number;
+  hardwareGained: number;
+  propellantGained: number;
+  reputationGained: number;
+  flightxpGained: number;
+  // What finished during the gap, in completion order — research/certification (their
+  // own dedicated GameState slots) plus every kind in the generic processes array
+  // (promotions, sonda/Aurora integration + weather windows, pad transfers, contract
+  // builds). Empty when nothing completed — the modal simply omits this section.
+  completedProcessLabels: string[];
+  // Program Records newly earned during the gap (name, not id — same as
+  // MilestoneCallout's title, since a record earned while away never got its own
+  // on-screen call-out at the time).
+  newRecordNames: string[];
   stoppage: PayrollStoppage | null;
 }
 
@@ -267,13 +290,28 @@ function computeBootOffline(): { initialState: GameState; awaySummary: AwaySumma
           elapsedMs: offline.elapsedMs,
           appliedMs: offline.appliedMs,
           capped: offline.capped,
-          // Uses missionsResolution.resources, not offline.resources, for both: a
+          // Uses missionsResolution.resources, not offline.resources, throughout: a
           // certification resolving during the gap credits Flight Data into Research
           // (ECONOMY §8), and a newly-earned Program Record can credit Funding during the
           // gap too (e.g. "First ignition" backfilling the instant that certification
           // resolves) — omitting either would silently under-report the summary.
           fundingGained: missionsResolution.resources.funding.amount - loaded.resources.funding.amount,
           researchGained: missionsResolution.resources.research.amount - loaded.resources.research.amount,
+          materialsGained: missionsResolution.resources.materials.amount - loaded.resources.materials.amount,
+          hardwareGained: missionsResolution.resources.hardware.amount - loaded.resources.hardware.amount,
+          propellantGained: missionsResolution.resources.propellant.amount - loaded.resources.propellant.amount,
+          reputationGained: missionsResolution.resources.reputation.amount - loaded.resources.reputation.amount,
+          flightxpGained: missionsResolution.resources.flightxp.amount - loaded.resources.flightxp.amount,
+          completedProcessLabels: [
+            ...researchResolution.justCompletedIds.map(describeCompletedResearch),
+            ...(certificationResolution.justCompleted
+              ? [describeCompletedCertification(certificationResolution.justCompleted.testId)]
+              : []),
+            ...offline.completedProcesses.map(describeCompletedProcess),
+          ],
+          newRecordNames: missionsResolution.records
+            .filter((id) => !loaded.records.includes(id))
+            .map((id) => RECORD_DEFS[id as keyof typeof RECORD_DEFS]?.name ?? id),
           stoppage: offline.stoppage,
         }
       : null;

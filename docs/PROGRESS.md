@@ -2052,5 +2052,64 @@ into cleanly. Flagging the alternate reading here in case that's not what was in
   resets to `createInitialState()` (merges data fields back to fresh, leaves the store's
   action functions — which aren't part of `GameState` — untouched).
 
-Next within Sprint 8: away-modal polish (payroll-stoppage reporting, session-1 ending),
-Settings screen, save/load + offline regression QA, private itch.io playtest build.
+### Away-modal polish + session-1 ending (SPRINTS.md task 3)
+
+**Payroll-stoppage reporting was already built** (Sprint 2's `PayrollStoppage` tracking,
+already surfaced in the modal) — confirmed, not rebuilt. The real gap: the modal only
+ever reported Funding/Research gains, a scope limit Sprint 2 itself flagged as expected
+to need revisiting ("no rework expected when later sprints add offline-relevant
+resources") — by Sprint 8 that's Materials/Hardware/Propellant/Reputation/Flight XP, none
+of which showed up in "While you were away" despite `computeBootOffline` already
+computing their final post-gap values for other purposes.
+
+**Built:**
+- `AwaySummary` (persistStore.ts) gains 5 more `*Gained` fields (all 7 resources now),
+  `completedProcessLabels: string[]` (what finished during the gap), and
+  `newRecordNames: string[]` (Program Records earned while away — these never got their
+  own on-screen MilestoneCallout at the time, since nothing was mounted to show it).
+- `core/processLabel.ts` (new): past-tense completion labels ("Research: Aluminum
+  alloys", "Promoted: Technician → Engineer", "Aurora I: Structure complete") — plain
+  mechanical status text, not narrative prose (same category as BuildingTile's own
+  `description` field), so built the same way rather than routed through
+  NARRATIVE_EVENTS.md. Deliberately separate from `ActiveProcessStrip`'s own
+  present-tense ("Researching:") labeling — different tense, no shared call site, kept
+  Sprint 7.5-era code untouched rather than force a refactor into this pass.
+- Research/certification completions are described from
+  `researchResolution.justCompletedIds`/`certificationResolution.justCompleted` (their
+  own dedicated GameState slots, resolved separately from the generic `processes` array)
+  — `describeCompletedProcess` only covers the generic array's kinds (training,
+  sonda/Aurora integration + weather windows, transfer, contract_build).
+- `AwayModal.tsx`: resource-gain list now iterates all 7, skipping any that gained
+  nothing (a save with no Supply Depot yet shows no Materials line, rather than "+0"
+  noise); new "Finished while you were away" and "Records earned" sections, each
+  omitted entirely when empty.
+
+**"Session-1 ending: a timer always left running" (GDD §11) — verified by design, not
+new code.** Every meaningful early action already leaves something running: Finance
+produces continuously the moment it's staffed, and this sprint's own T-01→T-02→T-03
+tooltip sequence (previous entry, above) now actively walks a fresh player through
+exactly pitch → afford a hire → hire → assign to Finance — the same path that leaves
+Finance producing. A player who closes the tab having done nothing at all would see a
+$0/no-completions away modal next time, but that requires deliberately not following
+the onboarding path the tooltips now reinforce; not treated as a gap.
+
+**Verification:**
+- 375 tests passing (up from 366 — 9 in `core/processLabel.test.ts`). `computeBootOffline`
+  itself stays untested at the unit level, consistent with the existing pattern (it runs
+  at module-load time and isn't exported; the original `fundingGained`/`researchGained`
+  fields were never unit-tested either — this codebase verifies it via Playwright only,
+  followed here rather than introducing a second convention). Typecheck, lint, production
+  build all clean.
+- Playwright, through a real browser, one comprehensive injected scenario (2h offline
+  gap, Finance/Supply Depot/Fabrication/Refinery/R&D Lab all staffed, a research node and
+  a certification test both in progress at close): confirmed all 7 resource lines render
+  with correct icons/amounts (Funding +632, Research +314, Materials +1,882, Hardware +6,
+  Propellant +1,000, Reputation +3, Flight XP +30), "Finished while you were away" listed
+  both "Research: Aluminum alloys" and "Certified: Probe-1 static fire, test 1", "Records
+  earned" listed "First ignition" (the scripted-failure record, correctly backfilled
+  alongside the certification's own resolution) — all in one screenshot-verified modal,
+  zero console errors, zero layout overflow (`max-height: 80vh` + scroll added
+  defensively for a save with many simultaneous completions).
+
+Next within Sprint 8: Settings screen (save export/import, manual save, hard reset,
+sound/motion toggles), save/load + offline regression QA, private itch.io playtest build.
