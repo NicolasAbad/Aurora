@@ -2266,21 +2266,39 @@ round-tripped through `JSON.stringify` → `importSave` → `loadGame`), and liv
 Settings-screen Playwright pass reported above (pitch to a known value → export → hard
 reset → import → Funding reads the exact pre-export value back).
 
-### Sprint 8 status: 7 of 8 tasks closed; NOT closing the sprint yet
+### Sprint 8 status: COMPLETE PENDING PLAYTEST (owner decision, 2026-07-27)
 
 Opening sequence, FTUE tooltips, locked-complex verification, milestone call-outs,
 away-modal polish, Settings screen, and save/load + offline regression QA are all done,
-tested, and committed (see the sections above). The private itch.io playtest build was
-offered three ways — prepare-and-hand-off, build-only, or skip — and **the owner chose
-to skip it for now**, explicitly, not by default. Deferred, not forgotten: SPRINTS.md's
-own Sprint 8 acceptance criterion ("a fresh tester reaches Aurora I with no external
-explanation... over a multi-day arc") can't actually be verified without external
-testers, which can't happen without this deploy. Sprint 8 stays open until that
-happens — the 7 completed tasks are real, verified progress, not a claim that the
-sprint itself is done.
+tested, and committed (see the sections above) — 7 of 8 tasks. The private itch.io
+playtest build (task 7) was offered three ways — prepare-and-hand-off, build-only, or
+skip — and the owner's decision, given explicitly rather than by default, is to defer it
+further than a plain skip: **push the private playtest to the LAST planned sprint**,
+testing solo in the interim, publishing externally only once every planned feature and
+polish pass is done. This trades away early external pacing validation for more
+iteration room before anyone outside sees the build — a deliberate, informed call, not
+an oversight.
+
+Practical effect: SPRINTS.md's own Sprint 8 acceptance criterion ("a fresh tester
+reaches Aurora I with no external explanation... over a multi-day arc") formally still
+needs external testers to verify, and stays unverified until that deploy happens. But
+per the owner's explicit direction, Sprint 8 is not a blocker for later work — the 7
+completed tasks are real, tested, integrated-path-verified progress, and Sprint 9 starts
+now. Carried forward as a standing note for whichever sprint ends up being "last": that
+sprint is simultaneously the deploy sprint AND the first time anyone but the owner plays
+the game, so its scope needs real buffer, not a tight schedule (SPRINTS.md already flags
+multi-day pacing as the game's #1 unvalidated risk).
 
 327 → 380 tests across this sprint's work (casual sim profile, economy unlock, FTUE
 tooltips, away-modal polish, Settings screen — the offline-process-kinds QA pass added
 no new tests, pure Playwright verification); typecheck/lint/production build clean at
 every commit. No ECONOMY_MODEL value changed outside the explicitly proposed and
 sim-verified v3.6 pricing pass.
+
+**Re-verified at the start of Sprint 9 (2026-07-27):** fresh typecheck/lint/380-test run
+and a full `npm run sim` all reproduce the numbers above exactly — pacing floor PASS,
+salary band 54.2%→55.0%, Flight Data 24.4%/25.0% sonda/satellite, casual profile
+unchanged. Doc versions confirmed: ECONOMY_MODEL.md and NARRATIVE_EVENTS.md both at
+v3.6 (the Sprint 8 economy-unlock pass), BACKLOG.md's Campus/Production upgrade set and
+Aluminum alloys both marked SHIPPED against v3.6, UI_SPEC.md unchanged at v3.3 (correctly
+— no UI_SPEC content was part of the economy-unlock pass).
