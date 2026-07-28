@@ -20,11 +20,13 @@ import {
 } from './certification';
 import { applyGrant, costAtLevel, pitchYield } from './economy';
 import { hardwareAtOrAboveTier, spendHardware } from './hardware';
+import { applyModifiers } from './modifiers';
 import { isNodeAvailable, type ResearchState } from './research';
 import type {
   BuildingId,
   GameState,
   HardwareTier,
+  Modifier,
   Process,
   ResourceId,
   ResourceState,
@@ -301,6 +303,7 @@ export function startResearch(
   nodeId: string,
   now: number,
   secondTrackUnlocked = false,
+  modifiers: Modifier[] = [],
 ): StartResearchResult | null {
   const node = RESEARCH_BY_ID.get(nodeId);
   if (!node || !isNodeAvailable(node, research.completed)) return null;
@@ -315,11 +318,13 @@ export function startResearch(
     return null;
   }
 
+  // NARRATIVE §3 E-05: temporary +10% process-duration modifier (default [] keeps every
+  // pre-Sprint-9 call site's exact old behavior).
   const process: Process = {
     id: `research-${nodeId}`,
     kind: 'research',
     startedAt: now,
-    durationMs: node.durationMs,
+    durationMs: applyModifiers(node.durationMs, modifiers, 'process.duration', now),
     payload: { nodeId },
   };
 
@@ -353,6 +358,7 @@ export function startCertification(
   instrumentationBought: boolean,
   now: number,
   randomFn: () => number = Math.random,
+  modifiers: Modifier[] = [],
 ): StartCertificationResult | null {
   if (certifications.inProgress) return null;
   const test = CERTIFICATION_TESTS_BY_ID.get(testId);
@@ -367,6 +373,16 @@ export function startCertification(
     payload.committedRoll = randomFn();
   }
 
+  // NARRATIVE §3 E-05: temporary +10% process-duration modifier, stacked with Test
+  // Stand/Instrumentation's existing reduction (default [] keeps every pre-Sprint-9 call
+  // site's exact old behavior).
+  const durationMs = applyModifiers(
+    test.durationMs * certificationDurationMultiplier(testStandLevel, instrumentationBought),
+    modifiers,
+    'process.duration',
+    now,
+  );
+
   return {
     resources: payCost(resources, test.consumes),
     certifications: {
@@ -375,7 +391,7 @@ export function startCertification(
         id: `certification-${testId}-${now}`,
         kind: 'certification',
         startedAt: now,
-        durationMs: test.durationMs * certificationDurationMultiplier(testStandLevel, instrumentationBought),
+        durationMs,
         payload,
       },
     },
@@ -405,6 +421,7 @@ export function startPromotion(
   from: RoleId,
   to: RoleId,
   now: number,
+  modifiers: Modifier[] = [],
 ): StartPromotionResult | null {
   if (!classroomBuilt) return null;
   const def = PROMOTIONS.find((p) => p.from === from && p.to === to);
@@ -412,6 +429,8 @@ export function startPromotion(
   if (unassignedCount(staff, from) < 1) return null;
   if (resources.funding.amount < def.costFunding) return null;
 
+  // NARRATIVE §3 E-05: temporary +10% process-duration modifier (default [] keeps every
+  // pre-Sprint-9 call site's exact old behavior).
   return {
     resources: payCost(resources, { funding: def.costFunding }),
     staff: {
@@ -427,7 +446,7 @@ export function startPromotion(
         id: `promotion-${from}-${to}-${now}`,
         kind: 'training',
         startedAt: now,
-        durationMs: def.durationMs,
+        durationMs: applyModifiers(def.durationMs, modifiers, 'process.duration', now),
         payload: { from, to },
       },
     ],

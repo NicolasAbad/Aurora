@@ -35,7 +35,9 @@ import type {
   StaffState,
 } from './types';
 
-const EMPTY_CHECKLIST: Record<ChecklistItemId, boolean> = {
+// Exported: core/contractMission.ts's launchContractMission resets a contract-linked pad
+// to the same empty shape on resolution — one definition, not two copies to drift apart.
+export const EMPTY_CHECKLIST: Record<ChecklistItemId, boolean> = {
   rocketIntegrated: false,
   enginesCertified: false,
   transferToPad: false,
@@ -45,6 +47,23 @@ const EMPTY_CHECKLIST: Record<ChecklistItemId, boolean> = {
   trackingActive: false,
   weatherWindow: false,
 };
+
+// ECONOMY §4 v3.6: "Requires 1 additional Technician slot and its own Service Tower
+// purchase" (Launch Pad B) — Pad B is a separate BuildingId (`launchPadB`) with its own
+// `upgrades` array, so Confidence's Service Tower check (previously hardcoded to
+// `buildings.launchPad`, a real bug once Pad B exists) must resolve which BUILDING backs
+// a given pad. Exported: core/contractMission.ts's resolveContractChecklist needs the
+// exact same mapping.
+export function buildingForPad(padId: PadId): 'launchPad' | 'launchPadB' {
+  return padId === 'padA' ? 'launchPad' : 'launchPadB';
+}
+
+/** Sprint 9: Launch Pad B starts out exactly like padA did at game start (data/initialState.ts) —
+ * exported so state/persistStore.ts's buyBuilding action can add `mission.pads.padB` the
+ * instant the building reaches level 1, without a second hand-written copy of this shape. */
+export function emptyPadMissionState(): PadMissionState {
+  return { rocketStatus: 'none', stagesDone: [], checklist: { ...EMPTY_CHECKLIST }, confidence: 0, committedRoll: null };
+}
 
 /** Next stage in ECONOMY §7's strict sequential chain, or null once all 8 are done. */
 export function nextAuroraStageId(stagesDone: string[]): AuroraStageId | null {
@@ -102,7 +121,7 @@ export function startNextAuroraStage(
   now: number,
 ): StartAuroraStageResult | null {
   const pad = mission.pads[padId];
-  if (!pad) return null;
+  if (!pad || pad.contractId != null) return null; // Sprint 9: pad is a contract mission's, not Aurora's
   const alreadyRunning = processes.some((p) => p.payload.missionKind === 'auroraI' && p.payload.padId === padId);
   if (alreadyRunning) return null;
 
@@ -121,7 +140,7 @@ export function startNextAuroraStage(
       ? applyModifiers(stageDef.durationMs, modifiers, 'transfer.duration', now)
       : stageDef.durationMs;
   const durationMs =
-    baseDurationMs *
+    applyModifiers(baseDurationMs, modifiers, 'process.duration', now) *
     (halfDuration ? FAILURE_REINTEGRATION_DURATION_RATE : 1) *
     (autoRefuel ? AUTO_REFUEL_DURATION_MULT : 1);
 
@@ -271,7 +290,7 @@ export function resolveAuroraChecklist(
   randomFn: () => number = Math.random,
 ): MissionState {
   const pad = mission.pads[padId];
-  if (!pad || pad.committedRoll !== null) return mission;
+  if (!pad || pad.contractId != null || pad.committedRoll !== null) return mission;
 
   const checklist: Record<ChecklistItemId, boolean> = {
     rocketIntegrated: VAB_STAGE_IDS.every((id) => pad.stagesDone.includes(id)),
@@ -285,14 +304,18 @@ export function resolveAuroraChecklist(
   };
   const allDone = (Object.values(checklist) as boolean[]).every(Boolean);
 
-  const confidence = computeConfidenceBreakdown({
+  const rawConfidence = computeConfidenceBreakdown({
     engineState,
     flightReviewApproved: checklist.flightReview,
     controllersFullyStaffed: checklist.controllersOnStation,
-    serviceTowerBuilt: buildings.launchPad.upgrades.includes('serviceTower'),
+    serviceTowerBuilt: buildings[buildingForPad(padId)].upgrades.includes('serviceTower'),
     weatherResolved: checklist.weatherWindow,
     flightXp,
   }).total;
+  // NARRATIVE §3 E-03 option B: one-shot "-10 Confidence next launch," consumed by
+  // whichever mission (sounding/Aurora/contract) next commits a roll — see
+  // core/types.ts's MissionState.confidencePenaltyNext.
+  const confidence = Math.max(0, rawConfidence - (mission.confidencePenaltyNext ?? 0));
 
   return {
     ...mission,
@@ -300,6 +323,7 @@ export function resolveAuroraChecklist(
       ...mission.pads,
       [padId]: { ...pad, checklist, confidence, committedRoll: allDone ? randomFn() : null },
     },
+    confidencePenaltyNext: allDone ? undefined : mission.confidencePenaltyNext,
   };
 }
 
@@ -325,7 +349,7 @@ export function launchAuroraMission(
   now: number,
 ): LaunchAuroraMissionResult | null {
   const pad = mission.pads[padId];
-  if (!pad || pad.committedRoll === null) return null;
+  if (!pad || pad.contractId != null || pad.committedRoll === null) return null;
 
   const success = pad.committedRoll < pad.confidence / 100;
   const tier = currentHardwareTier(completedTech);

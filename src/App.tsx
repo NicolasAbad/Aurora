@@ -28,6 +28,7 @@ import { nextFtueTooltip } from './core/ftue';
 import { RECORD_DEFS } from './core/records';
 import { narrativeText } from './data/narrative';
 import { BUILDINGS } from './data/buildings';
+import { EVENT_DEFS_BY_ID } from './data/events';
 import type { ComplexId, RecordId } from './core/types';
 
 const RUSH_ORDER_COST_FUNDING = 150; // ECONOMY §2
@@ -182,6 +183,18 @@ function LaunchPanel({
   onDismissChecklistTip: () => void;
 }) {
   const vabLevel = useGameStore((s) => s.buildings.vab.level);
+  // UI_SPEC §2b default: hidden until its own unlockCondition is met (not the teaser
+  // pattern — that's Training Center only) — same treatment TestingPanel already gives
+  // Payload Processing, since Launch Pad B's gate (Aurora I success + Rep >= 40) is well
+  // past the Launch tab's own tech gate that reveals its siblings.
+  const launchPadBUnlocked = useGameStore((s) =>
+    isUnlockConditionMet(BUILDINGS.launchPadB.unlockCondition, unlockContextFromState(s)),
+  );
+  // Sprint 9: Launch Pad B's own Launch Sequence panel exists once mission.pads.padB has
+  // been initialized (state/persistStore.ts's buyBuilding action does this the instant
+  // the building reaches level 1) — reading the pad's presence, not the building's own
+  // level, keeps this in lockstep with the one place that actually creates the pad slot.
+  const padBExists = useGameStore((s) => s.mission.pads.padB !== undefined);
 
   return (
     <>
@@ -192,6 +205,7 @@ function LaunchPanel({
         <BuildingTile buildingId="launchPad" />
         <BuildingTile buildingId="launchControl" />
         <BuildingTile buildingId="trackingStation" />
+        {launchPadBUnlocked && <BuildingTile buildingId="launchPadB" />}
       </div>
       {/* T-06 (NARRATIVE §2): "Launch checklist" is a screen-mount moment, not a
           game-state predicate — same FirstEntryTip treatment as T-16/T-17, tied to the
@@ -200,6 +214,7 @@ function LaunchPanel({
         <FirstEntryTip id="T-06" dismissed={checklistTipDismissed} onDismiss={onDismissChecklistTip} />
       )}
       {vabLevel >= 1 && <LaunchSequencePanel padId="padA" />}
+      {padBExists && <LaunchSequencePanel padId="padB" />}
     </>
   );
 }
@@ -288,6 +303,35 @@ function MilestoneCallout() {
   );
 }
 
+/**
+ * NARRATIVE §3 (Sprint 9): random events. "Wait as a pending card (never block play)" —
+ * a non-modal card (no backdrop, doesn't intercept clicks elsewhere), always exactly the
+ * two options the doc specifies. Copy resolved from data/events.ts's EventDef via
+ * narrativeText (rule 9 — the doc's own E-01/E-01a/E-01b ids), never inlined here.
+ */
+function EventCard() {
+  const pending = useGameStore((s) => s.events?.pending ?? null);
+  const resolveEvent = useGameStore((s) => s.resolveEvent);
+
+  if (!pending) return null;
+  const def = EVENT_DEFS_BY_ID.get(pending.id);
+  if (!def) return null;
+
+  return (
+    <div className="event-card">
+      <div className="event-card__text">{narrativeText(def.narrativeId)}</div>
+      <div className="event-card__options">
+        <button type="button" className="upgrade-button" onClick={() => resolveEvent('A')}>
+          {narrativeText(def.optionA.narrativeId)}
+        </button>
+        <button type="button" className="upgrade-button" onClick={() => resolveEvent('B')}>
+          {narrativeText(def.optionB.narrativeId)}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function App() {
   const [activeComplex, setActiveComplex] = useState<ComplexId>('campus');
   const [dismissedTips, setDismissedTips] = useState<Set<string>>(new Set());
@@ -308,6 +352,7 @@ export function App() {
       <AwayModal />
       <TierChangeToast />
       <MilestoneCallout />
+      <EventCard />
       {settingsOpen && <SettingsScreen onClose={() => setSettingsOpen(false)} />}
       {__DEV_TOOLS__ && (
         <div className="dev-tools-row">

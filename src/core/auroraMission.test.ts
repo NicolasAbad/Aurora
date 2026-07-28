@@ -3,6 +3,8 @@ import { createInitialState } from '../data/initialState';
 import {
   applyCompletedAuroraStages,
   applyCompletedAuroraWeather,
+  buildingForPad,
+  emptyPadMissionState,
   launchAuroraMission,
   maybeAutoQueueAuroraStage,
   nextAuroraStageId,
@@ -288,6 +290,38 @@ describe('launchAuroraMission', () => {
     expect(result!.resources.hardware.amount).toBe(54); // 60% of 90 (30+20+15+15+10 across the 5 VAB stages)
     expect(result!.narrativeSeen).toEqual(['N-12']);
     expect(result!.mission.auroraHalfDurationNext?.padA).toBe(true);
+  });
+});
+
+describe('buildingForPad (Sprint 9)', () => {
+  it('maps padA to launchPad and padB to launchPadB', () => {
+    expect(buildingForPad('padA')).toBe('launchPad');
+    expect(buildingForPad('padB')).toBe('launchPadB');
+  });
+});
+
+describe('Sprint 9: Aurora functions skip a contract-linked pad', () => {
+  function contractPad() {
+    return { ...emptyPadMissionState(), contractId: 'contract-1-0', rocketStatus: 'none' as const };
+  }
+
+  it('startNextAuroraStage refuses a pad owned by a contract mission', () => {
+    const state = fundedState();
+    const m = mission({ pads: { padA: contractPad() } });
+    expect(startNextAuroraStage(state.resources, m, 'padA', [], engineState(), [], [], 0)).toBeNull();
+  });
+
+  it('resolveAuroraChecklist is a no-op for a pad owned by a contract mission', () => {
+    const state = createInitialState();
+    const m = mission({ pads: { padA: { ...contractPad(), stagesDone: ['payloadIntegration'] } } });
+    const result = resolveAuroraChecklist(m, 'padA', state.buildings, state.staff, engineState(), 0);
+    expect(result).toBe(m);
+  });
+
+  it('launchAuroraMission refuses a pad owned by a contract mission even if committedRoll happens to be set', () => {
+    const state = createInitialState();
+    const m = mission({ pads: { padA: { ...contractPad(), committedRoll: 0.1, confidence: 90 } } });
+    expect(launchAuroraMission(state.resources, m, 'padA', [], [], 0)).toBeNull();
   });
 });
 

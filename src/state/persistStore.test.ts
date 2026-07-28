@@ -453,6 +453,62 @@ describe('Mission Log narrative triggers (Sprint 5)', () => {
   });
 });
 
+describe('Launch Pad B (Sprint 9): buyBuilding initializes mission.pads.padB', () => {
+  beforeEach(() => {
+    useGameStore.setState(createInitialState());
+  });
+
+  it('N-17 fires and mission.pads.padB is created the moment Launch Pad B reaches level 1', () => {
+    useGameStore.setState((s) => ({
+      resources: {
+        ...s.resources,
+        funding: { ...s.resources.funding, amount: 6000 },
+        materials: { ...s.resources.materials, amount: 1500 },
+        hardware: { ...s.resources.hardware, amount: 100, byTier: { aluminum: 100, titanium: 0 } },
+      },
+    }));
+    expect(useGameStore.getState().mission.pads.padB).toBeUndefined();
+    useGameStore.getState().buyBuilding('launchPadB');
+    expect(useGameStore.getState().buildings.launchPadB.level).toBe(1);
+    expect(useGameStore.getState().mission.pads.padB).toMatchObject({ rocketStatus: 'none', stagesDone: [], confidence: 0, committedRoll: null });
+    expect(useGameStore.getState().narrative.seen).toContain('N-17');
+  });
+});
+
+describe('Satellite contracts through the real store (Sprint 9)', () => {
+  beforeEach(() => {
+    useGameStore.setState(createInitialState());
+  });
+
+  it('offer generation (via applyTick), acceptance, and build-start flow through the real store; the pad becomes exclusively the contract\'s', () => {
+    useGameStore.setState((s) => ({
+      resources: {
+        ...s.resources,
+        reputation: { ...s.resources.reputation, amount: 100 },
+        hardware: { ...s.resources.hardware, amount: 40, byTier: { aluminum: 40, titanium: 0 }, cap: 500 },
+      },
+      buildings: { ...s.buildings, payloadProcessing: { ...s.buildings.payloadProcessing, level: 1 } },
+    }));
+
+    useGameStore.getState().applyTick(0);
+    const offer = useGameStore.getState().contracts.offers.find((o) => o.tier === 1);
+    expect(offer).toBeDefined();
+
+    useGameStore.getState().acceptContractOffer(offer!.id);
+    expect(useGameStore.getState().contracts.active).toHaveLength(1);
+
+    useGameStore.getState().startContractStage('padA', offer!.id);
+    expect(useGameStore.getState().mission.pads.padA?.contractId).toBe(offer!.id);
+    expect(useGameStore.getState().resources.hardware.amount).toBe(0); // 40 - 40 paid
+    expect(useGameStore.getState().contracts.active[0].padId).toBe('padA');
+
+    // Pad exclusivity: Aurora's own action must now refuse this pad (the "pad-queue
+    // tension" SPRINTS.md's acceptance criterion names) — nothing should change.
+    useGameStore.getState().startAuroraStage('padA');
+    expect(useGameStore.getState().mission.pads.padA?.stagesDone).toEqual([]);
+  });
+});
+
 // SPRINTS.md Sprint 7 task 4: "committedRoll drawn and persisted at checklist
 // completion; countdown resolves it deterministically (export/import cannot re-roll —
 // regression test)." A save-scummer's whole strategy is: get to checklist completion,

@@ -91,9 +91,22 @@ function useActiveChips(): Chip[] {
     if (p.kind === 'weather_window' && p.payload.missionKind === 'auroraI') {
       chips.push({ id: p.id, label: 'Aurora I: Weather window', process: p, complex: 'launch' });
     }
-    // Remaining kinds (transfer, contract_build) have no current UI consumer — added
-    // here the same sprint that gives them a real payload, same "infra only where
-    // content exists" restraint as everywhere else in this codebase.
+    if (p.kind === 'integration' && p.payload.missionKind === 'contractPayload') {
+      const stageId = p.payload.stageId as string;
+      const label =
+        stageId === 'payloadIntegration'
+          ? 'Contract: Payload integration'
+          : stageId === 'padTransfer'
+            ? 'Contract: Pad transfer'
+            : 'Contract: Propellant load';
+      chips.push({ id: p.id, label, process: p, complex: 'launch' });
+    }
+    if (p.kind === 'weather_window' && p.payload.missionKind === 'contractPayload') {
+      chips.push({ id: p.id, label: 'Contract: Weather window', process: p, complex: 'launch' });
+    }
+    // Remaining kinds (transfer, contract_build) have no current UI consumer — the
+    // reserved ProcessKind values confirmed unused by any real code path (Sprint 8's
+    // offline-QA pass), not a gap.
   }
 
   return chips;

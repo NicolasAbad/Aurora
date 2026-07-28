@@ -210,6 +210,41 @@ body {
   color: var(--text);
 }
 
+/* NARRATIVE §3 (Sprint 9): random events. "Wait as a pending card, never block play" —
+ * fixed, non-modal (no backdrop), sits below the ticker/process-strip; unlike
+ * milestone-callout it does NOT auto-dismiss (a real choice needs a real answer). */
+.event-card {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 12px 16px;
+  font-size: 0.9em;
+  z-index: 199;
+  max-width: 420px;
+  text-align: center;
+}
+
+.event-card__text {
+  margin-bottom: 10px;
+}
+
+.event-card__options {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.research-node__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
 .complex-tabs {
   display: flex;
   border-bottom: 1px solid var(--border);

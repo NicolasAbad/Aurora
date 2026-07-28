@@ -245,8 +245,12 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
       kind: 'all',
       conditions: [{ kind: 'auroraISuccess' }, { kind: 'reputation', amount: 40 }],
     },
-    // Needs its own Service Tower purchase for +5 Confidence (per-pad, ECONOMY §4) —
-    // handled by the Sprint 9 per-pad mission system, not duplicated here.
+    // ECONOMY §4: "Requires... its own Service Tower purchase for the +5 Confidence" —
+    // a separate BuildingId from `launchPad`, so its own `upgrades` array is independent;
+    // same cost/effect/copy as Pad A's, priced identically (no second value to invent).
+    internalUpgrades: [
+      { id: 'serviceTower', name: 'Service Tower', cost: { funding: 800, materials: 150 }, narrativeId: 'U-05' },
+    ],
   },
 };
 

@@ -33,12 +33,18 @@ export function describeCompletedProcess(process: Process): string {
         const stage = AURORA_I_STAGES_BY_ID.get(process.payload.stageId as never);
         return `Aurora I: ${stage?.name ?? process.payload.stageId} complete`;
       }
+      if (process.payload.missionKind === 'contractPayload') {
+        const stageId = process.payload.stageId as string;
+        if (stageId === 'payloadIntegration') return 'Contract: payload integration complete';
+        if (stageId === 'padTransfer') return 'Contract: pad transfer complete';
+        return 'Contract: propellant loaded';
+      }
       return 'Integration complete';
     }
     case 'weather_window':
-      return process.payload.missionKind === 'auroraI'
-        ? 'Aurora I: weather window opened'
-        : 'Weather window opened';
+      if (process.payload.missionKind === 'auroraI') return 'Aurora I: weather window opened';
+      if (process.payload.missionKind === 'contractPayload') return 'Contract: weather window opened';
+      return 'Weather window opened';
     case 'transfer':
       return 'Pad transfer complete';
     case 'contract_build':

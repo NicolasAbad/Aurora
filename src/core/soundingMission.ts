@@ -20,11 +20,13 @@ import { CONTRACT_TIERS, TIER0_PAYLOAD_EXTRA_HARDWARE, TIER0_PAYLOAD_EXTRA_PROPE
 import { markSeen } from '../data/narrative';
 import { applyGrant } from './economy';
 import { creditHardware, currentHardwareTier, spendHardware } from './hardware';
+import { applyModifiers } from './modifiers';
 import type {
   ContractState,
   EngineCertificationState,
   GameState,
   MissionState,
+  Modifier,
   Process,
   SoundingRocketId,
 } from './types';
@@ -85,6 +87,7 @@ export function startSoundingAssembly(
   rocketId: SoundingRocketId,
   contractId: string | null,
   now: number,
+  modifiers: Modifier[] = [],
 ): StartSoundingAssemblyResult | null {
   if (mission.sounding) return null;
   if (!testStandBuilt || !launchRailBuilt) return null;
@@ -96,7 +99,12 @@ export function startSoundingAssembly(
   if (resources.hardware.amount < hardwareCost) return null;
 
   const halfDuration = mission.soundingHalfDurationNext[rocketId] ?? false;
-  const durationMs = def.assemblyDurationMs * (halfDuration ? FAILURE_REINTEGRATION_DURATION_RATE : 1);
+  // NARRATIVE §3 E-05: temporary +10% process-duration modifier, same generic query
+  // every other process-starting function applies (default [] keeps every pre-Sprint-9
+  // call site's exact old behavior — applyModifiers(x, [], ...) is always x).
+  const durationMs =
+    applyModifiers(def.assemblyDurationMs, modifiers, 'process.duration', now) *
+    (halfDuration ? FAILURE_REINTEGRATION_DURATION_RATE : 1);
 
   return {
     resources: {
@@ -231,12 +239,16 @@ export function resolveSoundingChecklist(
 
   const propellantReady = resources.propellant.amount >= requiredPropellant(sounding.rocketId, sounding.contractId);
   const checklist = { ...sounding.checklist, propellantReady };
-  const confidence = computeSondaConfidence(engineState);
+  const rawConfidence = computeSondaConfidence(engineState);
+  // NARRATIVE §3 E-03 option B: one-shot "-10 Confidence next launch" — see
+  // core/types.ts's MissionState.confidencePenaltyNext.
+  const confidence = Math.max(0, rawConfidence - (mission.confidencePenaltyNext ?? 0));
   const complete = checklist.assembled && checklist.propellantReady && checklist.weatherWindow && checklist.flightReview;
 
   return {
     ...mission,
     sounding: { ...sounding, checklist, confidence, committedRoll: complete ? randomFn() : null },
+    confidencePenaltyNext: complete ? undefined : mission.confidencePenaltyNext,
   };
 }
 

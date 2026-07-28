@@ -1,8 +1,13 @@
-// ECONOMY §10: contract offers, acceptance and deadline penalties. Sprint 6 only builds
-// tier 0 (Payload Processing, required by tiers 1/2, doesn't exist until post-Aurora I);
-// this module is written to extend cleanly when Sprint 9 adds them (CONTRACT_TIERS
-// already lists all three — see data/contracts.ts).
-import { CONTRACT_TIERS, MISSED_DEADLINE_REPUTATION_PENALTY, TIER0_CLIENTS } from '../data/contracts';
+// ECONOMY §10: contract offers, acceptance and deadline penalties. Sprint 6 built tier 0;
+// Sprint 9 adds tiers 1/2 (satellite contracts, post-Aurora I — core/contractMission.ts
+// owns the actual build/launch flow once accepted).
+import {
+  CONTRACT_TIERS,
+  MISSED_DEADLINE_REPUTATION_PENALTY,
+  TIER0_CLIENTS,
+  TIER1_CLIENTS,
+  TIER2_CLIENTS,
+} from '../data/contracts';
 import type { ActiveContract, ContractOffer, ContractState, GameState } from './types';
 
 /** Contracts accepted but not yet fulfilled or missed — what's still worth pursuing
@@ -40,6 +45,45 @@ export function maybeGenerateTierZeroOffer(
     client,
     offeredAt: now,
     deadlineMs: CONTRACT_TIERS[0].offerRotationMs,
+  };
+  return { ...contracts, offers: [...contracts.offers, offer] };
+}
+
+const SATELLITE_CLIENTS: Record<1 | 2, readonly string[]> = {
+  1: TIER1_CLIENTS,
+  2: TIER2_CLIENTS,
+};
+
+/**
+ * ECONOMY §10 v3.6: "Satellite tiers (post-Aurora I; 2 active offers, rotate 8h; require
+ * Payload Processing)." Read as one dedicated offer slot per tier (tier 1 and tier 2 each
+ * independently rotating every 8h) rather than 2 slots randomly drawing from either tier
+ * — the doc's own two-row table gives each tier its own client pool, deadline-shared
+ * rotation cadence, and requirement set, so this is the direct reading, not an invented
+ * mechanic. Mirrors maybeGenerateTierZeroOffer exactly, generalized by tier. Clean Room
+ * (tier 2's extra building prerequisite) gates BUILDING the payload, not the offer
+ * appearing — same "Requires" column as the Hardware/Propellant/Reputation figures, all
+ * checked at build-start time (core/contractMission.ts), not offer-generation time.
+ */
+export function maybeGenerateSatelliteOffer(
+  tier: 1 | 2,
+  contracts: ContractState,
+  payloadProcessingBuilt: boolean,
+  now: number,
+  randomFn: () => number = Math.random,
+): ContractState {
+  if (!payloadProcessingBuilt) return contracts;
+  const hasPending = contracts.offers.some((o) => o.tier === tier && isOfferPending(o, contracts, now));
+  if (hasPending) return contracts;
+
+  const clients = SATELLITE_CLIENTS[tier];
+  const client = clients[Math.floor(randomFn() * clients.length)];
+  const offer: ContractOffer = {
+    id: `contract-${tier}-${now}`,
+    tier,
+    client,
+    offeredAt: now,
+    deadlineMs: CONTRACT_TIERS[tier].offerRotationMs,
   };
   return { ...contracts, offers: [...contracts.offers, offer] };
 }

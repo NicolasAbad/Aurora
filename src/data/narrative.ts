@@ -89,6 +89,26 @@ export const NARRATIVE_TEXT: Record<string, string> = {
   'T-17': 'This is where rockets fly. Build the VAB, integrate a rocket, and complete the launch checklist — every item, every time — to unlock the countdown.',
   // §10 — manual verb descriptions (same "no purchasable without effect text" rule).
   rushOrder: 'Trade Funding for instant Materials when you need them now instead of waiting on the Depot.',
+  // §3 (Sprint 9) — random events. Each event is one flavor string (title + situation)
+  // plus its two option strings (data/events.ts's EventDef.optionA/B.narrativeId).
+  'E-01': 'Surprise inspection: a municipal inspector showed up unannounced. He eyes the Refinery with suspicion.',
+  'E-01a': "Pay the 'preventive' fine (−5% current Funding)",
+  'E-01b': 'Halt production for 20 minutes for the guided tour',
+  'E-02': "Investor offer: a fund offers quick capital in exchange for being named 'strategic partner' in the press.",
+  'E-02a': '+1,000 Funding, −10 Reputation',
+  'E-02b': 'Decline gracefully (+3 Reputation)',
+  'E-03': 'Defect found: a technician found a micro-fracture in a Hardware batch.',
+  'E-03a': 'Scrap the batch (−15 Hardware)',
+  'E-03b': 'Use it anyway (−10 Confidence on the next launch)',
+  'E-04': "Star scientist: a renowned scientist wants in. So do her salary expectations.",
+  'E-04a': 'Hire (+1 Scientist to the pool at no hiring cost, but her salary premium is permanent)',
+  'E-04b': 'Let her go',
+  'E-05': "Documentary crew: a production company wants to film the program. 'We'll barely be in the way,' they promise.",
+  'E-05a': '+15 Reputation, but every process runs 10% longer for the next 2 hours',
+  'E-05b': 'Decline',
+  'E-06': "Scrapyard deal: a factory closed down and offers its materials 'at a friendly price.'",
+  'E-06a': 'Buy (300 Materials for 200 Funding)',
+  'E-06b': 'Pass',
 };
 
 /** Resolves an ID to its text, filling any `{name}` placeholders (T-10's open-slot

@@ -161,9 +161,13 @@ function resolveConsumer(
  * "reuses the exact same resolution logic as online" (CLAUDE.md rule 6), starvation
  * included (ECONOMY §4b: "offline resolution uses these exact same rules").
  *
- * `modifiers`/`now` (default `[]`/`0`, ECONOMY §4/§5 v3.6): only consulted for Aluminum
- * alloys' Fabrication-consumption modifier — every pre-v3.6 call site that omits them
- * keeps the exact old behavior (no modifiers means no filtering ever matters).
+ * `modifiers`/`now` (default `[]`/`0`, ECONOMY §4/§5 v3.6): consulted for Aluminum alloys'
+ * Fabrication-consumption modifier, NARRATIVE §3 E-04's permanent `salary.flat` add, and
+ * E-01 option B's temporary `production.rate` zero-out ("Halt Production 20 min") —
+ * production only, salaries still deduct normally during a halt (the event says "halt
+ * production," not "furlough staff"), so it scales a SEPARATE delta from salary's own.
+ * Every pre-v3.6 call site that omits `modifiers`/`now` keeps the exact old behavior (no
+ * modifiers means every query here is a no-op).
  */
 export function resolveEconomyTick(
   resources: GameState['resources'],
@@ -176,7 +180,8 @@ export function resolveEconomyTick(
   now = 0,
 ): EconomyTickResult {
   const deltaSec = (deltaMs / 1000) * rateMultiplier;
-  const salaryCost = totalSalaryPerSecond(staff) * deltaSec;
+  const salaryFlatPerSecond = applyModifiers(0, modifiers, 'salary.flat', now);
+  const salaryCost = (totalSalaryPerSecond(staff) + salaryFlatPerSecond) * deltaSec;
   const canPaySalaries = resources.funding.amount >= salaryCost;
 
   if (!canPaySalaries) {
@@ -188,13 +193,15 @@ export function resolveEconomyTick(
     funding = { ...funding, amount: funding.amount - salaryCost };
   }
 
+  const productionDeltaSec = deltaSec * applyModifiers(1, modifiers, 'production.rate', now);
+
   // --- Pure producers (§4b step 2) ---
   const financeAmount =
     productionPerSecond(
       BUILDINGS.finance.production!.basePerSec,
       buildings.finance.level,
       buildingStaffRatio(staff, 'finance', buildings.finance.level, buildings.finance.upgrades),
-    ) * deltaSec;
+    ) * productionDeltaSec;
   funding = applyGrant(funding, financeAmount, false);
 
   const supplyDepotAmount =
@@ -202,7 +209,7 @@ export function resolveEconomyTick(
       BUILDINGS.supplyDepot.production!.basePerSec,
       buildings.supplyDepot.level,
       buildingStaffRatio(staff, 'supplyDepot', buildings.supplyDepot.level, buildings.supplyDepot.upgrades),
-    ) * deltaSec;
+    ) * productionDeltaSec;
   let materials = applyGrant(resources.materials, supplyDepotAmount, false);
 
   const rndAmount =
@@ -210,7 +217,7 @@ export function resolveEconomyTick(
       BUILDINGS.rndLab.production!.basePerSec,
       buildings.rndLab.level,
       buildingStaffRatio(staff, 'rndLab', buildings.rndLab.level, buildings.rndLab.upgrades),
-    ) * deltaSec;
+    ) * productionDeltaSec;
   const research = applyGrant(resources.research, rndAmount, false);
 
   // --- Consumers (§4b step 3): fixed order, Fabrication then Refinery ---
@@ -224,7 +231,7 @@ export function resolveEconomyTick(
     buildings.fabrication,
     staff,
     materials,
-    deltaSec,
+    productionDeltaSec,
     deltaMs,
     fabConsumeMult,
   );
@@ -232,7 +239,7 @@ export function resolveEconomyTick(
   const hardware = creditHardware(resources.hardware, fab.producedAmount, currentHardwareTier(completedTech));
 
   const refConsumeMult = refineryConsumeMultiplier(buildings.refinery.upgrades.includes('recoveryLoop'));
-  const ref = resolveConsumer('refinery', buildings.refinery, staff, materials, deltaSec, deltaMs, refConsumeMult);
+  const ref = resolveConsumer('refinery', buildings.refinery, staff, materials, productionDeltaSec, deltaMs, refConsumeMult);
   materials = ref.materials;
   const propellant = applyGrant(resources.propellant, ref.producedAmount, false);
 

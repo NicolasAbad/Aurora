@@ -17,14 +17,27 @@ import {
   startResearch,
 } from '../core/actions';
 import {
+  emptyPadMissionState,
   launchAuroraMission,
   resolveAuroraTick,
   startAuroraWeatherCheck,
   startNextAuroraStage,
 } from '../core/auroraMission';
 import { resolveCertification } from '../core/certification';
-import { acceptContract, maybeGenerateTierZeroOffer, resolveContractDeadlines } from '../core/contracts';
+import {
+  acceptContract,
+  maybeGenerateSatelliteOffer,
+  maybeGenerateTierZeroOffer,
+  resolveContractDeadlines,
+} from '../core/contracts';
+import {
+  launchContractMission,
+  resolveContractMissionTick,
+  startContractWeatherCheck,
+  startNextContractStage,
+} from '../core/contractMission';
 import { resolveEconomyTick } from '../core/economy';
+import { DEFAULT_EVENTS_STATE, resolveEventChoice, tickEvents } from '../core/events';
 import { applyModifiers, pruneExpiredModifiers } from '../core/modifiers';
 import { OFFLINE_CAP_MS, resolveOffline, type PayrollStoppage } from '../core/offlineResolution';
 import { contextFromState, RECORD_DEFS, resolveRecords } from '../core/records';
@@ -215,17 +228,32 @@ function resolveMissionsContractsAndRecords(
     now,
   );
 
-  const contractsWithOffer = maybeGenerateTierZeroOffer(contracts, launchRailBuilt, now);
-  const deadlineResolution = resolveContractDeadlines(contractsWithOffer, auroraTick.resources, now);
+  // Sprint 9: satellite-contract pads (core/contractMission.ts) resolve independently of
+  // Aurora's own pads — auroraTick.mission already carries any padB Aurora just touched;
+  // this pass only ever advances pads with PadMissionState.contractId set (its own guard).
+  const contractTick = resolveContractMissionTick(
+    auroraTick.mission,
+    buildings,
+    staff,
+    certifications.engines.orbital1,
+    resources.flightxp.amount,
+    completedProcesses,
+  );
+
+  let contractsWithOffers = maybeGenerateTierZeroOffer(contracts, launchRailBuilt, now);
+  const payloadProcessingBuilt = buildings.payloadProcessing.level >= 1;
+  contractsWithOffers = maybeGenerateSatelliteOffer(1, contractsWithOffers, payloadProcessingBuilt, now);
+  contractsWithOffers = maybeGenerateSatelliteOffer(2, contractsWithOffers, payloadProcessingBuilt, now);
+  const deadlineResolution = resolveContractDeadlines(contractsWithOffers, auroraTick.resources, now);
 
   const recordsResolution = resolveRecords(
     records,
     deadlineResolution.resources,
-    contextFromState({ certifications, mission: auroraTick.mission, contracts: deadlineResolution.contracts }),
+    contextFromState({ certifications, mission: contractTick.mission, contracts: deadlineResolution.contracts }),
   );
 
   return {
-    mission: auroraTick.mission,
+    mission: contractTick.mission,
     resources: recordsResolution.resources,
     processes: auroraTick.processes,
     contracts: deadlineResolution.contracts,
@@ -428,6 +456,20 @@ export interface GameActions {
   launchSounding: () => void;
   /** No-ops if the offer doesn't exist, has expired, or is already accepted. */
   acceptContractOffer: (offerId: string) => void;
+  /** ECONOMY §10 v3.6: starts (or continues) `offerId`'s satellite payload build on
+   * `padId`. No-ops if the pad is occupied by anything else, the contract isn't a
+   * currently-accepted tier-1/2 offer, its Reputation/Clean Room prerequisite is unmet
+   * (checked only when starting fresh), or the stage's cost is short. */
+  startContractStage: (padId: PadId, offerId: string) => void;
+  /** No-ops if the pad has no contract-linked mission, its weather item is already done,
+   * or a check is already running. */
+  startContractWeather: (padId: PadId) => void;
+  /** No-ops until the pad's contract-linked checklist has committed a roll (rule 12).
+   * Resolves the already-decided outcome; the contract stays active on failure. */
+  launchContract: (padId: PadId) => void;
+  /** NARRATIVE §3: applies the chosen option's effect to whichever event is currently
+   * pending, then clears it. No-ops if nothing is pending. */
+  resolveEvent: (choice: 'A' | 'B') => void;
   /** Starts (or, for the instant Flight Review, resolves) the next of Aurora I's 8
    * sequential stages on `padId`. No-ops if a stage is already running on this pad, the
    * next stage is "Engines" and Orbital-1 isn't certified yet, or the cost is short. */
@@ -462,10 +504,16 @@ export const useGameStore = create<Store>()((set, get) => ({
     const result = buyBuildingUpgrade(state.resources, state.buildings, buildingId);
     if (result) {
       let seen = state.narrative.seen;
+      let mission = state.mission;
       if (buildingId === 'finance' && result.buildings.finance.level === 1) seen = markSeen(seen, 'N-03');
       if (buildingId === 'testStand' && result.buildings.testStand.level === 1) seen = markSeen(seen, 'N-06');
+      if (buildingId === 'launchPadB' && result.buildings.launchPadB.level === 1) {
+        seen = markSeen(seen, 'N-17'); // Launch Pad B built
+        mission = { ...mission, pads: { ...mission.pads, padB: emptyPadMissionState() } };
+      }
       set({
         ...result,
+        mission,
         telemetry: trackFirstOccurrence(state.telemetry, 'first_building_upgrade', { buildingId }),
         narrative: { ...state.narrative, seen },
       });
@@ -630,6 +678,65 @@ export const useGameStore = create<Store>()((set, get) => ({
     }
   },
 
+  startContractStage: (padId, offerId) => {
+    const state = get();
+    const result = startNextContractStage(
+      state.resources,
+      state.mission,
+      state.contracts,
+      padId,
+      offerId,
+      state.processes,
+      state.buildings,
+      state.research.completed,
+      state.modifiers,
+      Date.now(),
+    );
+    if (result) {
+      set({
+        resources: result.resources,
+        mission: result.mission,
+        processes: result.processes,
+        contracts: result.contracts,
+        telemetry: trackFirstOccurrence(state.telemetry, 'first_contract_stage_started', { padId, offerId }),
+      });
+    }
+  },
+
+  startContractWeather: (padId) => {
+    const state = get();
+    const result = startContractWeatherCheck(state.mission, padId, state.processes, Date.now());
+    if (result) set(result);
+  },
+
+  launchContract: (padId) => {
+    const state = get();
+    const result = launchContractMission(
+      state.resources,
+      state.mission,
+      state.contracts,
+      padId,
+      state.narrative.seen,
+      state.research.completed,
+      Date.now(),
+    );
+    if (result) {
+      set({
+        resources: result.resources,
+        mission: result.mission,
+        contracts: result.contracts,
+        narrative: { ...state.narrative, seen: result.narrativeSeen },
+        telemetry: trackFirstOccurrence(state.telemetry, 'first_contract_launch', { padId }),
+      });
+    }
+  },
+
+  resolveEvent: (choice) => {
+    const state = get();
+    const result = resolveEventChoice(state, choice, Date.now());
+    if (result) set(result);
+  },
+
   startAuroraStage: (padId) => {
     const state = get();
     const result = startNextAuroraStage(
@@ -786,6 +893,27 @@ export const useGameStore = create<Store>()((set, get) => ({
       seen = markSeen(seen, 'N-15'); // Orbital flight tech
     }
 
+    // NARRATIVE §3 (Sprint 9): random events. Online-only — accumulates real "active"
+    // time (warp-scaled, same as everything else this tick), never runs during offline
+    // resolution (core/types.ts's EventsState comment explains why). "Never during
+    // countdown": any pad or the sounding mission currently sitting on a committed roll,
+    // awaiting the launch button.
+    const duringCountdown =
+      Object.values(missionsResolution.mission.pads).some((pad) => pad?.committedRoll !== null) ||
+      missionsResolution.mission.sounding?.committedRoll != null;
+    const eventsTick = tickEvents(
+      state.events ?? DEFAULT_EVENTS_STATE,
+      deltaMs * warp,
+      {
+        refineryBuilt: buildings.refinery.level >= 1,
+        complexBBuilt: missionsResolution.resources.funding.lifetimeEarned >= COMPLEX_B_UNLOCK_FUNDING,
+        hardwareAmount: missionsResolution.resources.hardware.amount,
+        scientistsHired: state.staff.pools.scientist.hired,
+      },
+      duringCountdown,
+      Date.now(),
+    );
+
     set({
       resources: missionsResolution.resources,
       buildings,
@@ -799,6 +927,7 @@ export const useGameStore = create<Store>()((set, get) => ({
       narrative: { ...state.narrative, seen },
       modifiers: researchResolution.modifiers,
       economyFlags: { ...state.economyFlags, payrollUnpaid },
+      events: eventsTick.events,
     });
   },
 }));

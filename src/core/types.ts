@@ -174,6 +174,15 @@ export interface PadMissionState {
   checklist: Record<ChecklistItemId, boolean>;
   confidence: number;
   committedRoll: number | null; // drawn at checklist completion (rule 12); null until then
+  // ECONOMY §10 v3.6 (Sprint 9): which satellite-contract offer (ContractOffer.id) this
+  // pad's current mission is fulfilling. Additive optional (rule 5) — absent/null means
+  // an Aurora-I-class story mission (core/auroraMission.ts), the pre-Sprint-9 default.
+  // Set when core/contractMission.ts starts a payload integration on this pad, cleared
+  // when that mission resolves (success or failure) — a pad can only ever host one
+  // mission (story or contract) at a time, which IS the "pad-queue tension" SPRINTS.md's
+  // acceptance criterion refers to. Aurora's own pad functions skip any pad with this set
+  // (see their own guards); contractMission.ts's functions only ever touch pads with it set.
+  contractId?: string | null;
 }
 
 export interface LaunchRecord {
@@ -226,6 +235,15 @@ export interface MissionState {
   // (CLAUDE.md rule 5) — absent means no pad has ever failed, no migration needed;
   // read as `mission.auroraHalfDurationNext?.[padId] ?? false`.
   auroraHalfDurationNext?: Partial<Record<PadId, boolean>>;
+  // NARRATIVE §3 E-03 option B ("Use it anyway"): -10 Confidence on the NEXT mission's
+  // checklist resolution, any mission kind (sounding/Aurora/contract — whichever commits
+  // a roll next). Additive optional (rule 5). Doesn't fit core/modifiers.ts's shape
+  // (permanent or time-expiring, never "consumed on first use"), so it's a one-shot flag
+  // living here instead, mirroring soundingHalfDurationNext/auroraHalfDurationNext's own
+  // "pending effect for the next mission" pattern. Applied and cleared at the moment a
+  // checklist's committedRoll is drawn (core/soundingMission.ts, core/auroraMission.ts,
+  // core/contractMission.ts) — never redrawn or reapplied after that.
+  confidencePenaltyNext?: number;
 }
 
 export interface EconomyFlags {
@@ -305,6 +323,25 @@ export interface TelemetryEvent {
   props: Record<string, unknown>;
 }
 
+// NARRATIVE §3 / ECONOMY §11 (Sprint 9): random events. "15% check per 10 active min,
+// >=30 min apart, never during countdown" — `activeMsAccumulated` only advances during
+// ONLINE ticks (never offline resolution: a 2-option card popping up unattended makes no
+// sense, and NARRATIVE's "events wait as a pending card, never block play" implies a
+// player has to be there to see one appear). `pending` holds at most one event awaiting a
+// choice; a second 10-min window rolling while one is already pending is a no-op (the
+// card must resolve, or keep waiting, before another can appear) — same "one thing at a
+// time" precedent as research/certification's single in-progress slot.
+export interface PendingEventState {
+  id: string; // matches an EventDef id in data/events.ts (E-01..E-06)
+  triggeredAt: number;
+}
+
+export interface EventsState {
+  activeMsAccumulated: number;
+  lastEventAt: number | null;
+  pending: PendingEventState | null;
+}
+
 export interface GameState {
   schemaVersion: number;
   lastSeenAt: number;
@@ -335,4 +372,8 @@ export interface GameState {
   records: string[];
   narrative: { seen: string[] };
   telemetry: TelemetryEvent[];
+  // Sprint 9, additive optional (rule 5): absent means never checked/no pending event —
+  // read as `state.events ?? { activeMsAccumulated: 0, lastEventAt: null, pending: null }`
+  // at every call site (core/events.ts exports the same default).
+  events?: EventsState;
 }

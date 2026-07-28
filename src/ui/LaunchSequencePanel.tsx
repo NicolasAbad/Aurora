@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../state/persistStore';
 import { canAffordCost } from '../core/actions';
-import { nextAuroraStageId } from '../core/auroraMission';
+import { buildingForPad, nextAuroraStageId } from '../core/auroraMission';
 import { computeConfidenceBreakdown } from '../core/confidence';
 import { AURORA_I_STAGES_BY_ID } from '../data/auroraI';
+import { CONTRACT_TIERS, SATELLITE_BUILD } from '../data/contracts';
 import { formatDuration, formatPercent } from '../core/format';
 import { progressFraction, remainingMs } from '../core/time';
 import { CostLabel } from './CostLabel';
@@ -39,8 +40,13 @@ const CHECKLIST_ORDER: ChecklistItemId[] = [
   'weatherWindow',
 ];
 
-function findPadProcess(processes: Process[], padId: PadId, kind: 'integration' | 'weather_window'): Process | undefined {
-  return processes.find((p) => p.kind === kind && p.payload.missionKind === 'auroraI' && p.payload.padId === padId);
+function findPadProcess(
+  processes: Process[],
+  padId: PadId,
+  kind: 'integration' | 'weather_window',
+  missionKind: 'auroraI' | 'contractPayload',
+): Process | undefined {
+  return processes.find((p) => p.kind === kind && p.payload.missionKind === missionKind && p.payload.padId === padId);
 }
 
 function Ring({ process }: { process: Process }) {
@@ -71,7 +77,7 @@ function NextStageWidget({ padId }: { padId: PadId }) {
   const orbital1Certified = useGameStore((s) => s.certifications.engines.orbital1.certified);
 
   const stageId = nextAuroraStageId(pad.stagesDone);
-  const process = findPadProcess(processes, padId, 'integration');
+  const process = findPadProcess(processes, padId, 'integration', 'auroraI');
   if (process) {
     const stage = AURORA_I_STAGES_BY_ID.get(process.payload.stageId as never);
     return (
@@ -107,11 +113,72 @@ function NextStageWidget({ padId }: { padId: PadId }) {
   );
 }
 
+// ECONOMY §10 v3.6: a contract-linked pad's 4-stage build (payloadIntegration/padTransfer/
+// propellantLoad/flightReview) — mirrors NextStageWidget's shape exactly, against
+// core/contractMission.ts's stage order instead of Aurora's 5-stage VAB table.
+const CONTRACT_STAGE_LABELS: Record<string, string> = {
+  payloadIntegration: 'Payload integration',
+  padTransfer: 'Pad transfer',
+  propellantLoad: 'Propellant load',
+  flightReview: 'Flight review',
+};
+
+function ContractNextStageWidget({ padId, offerId, tier }: { padId: PadId; offerId: string; tier: 1 | 2 }) {
+  const pad = useGameStore(useShallow((s) => s.mission.pads[padId]))!;
+  const processes = useGameStore(useShallow((s) => s.processes));
+  const resources = useGameStore(useShallow((s) => s.resources));
+  const startContractStage = useGameStore((s) => s.startContractStage);
+
+  const process = findPadProcess(processes, padId, 'integration', 'contractPayload');
+  if (process) {
+    const stageId = process.payload.stageId as string;
+    return (
+      <div className="research-node">
+        <div className="research-node__name">In progress: {CONTRACT_STAGE_LABELS[stageId] ?? stageId}</div>
+        <Ring process={process} />
+      </div>
+    );
+  }
+
+  const build = SATELLITE_BUILD[tier];
+  const order = ['payloadIntegration', 'padTransfer', 'propellantLoad', 'flightReview'];
+  const stageId = order.find((id) => !pad.stagesDone.includes(id));
+  if (!stageId) return null; // all 4 stages done
+
+  const cost =
+    stageId === 'payloadIntegration'
+      ? { hardware: build.hardware }
+      : stageId === 'propellantLoad'
+        ? { propellant: build.propellant }
+        : {};
+  const canAfford = canAffordCost(resources, cost, stageId === 'payloadIntegration' ? build.minHardwareTier : undefined);
+
+  return (
+    <div className="research-node">
+      <div className="research-node__name">Next: {CONTRACT_STAGE_LABELS[stageId]}</div>
+      <div className="research-node__cost">
+        <CostLabel cost={cost} />
+        {stageId === 'flightReview' ? ' (instant, free)' : ''}
+      </div>
+      <button
+        type="button"
+        className="upgrade-button"
+        disabled={!canAfford}
+        onClick={() => startContractStage(padId, offerId)}
+      >
+        {stageId === 'flightReview' ? 'Pay' : 'Start'}
+      </button>
+    </div>
+  );
+}
+
 function ConfidenceBreakdownView({ padId }: { padId: PadId }) {
   const [expanded, setExpanded] = useState(false);
   const pad = useGameStore(useShallow((s) => s.mission.pads[padId]))!;
   const engineState = useGameStore(useShallow((s) => s.certifications.engines.orbital1));
-  const serviceTowerBuilt = useGameStore((s) => s.buildings.launchPad.upgrades.includes('serviceTower'));
+  // Launch Pad B (Sprint 9) has its own, separate `upgrades` array — reading
+  // `buildings.launchPad` unconditionally was a real bug once Pad B could exist.
+  const serviceTowerBuilt = useGameStore((s) => s.buildings[buildingForPad(padId)].upgrades.includes('serviceTower'));
   const flightXp = useGameStore((s) => s.resources.flightxp.amount);
 
   const breakdown = computeConfidenceBreakdown({
@@ -143,15 +210,27 @@ function ConfidenceBreakdownView({ padId }: { padId: PadId }) {
   );
 }
 
-function ResultCard({ launch, onDismiss }: { launch: LaunchRecord; onDismiss: () => void }) {
+function ResultCard({ launch, tierReward, onDismiss }: { launch: LaunchRecord; tierReward?: string; onDismiss: () => void }) {
+  const isContract = launch.missionType === 'contract';
+  const headline = isContract
+    ? launch.success
+      ? 'Contract delivered.'
+      : "It didn't make it."
+    : launch.success
+      ? 'Aurora I is flying.'
+      : "It didn't make it.";
+  const detail = isContract
+    ? launch.success
+      ? `Contract fulfilled. Rewards: ${tierReward}.`
+      : 'Recovered 60% of integration Hardware as debris. The contract stays active — rebuild and retry before its deadline. The next integration on this pad runs at half duration.'
+    : launch.success
+      ? 'First orbit. Rewards: +250 Flight XP, +60 Reputation, +2,000 Flight Data.'
+      : 'Recovered 60% of integration Hardware as debris. +200 Flight XP, +1,200 Flight Data. The next integration on this pad runs at half duration.';
+
   return (
     <div className={`launch-result ${launch.success ? 'launch-result--success' : 'launch-result--failure'}`}>
-      <div className="launch-result__headline">{launch.success ? 'Aurora I is flying.' : "It didn't make it."}</div>
-      <div className="launch-result__detail">
-        {launch.success
-          ? 'First orbit. Rewards: +250 Flight XP, +60 Reputation, +2,000 Flight Data.'
-          : 'Recovered 60% of integration Hardware as debris. +200 Flight XP, +1,200 Flight Data. The next integration on this pad runs at half duration.'}
-      </div>
+      <div className="launch-result__headline">{headline}</div>
+      <div className="launch-result__detail">{detail}</div>
       <button type="button" className="upgrade-button" onClick={onDismiss}>
         Continue
       </button>
@@ -160,29 +239,58 @@ function ResultCard({ launch, onDismiss }: { launch: LaunchRecord; onDismiss: ()
 }
 
 /** GDD §7 / UI_SPEC §3.4: the full 8-item Launch Sequence, shown once the VAB exists.
- * Presentation note: the doc's "own full screen... 10->0 countdown" animation is
- * deliberately not built here (Sprint 11 polish territory, same restraint Sprint 6 used
- * for sondas) — pressing the dominant button resolves the already-committed roll (rule
- * 12) immediately and shows its result inline. */
+ * Sprint 9: also hosts satellite-contract missions on the same pad (ECONOMY §10 v3.6 —
+ * "use the full launch checklist with Confidence") — the checklist/Confidence/countdown
+ * chrome is identical either way; only the "what's next to build" widget and the result
+ * copy differ, branched on `pad.contractId`. Presentation note: the doc's "own full
+ * screen... 10->0 countdown" animation is deliberately not built here (Sprint 11 polish
+ * territory, same restraint Sprint 6 used for sondas) — pressing the dominant button
+ * resolves the already-committed roll (rule 12) immediately and shows its result inline. */
 export function LaunchSequencePanel({ padId }: { padId: PadId }) {
   const pad = useGameStore(useShallow((s) => s.mission.pads[padId]));
   const processes = useGameStore(useShallow((s) => s.processes));
   const launches = useGameStore(useShallow((s) => s.mission.launches));
+  const offers = useGameStore(useShallow((s) => s.contracts.offers));
   const startAuroraWeather = useGameStore((s) => s.startAuroraWeather);
   const launchAurora = useGameStore((s) => s.launchAurora);
+  const startContractWeather = useGameStore((s) => s.startContractWeather);
+  const launchContract = useGameStore((s) => s.launchContract);
   const [dismissedLaunchId, setDismissedLaunchId] = useState<string | null>(null);
 
   if (!pad) return null;
 
-  const weatherProcess = findPadProcess(processes, padId, 'weather_window');
+  const isContract = pad.contractId != null;
+  const offer = isContract ? offers.find((o) => o.id === pad.contractId) : undefined;
+  const tier = offer && (offer.tier === 1 || offer.tier === 2) ? offer.tier : null;
+
+  const weatherProcess = findPadProcess(processes, padId, 'weather_window', isContract ? 'contractPayload' : 'auroraI');
   const latestLaunch = [...launches].reverse().find((l) => l.padId === padId);
   const showResult = pad.rocketStatus === 'none' && latestLaunch && latestLaunch.id !== dismissedLaunchId;
+  // ResultCard renders AFTER launchContract has already reset pad.contractId to null, so
+  // the reward text must come from the launch record's own contractId (still present),
+  // never from the live pad state — reading `offer`/`tier` here would always be
+  // undefined by the time a result is actually showing (a real bug this exact ordering
+  // caught during Playwright verification: the card read "Rewards: undefined").
+  const resultOffer =
+    latestLaunch?.missionType === 'contract' && latestLaunch.contractId
+      ? offers.find((o) => o.id === latestLaunch.contractId)
+      : undefined;
+  const resultTier = resultOffer && (resultOffer.tier === 1 || resultOffer.tier === 2) ? resultOffer.tier : null;
+  const tierReward = resultTier
+    ? (() => {
+        const r = CONTRACT_TIERS[resultTier].reward;
+        return `$${r.funding.toLocaleString()}, +${r.reputation} Reputation, +${r.flightxp} Flight XP, +${r.flightData} Flight Data`;
+      })()
+    : undefined;
 
   return (
     <div className="research-panel launch-sequence">
-      <div className="research-panel__header">Launch Sequence — Pad {padId === 'padA' ? 'A' : 'B'}</div>
+      <div className="research-panel__header">
+        Launch Sequence — Pad {padId === 'padA' ? 'A' : 'B'}
+        {isContract && offer ? ` — ${offer.client}` : ''}
+      </div>
       {showResult && latestLaunch ? (
-        <ResultCard launch={latestLaunch} onDismiss={() => setDismissedLaunchId(latestLaunch.id)} />
+        <ResultCard launch={latestLaunch} tierReward={tierReward} onDismiss={() => setDismissedLaunchId(latestLaunch.id)} />
       ) : (
         <>
           <ConfidenceBreakdownView padId={padId} />
@@ -195,11 +303,19 @@ export function LaunchSequencePanel({ padId }: { padId: PadId }) {
             })}
           </div>
           {!pad.checklist.weatherWindow && !weatherProcess && (
-            <button type="button" className="upgrade-button" onClick={() => startAuroraWeather(padId)}>
+            <button
+              type="button"
+              className="upgrade-button"
+              onClick={() => (isContract ? startContractWeather(padId) : startAuroraWeather(padId))}
+            >
               Check weather
             </button>
           )}
-          <NextStageWidget padId={padId} />
+          {isContract && tier && pad.contractId ? (
+            <ContractNextStageWidget padId={padId} offerId={pad.contractId} tier={tier} />
+          ) : (
+            !isContract && <NextStageWidget padId={padId} />
+          )}
           <button
             type="button"
             className="countdown-button"
@@ -208,7 +324,11 @@ export function LaunchSequencePanel({ padId }: { padId: PadId }) {
               if (pad.confidence < 100 && !window.confirm(`Launch at ${formatPercent(pad.confidence)}? Success is not guaranteed.`)) {
                 return;
               }
-              launchAurora(padId);
+              if (isContract) {
+                launchContract(padId);
+              } else {
+                launchAurora(padId);
+              }
             }}
           >
             {pad.committedRoll === null ? 'Complete the checklist' : `Launch at ${formatPercent(pad.confidence)}`}

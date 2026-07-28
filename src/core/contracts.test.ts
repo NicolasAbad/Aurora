@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../data/initialState';
-import { TIER0_CLIENTS } from '../data/contracts';
+import { TIER0_CLIENTS, TIER1_CLIENTS, TIER2_CLIENTS } from '../data/contracts';
 import {
   acceptContract,
   activePendingContracts,
   isOfferPending,
+  maybeGenerateSatelliteOffer,
   maybeGenerateTierZeroOffer,
   resolveContractDeadlines,
 } from './contracts';
@@ -45,6 +46,45 @@ describe('maybeGenerateTierZeroOffer', () => {
     const accepted = acceptContract(first, first.offers[0].id, 100)!;
     const second = maybeGenerateTierZeroOffer(accepted, true, 200);
     expect(second.offers).toHaveLength(2);
+  });
+});
+
+describe('maybeGenerateSatelliteOffer (ECONOMY §10 v3.6, Sprint 9)', () => {
+  it('does nothing before Payload Processing is built, for either tier', () => {
+    expect(maybeGenerateSatelliteOffer(1, contracts(), false, 0).offers).toHaveLength(0);
+    expect(maybeGenerateSatelliteOffer(2, contracts(), false, 0).offers).toHaveLength(0);
+  });
+
+  it('generates one tier-1 offer, 8h rotation, from the tier-1 client pool', () => {
+    const result = maybeGenerateSatelliteOffer(1, contracts(), true, 1000, () => 0);
+    expect(result.offers).toHaveLength(1);
+    expect(result.offers[0]).toMatchObject({ tier: 1, offeredAt: 1000, deadlineMs: 8 * HOUR, client: TIER1_CLIENTS[0] });
+  });
+
+  it('generates one tier-2 offer, 8h rotation, from the tier-2 (constellation) client pool', () => {
+    const result = maybeGenerateSatelliteOffer(2, contracts(), true, 1000, () => 0);
+    expect(result.offers).toHaveLength(1);
+    expect(result.offers[0]).toMatchObject({ tier: 2, offeredAt: 1000, deadlineMs: 8 * HOUR, client: TIER2_CLIENTS[0] });
+  });
+
+  it('tier 1 and tier 2 rotate independently — both can be pending simultaneously', () => {
+    let c = maybeGenerateSatelliteOffer(1, contracts(), true, 0);
+    c = maybeGenerateSatelliteOffer(2, c, true, 0);
+    expect(c.offers).toHaveLength(2);
+    expect(c.offers.map((o) => o.tier).sort()).toEqual([1, 2]);
+  });
+
+  it('does not generate a second tier-1 offer while one is still pending', () => {
+    const first = maybeGenerateSatelliteOffer(1, contracts(), true, 0);
+    const second = maybeGenerateSatelliteOffer(1, first, true, 1000);
+    expect(second.offers).toHaveLength(1);
+  });
+
+  it('generating a tier-2 offer does not touch an already-pending tier-1 offer', () => {
+    const first = maybeGenerateSatelliteOffer(1, contracts(), true, 0);
+    const second = maybeGenerateSatelliteOffer(2, first, true, 0);
+    expect(second.offers).toHaveLength(2);
+    expect(second.offers[0]).toBe(first.offers[0]);
   });
 });
 
