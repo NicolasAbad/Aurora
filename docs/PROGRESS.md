@@ -2266,6 +2266,21 @@ round-tripped through `JSON.stringify` → `importSave` → `loadGame`), and liv
 Settings-screen Playwright pass reported above (pitch to a known value → export → hard
 reset → import → Funding reads the exact pre-export value back).
 
-Next within Sprint 8: private itch.io playtest build — this needs the owner's itch.io
-account/credentials and is a public(-ish), external deployment action, so it's the one
-remaining piece to talk through rather than just do.
+### Sprint 8 status: 7 of 8 tasks closed; NOT closing the sprint yet
+
+Opening sequence, FTUE tooltips, locked-complex verification, milestone call-outs,
+away-modal polish, Settings screen, and save/load + offline regression QA are all done,
+tested, and committed (see the sections above). The private itch.io playtest build was
+offered three ways — prepare-and-hand-off, build-only, or skip — and **the owner chose
+to skip it for now**, explicitly, not by default. Deferred, not forgotten: SPRINTS.md's
+own Sprint 8 acceptance criterion ("a fresh tester reaches Aurora I with no external
+explanation... over a multi-day arc") can't actually be verified without external
+testers, which can't happen without this deploy. Sprint 8 stays open until that
+happens — the 7 completed tasks are real, verified progress, not a claim that the
+sprint itself is done.
+
+327 → 380 tests across this sprint's work (casual sim profile, economy unlock, FTUE
+tooltips, away-modal polish, Settings screen — the offline-process-kinds QA pass added
+no new tests, pure Playwright verification); typecheck/lint/production build clean at
+every commit. No ECONOMY_MODEL value changed outside the explicitly proposed and
+sim-verified v3.6 pricing pass.
