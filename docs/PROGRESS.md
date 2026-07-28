@@ -2302,3 +2302,184 @@ unchanged. Doc versions confirmed: ECONOMY_MODEL.md and NARRATIVE_EVENTS.md both
 v3.6 (the Sprint 8 economy-unlock pass), BACKLOG.md's Campus/Production upgrade set and
 Aluminum alloys both marked SHIPPED against v3.6, UI_SPEC.md unchanged at v3.3 (correctly
 — no UI_SPEC content was part of the economy-unlock pass).
+
+## Sprint 9 — Contracts & events — COMPLETE (2026-07-28)
+
+All 4 SPRINTS.md tasks done and verified through the integrated path (real store, real
+resolution flow, live browser — CLAUDE.md step 5). Owner decision carried in from the
+Sprint 8 close: the private itch.io playtest moves to the LAST planned sprint, not this
+one — so this sprint's own acceptance clauses about triaging tester feedback and asking
+testers the "does the arc sustain interest past Aurora I" question are N/A this cycle,
+not silently dropped (there is no feedback yet to triage). The mechanical clauses —
+pad-queue tension, deadline penalties — are fully built and verified below.
+
+### Doc gap resolved before coding: satellite contract build process (ECONOMY §10 v3.6)
+
+ECONOMY_MODEL §10 gave Aurora I a full 5-stage VAB table (cost + duration per stage) but
+satellite contracts only a lump "Requires: 40 H + 250 P" (tier 1) / "80 H Titanium + 400
+P" (tier 2) — no build duration, no stated Research cost for their flight review. A real
+CLAUDE.md rule-1 gap, not a design call to make silently. Flagged via AskUserQuestion with
+three options; owner picked the recommended one and wrote it into ECONOMY_MODEL.md
+themselves (v3.6, §10): a single "Payload integration" stage (not Aurora I's 5-stage
+breakdown — a routine contract satellite doesn't carry the flagship mission's narrative
+weight), duration scaled to Aurora I's own established Hardware-per-minute density (90 H /
+75 min → 50,000 ms/H: tier 1 ≈ 2,000,000 ms / 33 min 20 s, tier 2 ≈ 4,000,000 ms / 66 min
+40 s), free flight review (0 Research). After integration, the pad reuses Aurora I's
+existing padTransfer (5 min) and propellantLoad timing at each tier's own Propellant
+total. **Minor doc-versioning note, not a content loss:** the owner's edit reused the
+label "v3.6" for this new §10 content — that number was already Sprint 8's economy-unlock
+version. Nothing shipped code depends on was dropped (the Sprint 8 §4/§5 upgrade content
+is still fully present in the file body), just the top-of-file changelog banner no longer
+separately restates the Sprint 8 entry. Flagged per rule 5b, left as the owner wrote it.
+
+### Task 1+2: Payload Processing contracts + full cycle (accept → build → checklist → launch → pay/fail)
+
+**Schema (additive optional, rule 5 — no migration):** `PadMissionState.contractId?:
+string | null` marks which satellite-contract offer (if any) currently owns a pad — this
+IS the pad-queue-tension mechanism: a pad hosts either a story mission or a contract
+mission at a time, enforced by `core/auroraMission.ts`'s own functions now refusing any
+pad with `contractId` set, and `core/contractMission.ts` (new) only ever touching pads
+that already have it set or are fully empty. `MissionState.confidencePenaltyNext?: number`
+(E-03's one-shot "-10 Confidence next launch," see Task 4) — doesn't fit the modifier
+system's permanent/time-expiring shape, so it's a one-shot flag mirroring
+`soundingHalfDurationNext`/`auroraHalfDurationNext`'s existing "pending effect for the
+next mission" pattern, consumed by whichever of the three checklist resolvers
+(sounding/Aurora/contract) commits a roll next.
+
+**`core/contracts.ts`:** `maybeGenerateSatelliteOffer(tier, ...)` generalizes the existing
+tier-0 generator — one dedicated offer slot per tier (not a shared pool), each
+independently rotating every 8h once Payload Processing is built, matching ECONOMY §10's
+own two-row table (each tier has its own client pool, so a shared-pool reading would need
+an invented tier-selection ratio nothing in the docs specifies).
+
+**`core/contractMission.ts` (new):** mirrors `auroraMission.ts`'s shape (start stage /
+apply completed / weather / resolve checklist / launch) end to end for contract-linked
+pads: `startNextContractStage` (fresh-start gates: Reputation, Clean Room + Titanium tier
+for tier 2, pad must be empty; continuing stages skip the fresh-start-only gates),
+`applyCompletedContractStages`, `startContractWeatherCheck` /
+`applyCompletedContractWeather` (same 2-5 min window Aurora uses), `resolveContractChecklist`
+(same 8-item checklist/Confidence/roll-commitment machinery ECONOMY §10 says to reuse —
+`rocketIntegrated` derives from the single payloadIntegration stage instead of Aurora's 5
+VAB sub-stages), `launchContractMission` (success pays ONLY the contract's own tier reward
+— ECONOMY §8 has no separate "satellite launch" base reward the way sondas do, "Contract
+fulfilled" IS the full reward for a satellite contract; failure applies GDD §7b's general
+package scaled off the contract's own reward, contract stays active for retry per §10's
+explicit rule, `padId` cleared so a retry can target any free pad).
+
+**Real bug found and fixed during Playwright verification, not by a unit test:** the
+result card's reward text read "Rewards: undefined" — `launchContractMission` resets
+`pad.contractId` to `null` as part of resetting the pad, but the UI was deriving the
+reward text from the *live* pad's `contractId`, which by the time the result renders is
+already gone. Fixed by deriving it from the just-completed `LaunchRecord`'s own
+`contractId` field instead (present regardless of what the pad's current state is) —
+exactly the class of bug a rendered check catches that a pure-function unit test (which
+tested `launchContractMission`'s return value directly, correctly) wouldn't.
+
+**Generalized bug fix, found while wiring Pad B (Task 3), not scoped to contracts:**
+`core/auroraMission.ts`'s `resolveAuroraChecklist` and `ui/LaunchSequencePanel.tsx`'s
+`ConfidenceBreakdownView` both read `buildings.launchPad.upgrades.includes('serviceTower')`
+unconditionally — correct for padA, silently wrong for padB (a separate BuildingId with
+its own `upgrades` array). New `buildingForPad(padId)` helper (auroraMission.ts, exported)
+fixes both call sites.
+
+### Task 3: Launch Pad B
+
+Building data (base cost, slots, unlock condition `auroraISuccess AND reputation>=40`)
+already existed from earlier work; this sprint wires the actual mechanism: `buyBuilding`
+(persistStore.ts) special-cases `launchPadB` reaching level 1 — same pattern as the
+existing Finance/Test-Stand narrative special-cases — to create `mission.pads.padB` (via
+new `emptyPadMissionState()` export) and mark N-17 seen. Pad B gained its own `serviceTower`
+internal upgrade (same cost/copy as Pad A's — "its own Service Tower purchase," ECONOMY
+§4, not a shared one). UI: `App.tsx`'s `LaunchPanel` renders the Pad B tile once its
+unlock condition is met (UI_SPEC §2b default — hidden until earned, same treatment
+Payload Processing already gets, NOT the tab-level "show once the complex unlocks"
+treatment the other three Launch buildings get, since Pad B's gate is well past the tab's
+own) and mounts a second `<LaunchSequencePanel padId="padB">` once the pad exists — that
+component was already fully padId-parameterized from Sprint 7, so Pad B's own story
+missions and contract missions both work through it for free once its inputs are correct.
+
+### Task 4: Random events (`core/events.ts`, new)
+
+All 6 NARRATIVE §3 events (E-01..E-06) implemented with real mechanical effects, not
+placeholders — `data/events.ts` holds the precondition + effect definitions (content=data,
+rule 3), `core/events.ts` holds the pure resolution logic. `tickEvents` (online-only,
+called from `applyTick` — never offline resolution, since a 2-option card popping up
+unattended makes no sense and NARRATIVE's "never block play" implies a present player)
+accumulates active ms (warp-scaled, same as everything else in that tick), rolls the 15%
+check every 10-min window, respects the >=30 min gap and "never during countdown" (any
+pad or the sounding mission sitting on a committed roll). `resolveEventChoice` applies
+whichever option was picked:
+
+- **E-01 (Surprise inspection):** option A is a straight -5% current-Funding deduction;
+  option B ("Halt production 20 min") registers a real `production.rate` mult-0 Modifier,
+  expiring — required splitting `core/economy.ts`'s `resolveEconomyTick` into two deltas
+  (`deltaSec` for salaries, a new `productionDeltaSec` for producers/consumers) so a
+  production halt doesn't also stop salary deduction, which the event text never claims.
+- **E-02 (Investor offer) / E-06 (Scrapyard deal):** plain resource grants/trades; E-06's
+  Materials purchase silently no-ops if Funding is short (same established
+  insufficient-funds-is-a-no-op pattern as every purchase action in this codebase, not a
+  new mechanic).
+- **E-03 (Defect found):** option A spends up to 15 Hardware (floor 0); option B adds to
+  `mission.confidencePenaltyNext` (see schema note above).
+- **E-04 (Star scientist):** option A grants a free Scientist AND registers a
+  **permanent** `salary.flat` add-Modifier (+0.60 F/s) — required a new query point in
+  `resolveEconomyTick` (`salaryFlatPerSecond = applyModifiers(0, modifiers, 'salary.flat',
+  now)`, added to `totalSalaryPerSecond(staff)`), rule 4's "every bonus is a modifier,
+  never hardcoded" done for real rather than special-cased. Modifier IDs for all
+  event-sourced effects are timestamped, not fixed — NARRATIVE §3 never marks any event
+  one-time, so a later re-fire of the same event stacks its own effect instead of silently
+  no-opping against `registerModifier`'s same-id idempotency guard.
+- **E-05 (Documentary crew):** option A grants +15 Reputation and registers a temporary
+  (2h) `process.duration` mult-1.1 Modifier — required threading a `process.duration`
+  query into every process-starting function that didn't already have one:
+  `startResearch`, `startCertification`, `startPromotion` (core/actions.ts, all gained an
+  optional `modifiers` param, default `[]`, every pre-Sprint-9 call site unaffected),
+  `startSoundingAssembly` (core/soundingMission.ts), and `startNextAuroraStage` /
+  `startNextContractStage` (already modifier-aware, just gained the extra multiply).
+
+**Verification:**
+- 434 tests passing (up from 380 — 24 in `contracts.test.ts`'s new
+  `maybeGenerateSatelliteOffer` block, 18 in new `contractMission.test.ts`, 24 in new
+  `events.test.ts`, 4 new in `auroraMission.test.ts` for the contractId-guard/`buildingForPad`
+  additions, 2 new in `persistStore.test.ts` for Pad B creation and the real-store contract
+  pad-exclusivity check). Typecheck (`tsc -b`), lint, production build all clean; confirmed
+  `time-warp-control`/`dev-reset-button` still absent from the production bundle.
+- `npm run sim` (all three profiles) and the 10-seed/45-day human sweep both reproduce
+  Sprint 8's exact numbers (pacing floor PASS day 5, salary 54.2%→55.0%, Flight Data
+  24.4%/24.7% sonda/satellite, casual unchanged) — expected, since tier-1/2 contracts,
+  events, and Pad B are all post-Aurora-I/optional content the bot doesn't touch, same
+  documented restraint as every prior sprint's additions.
+- Playwright, through a real browser, one continuous pass against an injected
+  post-Aurora-I save (Payload Processing built, Reputation 100, VAB Clean Room owned,
+  Launch Control fully staffed, a pre-injected pending E-06 event): confirmed the event
+  card rendered E-06's real text and resolved on click (card cleared); all three contract
+  tiers (0/1/2) rendered with correct multi-word client names ("National Space Agency",
+  "LinkSphere") and correct requirement/reward text; accepted the tier-1 offer, started
+  the build on Pad A (header live-updated to "Launch Sequence — Pad A — National Space
+  Agency"); confirmed Aurora's own `startAuroraStage` action refuses that pad (pad-queue
+  tension, live, through the real store); drove the full 4-stage build (payload
+  integration → pad transfer → propellant load → free flight review) plus the weather
+  check via dev time-warp; checklist reached all 8 ✓, Confidence 100%, launched — result
+  card correctly read "Contract fulfilled. Rewards: $3,000, +10 Reputation, +60 Flight XP,
+  +600 Flight Data" (exactly `CONTRACT_TIERS[1].reward`) after the bug fix above; Mission
+  Log showed N-14 ("First satisfied customer..."). A **second** random event (E-01)
+  fired organically mid-run — unplanned but valuable confirmation that `tickEvents`' real
+  15%-per-10-active-min roll works through actual gameplay, not just the pre-injected
+  path. Built Launch Pad B live (funds were suffient after switching warp back to x1 —
+  the mid-run funding dip during the x600-warped build was ordinary warp-scaled salary
+  drain against an intentionally understaffed Finance in the test save, not a bug; see
+  the standing memory on this exact class of timing trap) and confirmed its own Launch
+  Sequence — Pad B panel mounted. Zero console errors across the entire pass.
+
+**Scope notes:**
+- `sim/run.ts` is unchanged — it still only models tier-0 contracts, same documented
+  restraint as every optional/late-game system before it (the economy-unlock upgrades,
+  Auto-refuel, etc.). Tiers 1/2's reward data was already present in the sim's own tables
+  from Sprint 6, unused until a future sprint's bot policy decides to spend it.
+- Offline resolution's existing per-gap (not per-chunk) modifier-expiry granularity
+  (`resolveOffline` checks `Modifier.expiresAt` once against the post-gap `now`, not at
+  each 1-minute chunk) means a temporary event modifier (E-01's 20-min halt, E-05's 2h
+  duration bump) that expires PARTWAY through a long offline gap is treated as fully
+  expired for the whole gap rather than partially applied — a pre-existing architectural
+  characteristic of the offline chunking system, not a Sprint 9 regression, and out of
+  this sprint's scope to redesign.
