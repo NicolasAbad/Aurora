@@ -2,10 +2,10 @@
 // Dev-only: nothing under /src imports from /sim, so it never reaches the production
 // bundle (CLAUDE.md rule 11 — env-gating is structural here, not a runtime flag).
 //
-// Runs TWO bot profiles against the real formulas in core/economy.ts and the real
+// Runs THREE bot profiles against the real formulas in core/economy.ts and the real
 // building data in data/buildings.ts, at accelerated time (1 simulated minute per
-// step), and reports both — because a single always-on bot can't tell you whether the
-// ECONOMY is paced right or the bot is just superhuman:
+// step), and reports all three — because a single always-on bot can't tell you whether
+// the ECONOMY is paced right or the bot is just superhuman:
 //   - "optimal": the original Sprint 0 bot — always on, re-evaluates spending every
 //     15 simulated minutes around the clock. An upper bound, not a target.
 //   - "human": 3 active sessions/day of ~20 min each (manual actions — pitch, Funding
@@ -13,20 +13,33 @@
 //     day resolves like the game's own offline rule (ECONOMY §11: resources AND
 //     salaries at 60%, capped at 10h/16h-with-Remote-Ops; process TIMERS still run at
 //     100% regardless — research, certification, sonda assembly, VAB stages, contracts).
+//     SPRINTS.md Sprint 0: "the profile all targets are stated against."
+//   - "casual" (SPRINTS.md Sprint 0, task 5 — specified since Sprint 0, never actually
+//     built until now, flagged as a known gap through the Sprint 7.5 follow-up): ONE
+//     ~30 min session/day. "The realistic once-daily player who will hit the 16h offline
+//     ceiling every day" — a ~23.5h gap between sessions always exceeds even the
+//     Remote-Ops-extended 16h offline cap, so this profile always loses some production
+//     to the cap, every single day. Per spec this is "instrumentation only, reports lost
+//     production" — it carries NO salary-band/Flight-Data/pacing-floor-or-ceiling target
+//     (those are stated against "human" only); instead each day tracks how much time sat
+//     past the offline cap earning nothing, plus what passive Funding/Research would have
+//     accrued in that dead window at the normal 60% offline rate had the cap not applied
+//     (a reporting-only estimate, never granted to the bot's actual resources).
 //
 // Emits a day-by-day CSV per profile (each row tagged with its era — preFlight/sonda/
 // satellite, see classifyEra()) and checks the ECONOMY_MODEL.md sanity rules:
-//   - salaries = 30-55% of passive Funding income, sampled at 5 arc checkpoints
+//   - salaries = 30-55% of passive Funding income, sampled at 5 arc checkpoints (human)
 //   - Flight Data = 20-35% of Research income, checked separately for the sonda and
 //     satellite eras (ECONOMY §8 v2.3 — pre-flight is reported too but has no target,
-//     it's lab-only by construction)
+//     it's lab-only by construction) (human)
 //   - pacing floor (ECONOMY §8 v2.3, codified after the day-5 human result was
 //     accepted): the "human" profile must not reach Aurora I before simulated day 5.
 //     Always reported (PASS/FAIL) in printSummary(); a loud FLAG line in main() on
 //     failure. "human" is an efficient lower bound (no FTUE friction, no mistakes, no
 //     launch failures) — real players will be slower; revisit with real testers at
 //     Sprint 8, not before.
-// plus days-to-Aurora-I for both profiles (docs/PROGRESS.md carries the comparison).
+// plus days-to-Aurora-I for all three profiles (docs/PROGRESS.md carries the comparison;
+// "casual" is reported alongside but not held to human's targets, per spec).
 //
 // Certification and Aurora I values aren't owned by any core/ or data/ module yet (those
 // land in Sprint 7) so they're transcribed here directly from ECONOMY_MODEL §6-§7.
@@ -270,20 +283,24 @@ const RECORDS = {
 } as const;
 
 // ---------------------------------------------------------------------------
-// "Human" profile session schedule (sim-only methodology, see header note)
+// Session-based profiles' schedules (sim-only methodology, see header note)
 // ---------------------------------------------------------------------------
-type Profile = 'optimal' | 'human';
-const SESSION_START_HOURS = [7, 14, 21]; // 3 sessions/day, ~8h apart
+type Profile = 'optimal' | 'human' | 'casual';
+const SESSION_START_HOURS = [7, 14, 21]; // human: 3 sessions/day, ~8h apart
 const SESSION_DURATION_MS = 20 * MIN;
+const CASUAL_SESSION_START_HOURS = [19]; // casual: one evening check-in/day
+const CASUAL_SESSION_DURATION_MS = 30 * MIN;
 const OFFLINE_RATE = 0.6; // ECONOMY §11
 const OFFLINE_CAP_MS_BASE = 10 * HOUR;
 const OFFLINE_CAP_MS_EXTENDED = 16 * HOUR; // with Remote Ops tech
 
-function isInSession(nowMs: number): boolean {
+function isInSession(nowMs: number, profile: 'human' | 'casual'): boolean {
   const timeOfDayMs = nowMs % DAY_MS;
-  return SESSION_START_HOURS.some((h) => {
+  const starts = profile === 'human' ? SESSION_START_HOURS : CASUAL_SESSION_START_HOURS;
+  const durationMs = profile === 'human' ? SESSION_DURATION_MS : CASUAL_SESSION_DURATION_MS;
+  return starts.some((h) => {
     const start = h * HOUR;
-    return timeOfDayMs >= start && timeOfDayMs < start + SESSION_DURATION_MS;
+    return timeOfDayMs >= start && timeOfDayMs < start + durationMs;
   });
 }
 
@@ -371,6 +388,12 @@ interface SimState {
     researchFromLab: number;
     researchFromFlightData: number;
     payrollUnpaidMs: number;
+    // "casual" profile only (see header note): time spent past the offline cap earning
+    // zero, plus what passive Funding/Research WOULD have accrued in that dead window at
+    // the normal 60% offline rate had the cap not applied — reporting-only, never granted.
+    lostProductionMs: number;
+    lostFundingEstimate: number;
+    lostResearchEstimate: number;
     notes: string[];
   };
 }
@@ -388,6 +411,9 @@ function freshDayAccumulator(): SimState['day'] {
     researchFromLab: 0,
     researchFromFlightData: 0,
     payrollUnpaidMs: 0,
+    lostProductionMs: 0,
+    lostFundingEstimate: 0,
+    lostResearchEstimate: 0,
     notes: [],
   };
 }
@@ -538,6 +564,16 @@ function passiveFundingRate(state: SimState): number {
   const required = def.slots!.technician!;
   const assigned = Math.min(state.staffHired.technician, required);
   return productionPerSecond(def.production!.basePerSec, level, assigned / required || 0);
+}
+
+// Factored out so the "casual" profile's lost-production estimate (tick(), step 2) can
+// reuse the exact same rate the real passive-production step (tick(), step 4) grants —
+// same pattern as passiveFundingRate() above.
+function rndLabRate(state: SimState): number {
+  const def = BUILDINGS.rndLab;
+  const required = def.slots!.scientist!;
+  const assigned = Math.min(state.staffHired.scientist, required);
+  return productionPerSecond(def.production!.basePerSec, state.buildingLevel.rndLab, assigned / required || 0);
 }
 
 // ---------------------------------------------------------------------------
@@ -1117,7 +1153,7 @@ function tick(state: SimState, profile: Profile): void {
     active = true; // always-on bot, no session/offline concept
     rateMultiplier = 1;
   } else {
-    active = isInSession(state.nowMs);
+    active = isInSession(state.nowMs, profile);
     if (active) {
       state.offlineElapsedMs = 0;
       rateMultiplier = 1;
@@ -1129,7 +1165,19 @@ function tick(state: SimState, profile: Profile): void {
       // Beyond the offline cap, ECONOMY §11 doesn't say gains/losses keep accruing at a
       // reduced rate forever — the cap is what bounds "While you were away." Treated
       // here as a hard stop (rate 0) past the cap, resuming at the next session.
-      rateMultiplier = state.offlineElapsedMs <= offlineCap ? OFFLINE_RATE : 0;
+      if (state.offlineElapsedMs <= offlineCap) {
+        rateMultiplier = OFFLINE_RATE;
+      } else {
+        rateMultiplier = 0;
+        // "casual" instrumentation (SPRINTS.md Sprint 0: "reports lost production") —
+        // this branch is also reachable by "human" in principle, but its 8h max gap
+        // between sessions never exceeds even the base 10h cap, so it's a no-op there in
+        // practice. Estimate, not a grant: what passive Funding/Research would have
+        // accrued this tick at the normal offline rate had the cap not applied.
+        state.day.lostProductionMs += TICK_MS;
+        state.day.lostFundingEstimate += passiveFundingRate(state) * dtSec * OFFLINE_RATE;
+        state.day.lostResearchEstimate += rndLabRate(state) * dtSec * OFFLINE_RATE;
+      }
     }
   }
 
@@ -1169,17 +1217,7 @@ function tick(state: SimState, profile: Profile): void {
     grant(state, 'funding', financeAmount, false);
     state.day.fundingFromPassive += financeAmount;
 
-    const rndAmount =
-      productionPerSecond(
-        BUILDINGS.rndLab.production!.basePerSec,
-        state.buildingLevel.rndLab,
-        state.staffHired.scientist > 0
-          ? Math.min(state.staffHired.scientist, BUILDINGS.rndLab.slots!.scientist!) /
-              BUILDINGS.rndLab.slots!.scientist!
-          : 0,
-      ) *
-      dtSec *
-      rateMultiplier;
+    const rndAmount = rndLabRate(state) * dtSec * rateMultiplier;
     grant(state, 'research', rndAmount, false);
     state.day.researchFromLab += rndAmount;
 
@@ -1282,6 +1320,9 @@ interface DayRow {
   researchFromFlightData: number;
   flightDataSharePct: string;
   payrollUnpaidMin: number;
+  lostProductionMin: number;
+  lostFundingEstimate: number;
+  lostResearchEstimate: number;
   notes: string;
 }
 
@@ -1346,6 +1387,9 @@ function runSimulation(profile: Profile, seed: number = SEED, days: number = DAY
         flightDataSharePct:
           totalResearch > 0 ? ((state.day.researchFromFlightData / totalResearch) * 100).toFixed(1) : 'n/a',
         payrollUnpaidMin: Math.round(state.day.payrollUnpaidMs / MIN),
+        lostProductionMin: Math.round(state.day.lostProductionMs / MIN),
+        lostFundingEstimate: Math.round(state.day.lostFundingEstimate),
+        lostResearchEstimate: Math.round(state.day.lostResearchEstimate),
         notes: state.day.notes.join('; '),
       });
       state.day = freshDayAccumulator();
@@ -1430,6 +1474,28 @@ function printSummary({ profile, rows, state, outPath, seed, days }: SimulationR
       `\nPacing floor (human must not reach Aurora I before day 5): ${
         floorOk ? 'PASS' : 'FAIL'
       }${state.auroraILaunchedDay !== null ? ` (reached day ${state.auroraILaunchedDay})` : ' (not reached)'}`,
+    );
+  }
+
+  // SPRINTS.md Sprint 0 task 5: "casual"... "instrumentation only, reports lost
+  // production" — no salary-band/Flight-Data/pacing target applies to this profile (those
+  // are stated against "human" only); this section is its whole purpose.
+  if (profile === 'casual') {
+    const totalLostMin = rows.reduce((s, r) => s + r.lostProductionMin, 0);
+    const totalLostFunding = rows.reduce((s, r) => s + r.lostFundingEstimate, 0);
+    const totalLostResearch = rows.reduce((s, r) => s + r.lostResearchEstimate, 0);
+    const avgLostHoursPerDay = totalLostMin / 60 / rows.length;
+    console.log(
+      `\nLost production (time past the offline cap, earning nothing — no target, reporting only):`,
+    );
+    console.log(
+      `  Average: ${avgLostHoursPerDay.toFixed(1)}h/day lost to the offline cap ` +
+        `(a ~23.5h daily gap always exceeds even the Remote-Ops 16h cap)`,
+    );
+    console.log(
+      `  Total over ${rows.length} days: ${(totalLostMin / 60).toFixed(0)}h lost; ` +
+        `estimated foregone passive income: ${totalLostFunding} Funding, ${totalLostResearch} Research ` +
+        `(what the normal 60% offline rate would have granted in that dead window, had the cap not applied)`,
     );
   }
   console.log('');
@@ -1579,15 +1645,18 @@ function runSweep(): void {
 function main(): void {
   const optimal = runSimulation('optimal');
   const human = runSimulation('human');
+  const casual = runSimulation('casual');
 
   printSummary(optimal);
   printSummary(human);
+  printSummary(casual);
 
   console.log('=== Profile comparison ===');
   const fmt = (r: SimulationResult) =>
     r.state.auroraILaunched ? `day ${r.state.auroraILaunchedDay}` : `not reached within ${r.days} days`;
   console.log(`  Days to Aurora I — optimal: ${fmt(optimal)}`);
   console.log(`  Days to Aurora I — human:   ${fmt(human)}`);
+  console.log(`  Days to Aurora I — casual:  ${fmt(casual)} (informational only — no target; see its own "Lost production" report above)`);
 
   // Codified pacing floor (ECONOMY §8 v2.3): report the fact, don't act on it. No
   // ECONOMY value is touched by this simulator, ever — see printSummary()'s per-profile
