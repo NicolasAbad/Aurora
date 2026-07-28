@@ -2207,5 +2207,65 @@ explicit `page.reload()` instead of `addInitScript`.
   round-trip, live; fed garbage text to the importer and got the correct "not valid
   JSON" error message, save left untouched. Zero console errors across the entire pass.
 
-Next within Sprint 8: save/load + offline regression QA across every process kind,
-private itch.io playtest build.
+### Save/load + offline regression QA across every process kind (SPRINTS.md task 6)
+
+**No app code changed by this pass** — pure verification, and the one discrepancy it
+surfaced was in the test data, not the app (detailed below).
+
+**Scoped the matrix first, not guessed at it:** `core/types.ts`'s `ProcessKind` union
+lists 7 kinds, but grepped the codebase and confirmed `'transfer'` and `'contract_build'`
+are never actually instantiated anywhere — reserved values with no real code path
+(matches `ActiveProcessStrip.tsx`'s own comment: "no current UI consumer"; pad transfer
+is really implemented as an `integration`/`auroraI` stage, and contracts have no
+process-backed "build" step). So the real matrix is 5 reachable kinds: research,
+certification, training (promotion), integration+weather_window (sounding),
+integration+weather_window (Aurora I).
+
+**Verification, in two Playwright passes through the real `computeBootOffline` path (not
+isolated unit calls — the acceptance-verification rule):**
+- The away-modal polish pass (already reported above) incidentally covered
+  research + certification: a save with both mid-process and a 2h offline gap showed
+  both completing correctly, their labels appearing in "Finished while you were away,"
+  and the paired Program Record backfilling correctly.
+- A dedicated pass for the remaining three: one injected save with a promotion,
+  an S-1 sounding assembly + weather check, and an Aurora I stage (`structure`) all
+  in progress simultaneously, 2h offline. All four processes resolved (the away modal
+  listed "Promoted: Technician → Engineer," "Assembled: S-1 sounding rocket," "Weather
+  window opened," "Aurora I: Structure complete"), and — checked past the modal's own
+  labels, against the actual saved state after a forced manual save — `staff.pools`
+  showed the promotion's real effect (engineer +1), the sounding checklist showed
+  `assembled`/`weatherWindow`/`propellantReady` all true, Aurora's `padA.stagesDone`
+  included `"structure"`, and the processes array was empty (nothing left dangling).
+  Zero console errors.
+
+**One real discrepancy found and resolved — in the test data, not the app:** the first
+run of the second pass showed the away modal correctly reporting "Assembled"/"Weather
+window opened," but the actual sounding checklist stayed `false` for both. Traced to
+`core/soundingMission.ts`'s `applyCompletedSoundingProcesses`, which matches a completed
+process to a checklist item via `payload.checklistItem` — a field my hand-built test
+save never set. Confirmed against the real process-creation code
+(`startSoundingAssembly`/`startSoundingWeatherCheck`) that it DOES set
+`checklistItem: 'assembled'`/`'weatherWindow'` correctly; fixed the test's injected
+payload to match, re-ran, all four values matched expectations exactly. A second,
+smaller test-authoring slip in the same pass: my own comment predicted the promotion
+would zero out `technician.hired` on completion — wrong; `startPromotion` already
+removes the unit the moment the promotion STARTS (not at completion), so the save's
+`technician: 1` was already the post-deduction count, and completion should only (and
+did) increment `engineer`. Corrected the expectation, not the app.
+
+**Save/load regression on every system:** already covered by existing
+`persistStore.test.ts` round-trip tests (research, certification, modifiers pruning, the
+Sprint 7 roll-commitment regression) plus this sprint's new `importSave` tests. Since
+`saveGame`/`loadGame` serialize the whole `GameState` generically (no per-field logic
+beyond migration and modifier pruning, both already tested), no additional per-field
+tests were added — that would be re-testing `JSON.stringify`/`parse`, not app behavior.
+
+**Export→wipe→import round-trip:** covered twice over — automated in
+`persistStore.test.ts`'s `importSave` tests (a full `createInitialState()`-based save
+round-tripped through `JSON.stringify` → `importSave` → `loadGame`), and live via the
+Settings-screen Playwright pass reported above (pitch to a known value → export → hard
+reset → import → Funding reads the exact pre-export value back).
+
+Next within Sprint 8: private itch.io playtest build — this needs the owner's itch.io
+account/credentials and is a public(-ish), external deployment action, so it's the one
+remaining piece to talk through rather than just do.
