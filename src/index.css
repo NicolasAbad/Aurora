@@ -132,6 +132,37 @@ body {
   }
 }
 
+/* UI_SPEC §4 (v3.6): "Milestones: small non-blocking call-out card (title + one Mission
+ * Log line), auto-dismisses" — Program Records (GDD §8's "Micro-milestones"). Sits
+ * below the tier-toast's fixed position so the two never overlap if both fire close
+ * together (rare, but both are timestamp-independent one-time events). */
+.milestone-callout {
+  position: fixed;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  padding: 10px 16px;
+  font-size: 0.9em;
+  z-index: 199;
+  max-width: 360px;
+  text-align: center;
+  animation: tier-toast-fade 5s ease-in-out forwards;
+}
+
+.milestone-callout__title {
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.milestone-callout__line {
+  margin-top: 4px;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
 /* UI_SPEC §3.4/NARRATIVE §9 (T-16/T-17): dismissible first-entry tooltip banner. */
 .first-entry-tip {
   display: flex;

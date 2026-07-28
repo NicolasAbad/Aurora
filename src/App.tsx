@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { Ticker } from './ui/Ticker';
 import { ComplexTabs } from './ui/ComplexTabs';
 import { BuildingTile } from './ui/BuildingTile';
@@ -21,9 +22,11 @@ import { DevResetButton } from './ui/DevResetButton';
 import { useGameStore } from './state/persistStore';
 import { formatCost } from './core/format';
 import { isUnlockConditionMet, unlockContextFromState } from './core/unlockConditions';
+import { nextFtueTooltip } from './core/ftue';
+import { RECORD_DEFS } from './core/records';
 import { narrativeText } from './data/narrative';
 import { BUILDINGS } from './data/buildings';
-import type { ComplexId } from './core/types';
+import type { ComplexId, RecordId } from './core/types';
 
 const RUSH_ORDER_COST_FUNDING = 150; // ECONOMY §2
 const CAMPUS_FINANCE_REVEAL_FUNDING = 150; // UI_SPEC §2d step 2
@@ -168,7 +171,14 @@ function LaunchPanel({
   onSelectComplex,
   tipDismissed,
   onDismissTip,
-}: ComplexPanelProps & { tipDismissed: boolean; onDismissTip: () => void }) {
+  checklistTipDismissed,
+  onDismissChecklistTip,
+}: ComplexPanelProps & {
+  tipDismissed: boolean;
+  onDismissTip: () => void;
+  checklistTipDismissed: boolean;
+  onDismissChecklistTip: () => void;
+}) {
   const vabLevel = useGameStore((s) => s.buildings.vab.level);
 
   return (
@@ -181,9 +191,33 @@ function LaunchPanel({
         <BuildingTile buildingId="launchControl" />
         <BuildingTile buildingId="trackingStation" />
       </div>
+      {/* T-06 (NARRATIVE §2): "Launch checklist" is a screen-mount moment, not a
+          game-state predicate — same FirstEntryTip treatment as T-16/T-17, tied to the
+          checklist panel's own reveal condition (core/ftue.ts's header note). */}
+      {vabLevel >= 1 && (
+        <FirstEntryTip id="T-06" dismissed={checklistTipDismissed} onDismiss={onDismissChecklistTip} />
+      )}
       {vabLevel >= 1 && <LaunchSequencePanel padId="padA" />}
     </>
   );
+}
+
+/** SPRINTS.md Sprint 8, task 1: contextual one-time tooltips (NARRATIVE §2, T-01..T-05/
+ * T-07..T-09 — T-06 is LaunchPanel's own FirstEntryTip, see core/ftue.ts's header note).
+ * Global slot (not tied to any one complex) since several of these moments — "Start,"
+ * "afford your first hire," "a timer is running" — aren't specific to whichever tab
+ * happens to be open. At most one shows at a time (core/ftue.ts's nextFtueTooltip picks
+ * the highest-priority unseen-and-true one); dismissing it naturally reveals the next. */
+function GlobalFtueTooltip({
+  dismissed,
+  onDismiss,
+}: {
+  dismissed: ReadonlySet<string>;
+  onDismiss: (id: string) => void;
+}) {
+  const nextId = useGameStore((s) => nextFtueTooltip(s, dismissed));
+  if (!nextId) return null;
+  return <FirstEntryTip id={nextId} dismissed={false} onDismiss={() => onDismiss(nextId)} />;
 }
 
 /** UI_SPEC §4 (v3.5): "the instant a new Hardware tier is researched... a one-time toast
@@ -209,6 +243,49 @@ function TierChangeToast() {
   return <div className="tier-toast">{narrativeText('T-14')}</div>;
 }
 
+/**
+ * UI_SPEC §4: "Milestones: small non-blocking call-out card (title + one Mission Log
+ * line), auto-dismisses." Read as Program Records (GDD §8 literally calls them
+ * "Micro-milestones," displayed on the Records board) — the strongest textual match
+ * for "milestone" anywhere in the docs; flagged here rather than silently assumed, in
+ * case the intended reading was complex-unlock events instead (SPRINTS.md groups this
+ * task with "locked complexes," which is the other plausible reading). Title = the
+ * record's name (core/records.ts's RECORD_DEFS); the "one Mission Log line" is the
+ * most recently added narrative.seen entry — records and their co-occurring Mission Log
+ * beat almost always land in the same tick (e.g. firstOrbit + N-11), though the pairing
+ * isn't a declared relationship anywhere in the code, so this degrades gracefully to
+ * title-only when nothing new landed in narrative.seen the same render.
+ */
+function MilestoneCallout() {
+  const records = useGameStore(useShallow((s) => s.records));
+  const seen = useGameStore(useShallow((s) => s.narrative.seen));
+  const prevRecordsRef = useRef(records);
+  const prevSeenRef = useRef(seen);
+  const [callout, setCallout] = useState<{ title: string; line: string | null } | null>(null);
+
+  useEffect(() => {
+    const newRecordIds = records.filter((id) => !prevRecordsRef.current.includes(id));
+    const newSeenIds = seen.filter((id) => !prevSeenRef.current.includes(id));
+    prevRecordsRef.current = records;
+    prevSeenRef.current = seen;
+
+    if (newRecordIds.length === 0) return;
+    const recordId = newRecordIds[newRecordIds.length - 1] as RecordId;
+    const line = newSeenIds.length > 0 ? narrativeText(newSeenIds[newSeenIds.length - 1]) : null;
+    setCallout({ title: RECORD_DEFS[recordId].name, line });
+    const t = setTimeout(() => setCallout(null), 5000);
+    return () => clearTimeout(t);
+  }, [records, seen]);
+
+  if (!callout) return null;
+  return (
+    <div className="milestone-callout">
+      <div className="milestone-callout__title">{callout.title}</div>
+      {callout.line && <div className="milestone-callout__line">{callout.line}</div>}
+    </div>
+  );
+}
+
 export function App() {
   const [activeComplex, setActiveComplex] = useState<ComplexId>('campus');
   const [dismissedTips, setDismissedTips] = useState<Set<string>>(new Set());
@@ -218,6 +295,7 @@ export function App() {
     <div className="app">
       <AwayModal />
       <TierChangeToast />
+      <MilestoneCallout />
       {__DEV_TOOLS__ && (
         <div className="dev-tools-row">
           <TimeWarpControl />
@@ -227,6 +305,7 @@ export function App() {
       <Ticker />
       <ActiveProcessStrip onSelectComplex={setActiveComplex} />
       <PayrollBanner />
+      <GlobalFtueTooltip dismissed={dismissedTips} onDismiss={dismissTip} />
       <ComplexTabs active={activeComplex} onSelect={setActiveComplex} />
       <main className="complex-panel">
         {activeComplex === 'campus' && <CampusPanel onSelectComplex={setActiveComplex} />}
@@ -243,6 +322,8 @@ export function App() {
             onSelectComplex={setActiveComplex}
             tipDismissed={dismissedTips.has('T-17')}
             onDismissTip={() => dismissTip('T-17')}
+            checklistTipDismissed={dismissedTips.has('T-06')}
+            onDismissChecklistTip={() => dismissTip('T-06')}
           />
         )}
       </main>

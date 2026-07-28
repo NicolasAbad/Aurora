@@ -4,7 +4,7 @@
 // is transcribed here in full now that Sprint 5 builds the Mission Log — but only
 // N-01..N-08 have a real TRIGGER wired anywhere in the code yet (see markSeen call
 // sites); N-09 onward sit ready, unwired, for whichever sprint builds VAB/Aurora I/
-// contracts/Pad B. T-01..T-09 FTUE tooltips are added with Sprint 8's tooltip system.
+// contracts/Pad B. T-01..T-09 FTUE tooltips are wired in Sprint 8 (core/ftue.ts + App.tsx).
 export const NARRATIVE_TEXT: Record<string, string> = {
   // §1 — Mission Log scripted beats (by trigger)
   'N-01': 'You pitched your idea at a bar. Someone covered the tab out of pity. That counts as investment.',
@@ -26,6 +26,18 @@ export const NARRATIVE_TEXT: Record<string, string> = {
   'N-15': 'Orbit. The word that sounded like science fiction back at that bar is now a line item in the quarterly plan.',
   'N-16': 'Aurora II completed its third pass around Earth. In the control room: silence. Then the roar. Next stop: sending people.',
   'N-17': 'A second pad. The field where the inspector once frowned at your Refinery now has two towers against the sky. The program is no longer a bet — it’s a place.',
+  // §2 (v3.6) — FTUE tooltips (shown once, dismissible). Triggers wired in core/ftue.ts
+  // (T-01..T-05/T-07..T-09) and LaunchPanel/App.tsx (T-06, a screen-mount moment, same
+  // FirstEntryTip treatment as T-16/T-17 — see core/ftue.ts's own header note).
+  'T-01': 'Pitch your idea to raise your first funding.',
+  'T-02': 'You can afford your first technician now.',
+  'T-03': 'Assign them to Finance — they’ll raise funds even while you’re away.',
+  'T-04': 'Processes keep running even when the game is closed.',
+  'T-05': 'Storage is full. Expanding the Warehouse prevents wasted production.',
+  'T-06': 'Every green item brings you closer to liftoff. Confidence shows your odds of success.',
+  'T-07': 'Payroll is unpaid — staffed buildings are on hold. Raise Funding (pitch!) and work resumes.',
+  'T-08': 'Aurora I will need 400 Propellant on board. Your Depot holds 250 per level — plan the expansion.',
+  'T-09': 'The Lab needs a Scientist. Build Crew Quarters, add the Classroom, and promote your way up: Technician → Engineer → Scientist.',
   // §6 — building upgrade descriptions (every purchasable states its effect BEFORE purchase)
   'U-01':
     'Train your people to change roles: Technician → Engineer → Scientist. Required before any promotion — and the only path to your first Scientist.',

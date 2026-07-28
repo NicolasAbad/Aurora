@@ -1970,6 +1970,87 @@ CLAUDE.md's step 5 asks for a rendered check on every UI-touching sprint.
   the active-process strip showed both as separate chips (4 total "Researching:"
   mentions on the page: 2 header + 2 strip). Zero console errors throughout.
 
-Next within Sprint 8: opening sequence + contextual tooltips, locked-complex call-outs,
-away-modal polish, Settings screen, save/load + offline regression QA, private itch.io
-playtest build.
+### Opening sequence, FTUE tooltips, locked complexes, milestone call-outs (SPRINTS.md task 1-2)
+
+**"First decision <30s" (GDD §11):** already a property of the existing pitch/hire flow
+(Sprint 1) — no artificial gate stands between load and a first hire. Confirmed, not
+rebuilt: a Playwright pass drove pitch → dismiss T-01 → pitch to Finance's 150-lifetime
+reveal → buy Finance → hire, all unobstructed by any modal or blocking UI.
+
+**Locked complexes greyed with visible conditions:** already satisfied since Sprint 0/
+the v2.6 progressive-disclosure pass (`ComplexTabs.tsx` — disabled tab + condition text
++ `title` attribute). Verified still holds via the existing `ComplexTabs.test.tsx` suite
+and live inspection; no code change needed here.
+
+**Contextual FTUE tooltips (NARRATIVE §2, T-01..T-09) — genuinely new, first wiring
+ever.** `docs/narrative.ts`'s own header comment had said "T-01..T-09 are added with
+Sprint 8's tooltip system" since Sprint 7.5 — confirmed by grep that none of the nine
+existed in `NARRATIVE_TEXT` at all before this pass. Built:
+- `core/ftue.ts` (new): `ftueTooltipCondition`/`nextFtueTooltip`, pure functions reading
+  `GameState` for 8 of the 9 triggers (T-01, T-02, T-03, T-04, T-05, T-07, T-08, T-09).
+  T-06 ("Launch checklist") is deliberately excluded — its moment is "first time the
+  player sees the Launch Sequence screen," a screen-mount event, not a game-state
+  predicate, so it's rendered the same way T-16/T-17 already are (`FirstEntryTip`,
+  App.tsx), tied to `LaunchSequencePanel`'s own reveal condition.
+- Dismissal is **session-scoped, not persisted to GameState** — same treatment Sprint
+  7.5 already chose for T-16/T-17 (`App.tsx`'s own comment: "the doc doesn't specify
+  cross-session persistence for these... stays a minimal, easily-revisited
+  implementation"). Followed the existing precedent rather than introducing a second
+  convention; a returning player who dismissed a tooltip last session will see it once
+  more, same as T-16/T-17 already behave.
+- One tooltip shows at a time (`nextFtueTooltip` picks the highest-priority
+  unseen-and-true one, NARRATIVE §2's own table order); dismissing it naturally reveals
+  the next eligible one.
+- **A real bug caught by the test suite before it ever reached the UI (rule 7 doing its
+  job):** T-05's first draft ("Cap reached: any resource at/over its cap") read
+  Propellant's *starting* cap of 0 (no Propellant Depot yet) as "at cap" from the very
+  first frame — `0 >= 0` is trivially true. Fixed by requiring `cap > 0` too.
+
+**Milestone call-outs (UI_SPEC §4: "small non-blocking call-out card (title + one
+Mission Log line), auto-dismisses") — a genuine doc-reading judgment call, flagged, not
+silently assumed.** Two plausible readings of "milestone": Program Records (GDD §8
+literally calls them "Micro-milestones") or complex-unlock events (SPRINTS.md groups
+this task with "locked complexes"). Went with Program Records — the stronger textual
+match, and the one with an existing `records: string[]`/`RECORD_DEFS` structure to hook
+into cleanly. Flagging the alternate reading here in case that's not what was intended.
+- `MilestoneCallout` (App.tsx, same file-local pattern as `TierChangeToast`/
+  `FirstEntryTip`): diffs `records` and `narrative.seen` against refs each render;
+  when `records` gains a new id, shows a card titled with `RECORD_DEFS[id].name`,
+  auto-dismissing after 5s, no user interaction required (matches "auto-dismisses"
+  literally — T-01..T-09's tooltips are the ones requiring a dismiss click, these don't).
+  The "one Mission Log line" is the most recently added `narrative.seen` entry in the
+  same update, when one landed — this is **not a declared relationship** anywhere in the
+  code (records and Mission Log beats are resolved by entirely independent trigger
+  functions that just often fire in the same tick), so it degrades to title-only when
+  nothing new landed in `narrative.seen` alongside the record.
+- **Verified the limitation is real, not hypothetical:** a live Playwright pass (time-
+  warping an in-progress Probe-1 Test 1 to completion) showed the callout paired
+  "First ignition" with N-05's text ("The first part came off the line...") instead of
+  N-07's ("The engine blew at four seconds...") — both fire in the same tick (the
+  scripted failure's 60% Hardware recovery independently trips N-05's own "first
+  Hardware fabricated" threshold), and the heuristic picked the array's last-added entry,
+  not necessarily the narratively "correct" one. Documented in the component's own
+  comment rather than fixed with an invented formal pairing (ECONOMY/NARRATIVE docs
+  don't define one) — flagging for the owner: worth a real `RECORD_DEFS` → narrative-id
+  link if this bothers a tester, not worth guessing at now.
+
+**Verification:**
+- 366 tests passing (up from 347 — 13 in `core/ftue.test.ts` covering every trigger
+  condition plus the T-05 cap-0 fix, 8 in `App.test.tsx` covering the FTUE tooltip
+  sequence and four milestone-callout cases including the auto-dismiss timer via
+  `vi.useFakeTimers()`). Typecheck, lint, production build all clean.
+- Playwright, through a real browser: fresh load shows T-01 immediately; dismissing it
+  and pitching to Funding ≥ 50 reveals T-02; buying Finance and hiring a Technician
+  reveals T-03 — the exact NARRATIVE §2 sequence, live. Separately, time-warping an
+  in-progress certification to completion showed the milestone card rendering with real
+  CSS ("First ignition" title + italic Mission Log line, auto-dismissing). Zero console
+  errors across every pass.
+- One test-methodology bug found and fixed along the way, not an app bug: `App.test.tsx`
+  reuses the real, module-level `useGameStore` singleton across tests — without an
+  explicit per-test reset, a `setState` call in one test leaked into the next test's
+  initial render, producing a false failure. Fixed with a `beforeEach` that shallow-
+  resets to `createInitialState()` (merges data fields back to fresh, leaves the store's
+  action functions — which aren't part of `GameState` — untouched).
+
+Next within Sprint 8: away-modal polish (payroll-stoppage reporting, session-1 ending),
+Settings screen, save/load + offline regression QA, private itch.io playtest build.
