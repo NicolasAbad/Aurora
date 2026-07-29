@@ -42,7 +42,8 @@ interface ComplexPanelProps {
  * a direct consequence of the player's last action." Steps 2-3 (Finance at 150 lifetime
  * Funding; Staff panel at Finance built) are naturally monotonic — lifetime Funding and
  * building levels never decrease in this game — so they're read live. Step 4 (Crew
- * Quarters + R&D Lab at the staff pool's first 2/2) is NOT monotonic once staff
+ * Quarters + R&D Lab + Training Center, at the staff pool's first 2/2 — Sprint 9.5 moved
+ * Training Center here from "visible at game start") is NOT monotonic once staff
  * dismissal (§4b) exists, so it's backed by the persisted `staffCapReachedOnce` latch,
  * OR'd with "already built" so a save from before this field existed never regresses. */
 function CampusPanel({ onSelectComplex }: ComplexPanelProps) {
@@ -66,11 +67,12 @@ function CampusPanel({ onSelectComplex }: ComplexPanelProps) {
         {financeRevealed && <BuildingTile buildingId="finance" />}
         {quartersAndLabRevealed && <BuildingTile buildingId="rndLab" />}
         {quartersAndLabRevealed && <BuildingTile buildingId="crewQuarters" />}
-        <BuildingTile buildingId="trainingCenter" />
+        {quartersAndLabRevealed && <BuildingTile buildingId="trainingCenter" />}
         {staffPanelRevealed && <StaffHiring />}
         {staffPanelRevealed && <PromotionPanel />}
       </div>
-      {/* UI_SPEC §2d: "Research panel is hidden entirely until R&D Lab is built." */}
+      {/* UI_SPEC §2d: "Research panel is hidden entirely until R&D Lab is built." Moves
+          to its own top-level tab in Sprint 9.5 task 5 (UI_SPEC §2g) — unchanged here. */}
       {rndLabLevel >= 1 && <ResearchPanel />}
     </>
   );
