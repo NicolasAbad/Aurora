@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { Ticker } from './ui/Ticker';
+import { CurrentDirective } from './ui/CurrentDirective';
 import { ComplexTabs } from './ui/ComplexTabs';
 import { BuildingTile } from './ui/BuildingTile';
 import { PitchButton } from './ui/PitchButton';
@@ -386,6 +387,7 @@ export function App() {
         </div>
       )}
       <Ticker onOpenSettings={() => setSettingsOpen(true)} />
+      <CurrentDirective />
       <ActiveProcessStrip onSelectComplex={setActiveComplex} />
       <PayrollBanner />
       <GlobalFtueTooltip dismissed={dismissedTips} onDismiss={dismissTip} />

@@ -128,6 +128,20 @@ export const NARRATIVE_TEXT: Record<string, string> = {
   'E-06': "Scrapyard deal: a factory closed down and offers its materials 'at a friendly price.'",
   'E-06a': 'Buy (300 Materials for 200 Funding)',
   'E-06b': 'Pass',
+  // §11 (v3.9) — Current Directive: persistent "what now" indicator (UI_SPEC §2h). Terse,
+  // action-first phrasing (states the NEXT action, not a status report) per the doc's rule.
+  'D-01': 'Pitch investors to start raising funds.',
+  'D-02': 'Build Finance to start earning passively.',
+  'D-03': 'Hire a Technician and assign them to Finance.',
+  'D-04': 'Build Crew Quarters to raise your staff cap.',
+  'D-05': 'Promote a Technician to Engineer, then Scientist, to staff the R&D Lab.',
+  'D-06': 'Pick a research node to start.',
+  'D-07': 'Build Supply Depot to start gathering Materials.',
+  'D-08': 'Certify an engine at the Test Stand before you can fly.',
+  'D-09': 'Launch your first S-1 sounding rocket.',
+  'D-10': 'Build the VAB to begin your first satellite.',
+  'D-11': "Keep building — Aurora I's stages integrate one at a time.",
+  'D-12': 'Check the Contracts panel — client work is now available.',
 };
 
 /** Resolves an ID to its text, filling any `{name}` placeholders (T-10's open-slot
