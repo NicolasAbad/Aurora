@@ -22,6 +22,16 @@ describe('hiringCost', () => {
     expect(hiringCost('technician', 1)).toBeCloseTo(50 * 1.15);
     expect(hiringCost('scientist', 2)).toBeCloseTo(400 * 1.15 ** 2);
   });
+
+  // ECONOMY §9 (Sprint 10): Recruiting's -15% hiring cost, registered on 'hiring.cost'.
+  it('applies a registered hiring.cost modifier', () => {
+    const modifiers = [{ id: 'xp:recruiting', source: 'recruiting', target: 'hiring.cost', op: 'mult' as const, value: 0.85 }];
+    expect(hiringCost('technician', 0, modifiers, Date.now())).toBeCloseTo(50 * 0.85);
+  });
+
+  it('omitting modifiers keeps the exact pre-Sprint-10 value', () => {
+    expect(hiringCost('technician', 0)).toBe(50);
+  });
 });
 
 describe('totalStaffCap', () => {

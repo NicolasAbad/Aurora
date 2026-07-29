@@ -1,17 +1,16 @@
 # UI_SPEC.md — Aurora Program — Interface specification v1
 *Web-first (desktop + mobile responsive), Android wrap later reuses the mobile layout.*
 
+**v3.5 changes (Sprint 10 task 1 — Flight Experience trees):** new top-level "Flight XP" tab, sibling to Research and gated the same way (ComplexTabs) — reuses Research's own Design B "timeline lanes" layout verbatim (screen 3), a direct judgment-call reuse rather than a new design decision (4 branches either way, same node-detail interaction). Unlocks the moment any Flight XP has been earned (matches "hidden until relevant," UI_SPEC §2b) — earlier than Tracking Station, since XP starts accruing from the first certification test.
+
 **v3.4 changes (Visual Identity 2.0 — new dedicated sprint, see SPRINTS Sprint 10.5):** Confidence Dial (screen 4), Constellation View (new §2i), Program Site Map (§2h amended — now the visual backing of the Current Directive, not text-only), Building Pictograms (§4, new rule). Plus three no-vote "cheap wins" bundled in: staff role silhouette icons, a weather-window radar-sweep visual, Mission Log category icon badges. All presentation-only — zero economy impact, no scoped unlock needed. (Note: this version number also retroactively covers §2d-§2h and the screen 3/4/5 redesigns added progressively since v3.3 without their own version bumps.)
 
-**v3.0 changes:** cost/amount rendering rules (§4 — icon+number for costs, $ symbol for Funds, full names only in ticker/tooltips); persistent active-process strip (§2c); staff availability visible from every complex tab (§2).
-
-**v2.8 changes:** no single-letter resource abbreviations in player-facing UI; manual-action cooldowns get visible recharge + acknowledged clicks (§4).
-
-**v3.3 changes:** §4's effect-disclosure rule scoped explicitly to player CHOICES; carve-out added for Probe-1's scripted first certification test (GDD §7) — cost/duration still shown like any process, but no result or Confidence percentage, since there's no choice to inform and no Confidence formula applies to that individual test.
-
-**v2.6 changes:** progressive-disclosure rules added (§2b) — default is hidden-until-relevant; the full content surface is never visible from the start.
-
-**v2.1 changes:** payroll-unpaid ticker state and paused-building indicator added (§4); above-cap display rule added (§2); accent color default set to signal orange (owner may flip to cyan — single CSS variable).
+**Version history (compressed — full detail only for the latest 2 versions above; older entries kept as one-liners):**
+- v3.3: effect-disclosure rule scoped to player choices; Probe-1's scripted first test carved out (no result/Confidence shown, cost/duration still shown).
+- v3.0: cost/amount rendering rules (icon+number, $ for Funds); persistent active-process strip; staff availability per tab.
+- v2.8: no single-letter resource abbreviations; visible cooldown recharge feedback.
+- v2.6: progressive-disclosure default (hidden-until-relevant).
+- v2.1: payroll-unpaid ticker state; above-cap display rule; signal-orange accent default.
 
 ## 1. Visual direction
 Dark "control room" theme: near-black panels, one accent color (**default: signal orange** — defined as one CSS variable so switching to cyan is a one-line change), monospace or technical sans for numbers, generous spacing. Flat surfaces, thin borders, no gradients or glow abuse. All growth must be VISIBLE: rolling number animations, buttons that light up the frame they become affordable, progress bars everywhere a timer runs.

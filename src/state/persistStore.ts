@@ -40,6 +40,8 @@ import {
 } from '../core/contractMission';
 import { resolveEconomyTick } from '../core/economy';
 import { DEFAULT_EVENTS_STATE, resolveEventChoice, tickEvents } from '../core/events';
+import { buyXpNode, DEFAULT_FLIGHT_XP_TREE_STATE } from '../core/flightXp';
+import { XP_TREE_BY_ID } from '../data/flightXpTree';
 import { applyModifiers, pruneExpiredModifiers } from '../core/modifiers';
 import { OFFLINE_CAP_MS, resolveOffline, type PayrollStoppage } from '../core/offlineResolution';
 import { contextFromState, RECORD_DEFS, resolveRecords } from '../core/records';
@@ -208,6 +210,7 @@ function resolveMissionsContractsAndRecords(
   completedProcesses: GameState['processes'],
   launchRailBuilt: boolean,
   now: number,
+  xpNodesOwned: string[] = [],
 ): {
   mission: GameState['mission'];
   resources: GameState['resources'];
@@ -216,7 +219,14 @@ function resolveMissionsContractsAndRecords(
   records: string[];
 } {
   const missionAfterSoundingProcesses = applyCompletedSoundingProcesses(mission, completedProcesses);
-  const missionAfterSounding = resolveSoundingChecklist(missionAfterSoundingProcesses, resources, certifications.engines.probe1);
+  const missionAfterSounding = resolveSoundingChecklist(
+    missionAfterSoundingProcesses,
+    resources,
+    certifications.engines.probe1,
+    Math.random,
+    modifiers,
+    now,
+  );
 
   const auroraTick = resolveAuroraTick(
     resources,
@@ -230,6 +240,7 @@ function resolveMissionsContractsAndRecords(
     processes,
     completedProcesses,
     now,
+    xpNodesOwned,
   );
 
   // Sprint 9: satellite-contract pads (core/contractMission.ts) resolve independently of
@@ -254,6 +265,8 @@ function resolveMissionsContractsAndRecords(
     records,
     deadlineResolution.resources,
     contextFromState({ certifications, mission: contractTick.mission, contracts: deadlineResolution.contracts }),
+    modifiers,
+    now,
   );
 
   return {
@@ -339,6 +352,9 @@ function computeBootOffline(): { initialState: GameState; awaySummary: AwaySumma
     loaded.narrative.seen,
     loaded.research.completed,
     now,
+    loaded.modifiers,
+    offline.buildings.trackingStation.level,
+    offline.buildings.trackingStation.upgrades.includes('antennaNetwork'),
   );
 
   // Missions (sounding + every Aurora-I-class pad)/contracts/records: same
@@ -358,6 +374,7 @@ function computeBootOffline(): { initialState: GameState; awaySummary: AwaySumma
     offline.completedProcesses,
     offline.buildings.launchRail.level >= 1,
     now,
+    loaded.flightXpTree?.purchased ?? [],
   );
 
   const initialState: GameState = {
@@ -440,6 +457,10 @@ export interface GameActions {
   buyBuilding: (buildingId: BuildingId) => void;
   /** No-ops if already owned, no such upgrade on this building, or unaffordable. */
   buyInternalUpgrade: (buildingId: BuildingId, upgradeId: string) => void;
+  /** ECONOMY §9: instant Flight Experience tree purchase. No-ops if deps aren't met,
+   * already owned, Flight XP is short, or the node's mechanic is still pending design
+   * (core/flightXp.ts's XP_NODES_PENDING_DESIGN). */
+  buyFlightXpNode: (nodeId: string) => void;
   /** ECONOMY §2 manual gather — free, one-time Materials grant. No-ops before Supply Depot lv1. */
   gatherMaterials: () => void;
   /** ECONOMY §2 Rush Order — instant Materials for Funding. No-ops before Fabrication is built or if unaffordable. */
@@ -564,6 +585,19 @@ export const useGameStore = create<Store>()((set, get) => ({
     }
   },
 
+  buyFlightXpNode: (nodeId) => {
+    const state = get();
+    const flightXpTree = state.flightXpTree ?? DEFAULT_FLIGHT_XP_TREE_STATE;
+    const result = buyXpNode(state.resources, flightXpTree, state.modifiers, nodeId);
+    if (result) {
+      // T-26 (NARRATIVE §9 v4.0): same "previously silent" treatment T-20 gives internal
+      // upgrades — a Flight XP purchase has a real, discrete name worth logging.
+      const node = XP_TREE_BY_ID.get(nodeId);
+      const log = appendLogLine(missionLogBase(state.narrative), narrativeText('T-26', { node: node?.name ?? nodeId }));
+      set({ ...result, narrative: { ...state.narrative, log } });
+    }
+  },
+
   gatherMaterials: () => {
     const state = get();
     const resources = applyGatherMaterials(state.resources, state.buildings.supplyDepot.level);
@@ -584,6 +618,8 @@ export const useGameStore = create<Store>()((set, get) => ({
       state.research.completed,
       state.buildings.crewQuarters.level,
       role,
+      state.modifiers,
+      Date.now(),
     );
     if (result) {
       // UI_SPEC §2d Campus reveal step 4: "the staff pool reaches its cap for the first
@@ -647,6 +683,8 @@ export const useGameStore = create<Store>()((set, get) => ({
       state.buildings.testStand.level,
       state.buildings.testStand.upgrades.includes('instrumentation'),
       Date.now(),
+      Math.random,
+      state.modifiers,
     );
     if (result) {
       set({ ...result, telemetry: trackFirstOccurrence(state.telemetry, 'first_certification_started', { testId }) });
@@ -697,6 +735,10 @@ export const useGameStore = create<Store>()((set, get) => ({
       state.narrative.seen,
       state.research.completed,
       Date.now(),
+      state.modifiers,
+      state.flightXpTree?.purchased ?? [],
+      state.buildings.trackingStation.level,
+      state.buildings.trackingStation.upgrades.includes('antennaNetwork'),
     );
     if (result) {
       set({
@@ -733,6 +775,7 @@ export const useGameStore = create<Store>()((set, get) => ({
       state.research.completed,
       state.modifiers,
       Date.now(),
+      state.flightXpTree?.purchased ?? [],
     );
     if (result) {
       set({
@@ -761,6 +804,9 @@ export const useGameStore = create<Store>()((set, get) => ({
       state.narrative.seen,
       state.research.completed,
       Date.now(),
+      state.modifiers,
+      state.buildings.trackingStation.level,
+      state.buildings.trackingStation.upgrades.includes('antennaNetwork'),
     );
     if (result) {
       set({
@@ -793,6 +839,7 @@ export const useGameStore = create<Store>()((set, get) => ({
       state.research.completed,
       state.modifiers,
       Date.now(),
+      state.flightXpTree?.purchased ?? [],
     );
     if (result) {
       set({ ...result, telemetry: trackFirstOccurrence(state.telemetry, 'first_aurora_stage_started', { padId }) });
@@ -818,6 +865,9 @@ export const useGameStore = create<Store>()((set, get) => ({
       state.research.completed,
       seenBeforeResolution,
       Date.now(),
+      state.modifiers,
+      state.buildings.trackingStation.level,
+      state.buildings.trackingStation.upgrades.includes('antennaNetwork'),
     );
     if (result) {
       set({
@@ -913,6 +963,9 @@ export const useGameStore = create<Store>()((set, get) => ({
       state.narrative.seen,
       state.research.completed,
       Date.now(),
+      state.modifiers,
+      buildings.trackingStation.level,
+      buildings.trackingStation.upgrades.includes('antennaNetwork'),
     );
 
     // Passive/threshold beats (no discrete player action to hook): checked every tick
@@ -943,6 +996,7 @@ export const useGameStore = create<Store>()((set, get) => ({
       completedProcesses,
       buildings.launchRail.level >= 1,
       Date.now(),
+      state.flightXpTree?.purchased ?? [],
     );
 
     // N-09/N-15: passive/threshold beats, same pattern as N-04/N-05 above — no discrete

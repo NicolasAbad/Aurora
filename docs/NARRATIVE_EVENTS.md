@@ -1,6 +1,8 @@
 # NARRATIVE_EVENTS.md — Aurora Program — Complete v1 game text (English)
 *All game text lives here, referenced by ID. Claude Code writes no new narrative: missing beats get added here first. Tone: skeptical press slowly turning believer; dry-humored internal memos.*
 
+**v4.0 changes (Sprint 10 — Flight Experience trees):** T-26 (Mission Log entry, XP node purchased) added. New §12: Flight Experience node descriptions — every XP node states its effect, including the two mechanic-change nodes, same "no purchasable without effect text" rule §8 already applies to the research tree.
+
 **v3.9 changes (genre research + owner-selected new features):** T-24 (Confidence explainer, first time shown below 100%) and T-25 (first-orbital-attempt distinguishing beat before Aurora I's VAB work) added. New §11: Current Directive text table (UI_SPEC §2h) — a persistent, dynamic "what now" indicator addressing a recurring root-cause confusion pattern across multiple playtests.
 
 **v3.8 changes:** T-23 added — the level-10 building-expansion milestone's celebration toast (ECONOMY §4c).
@@ -128,6 +130,7 @@ Rules: **v2-only upgrades (Sound Suppression, Cryogenic Stand, Heavy Crane) are 
 | T-23 | A building crosses a level-10 milestone (ECONOMY §4c) — distinct from the routine upgrade-purchase toast, a bigger celebratory moment | "[Building] expanded! +1 [Role] slot." |
 | T-24 | First time Confidence shows below 100% (any mission, sonda or Aurora) | "Confidence: your odds of success. It's never fixed — investing in certification, staffing, and weather always gets you to 100%. Launching below that is a choice, not a limit." |
 | T-25 | Immediately before Aurora I's VAB integration begins (its first stage started) — distinguishes the orbital climax from routine sonda flights, now that sondas have their own polished result flow | "This is your first ORBITAL attempt — a real satellite, not a sounding rocket. It takes longer and asks more of your program, but it's what everything so far has been building toward." |
+| T-26 | A Flight Experience node is purchased (Mission Log entry, same "every completed process gets a line" rule as T-18/19/20) | "Flight Experience: [Node Name] unlocked." |
 
 ## 11. Current Directive text (persistent "what now" indicator, UI_SPEC §2h)
 Ordered roughly by when each becomes the active directive; the engine shows whichever is most relevant to current state. Claude Code may add intermediate directives as needed, following the same terse, action-first phrasing (a directive states the NEXT action, not a status report).
@@ -150,3 +153,17 @@ Ordered roughly by when each becomes the active directive; the engine shows whic
 | Verb | Description |
 |---|---|
 | Rush Order | "Trade Funding for instant Materials when you need them now instead of waiting on the Depot." |
+
+## 12. Flight Experience node descriptions (player-facing — every node states its effect, ECONOMY §9)
+| Branch | Node | Description |
+|---|---|---|
+| Propulsion | Efficient mixtures | "Leaner fuel loads. −10% Propellant spent per launch." |
+| Propulsion | Optimized ignition | "Faster engine certification. −20% certification time." |
+| Propulsion | Partial reusability | "Recover unused propellant after every launch. +20% Propellant refunded per launch." |
+| Operations | Procedures | "Tighter VAB workflows. −10% stage integration time." |
+| Operations | Turnaround | "Faster pad handling. −30% pad transfer time (stacks with Basic logistics)." |
+| Operations | Parallel integration | "Run two VAB stages side by side. Coming soon — exact behavior still being finalized." |
+| Organization | Team culture | "A program people want to stay at. −5% effective salaries." |
+| Organization | Recruiting | "A reputation that hires itself. −15% hiring cost." |
+| Prestige | Public relations | "The program gets noticed. +20% Reputation earned." |
+| Prestige | Trusted brand | "Clients pay a premium to fly with you. +25% contract pay." |

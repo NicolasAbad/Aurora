@@ -85,6 +85,19 @@ export const NARRATIVE_TEXT: Record<string, string> = {
   flightOperations: 'Unlocks hiring Controllers directly.',
   flightProgram: 'Unlocks the Launch complex.',
   orbitalFlight: 'Unlocks Aurora II and the orbital mission class.',
+  // §12 (v4.0, Sprint 10) — Flight Experience node descriptions, keyed by the node's own
+  // id (XP_TREE / data/flightXpTree.ts), same "no separate ID column, id IS the key"
+  // reasoning as the research node descriptions immediately above.
+  efficientMixtures: 'Leaner fuel loads. -10% Propellant spent per launch.',
+  optimizedIgnition: 'Faster engine certification. -20% certification time.',
+  partialReusability: 'Recover unused propellant after every launch. +20% Propellant refunded per launch.',
+  procedures: 'Tighter VAB workflows. -10% stage integration time.',
+  turnaround: 'Faster pad handling. -30% pad transfer time (stacks with Basic logistics).',
+  parallelIntegration: 'Run two VAB stages side by side. Coming soon — exact behavior still being finalized.',
+  teamCulture: 'A program people want to stay at. -5% effective salaries.',
+  recruiting: 'A reputation that hires itself. -15% hiring cost.',
+  publicRelations: 'The program gets noticed. +20% Reputation earned.',
+  trustedBrand: 'Clients pay a premium to fly with you. +25% contract pay.',
   // §9 — UI feedback text (toasts, confirmations — not Mission Log entries; rendered
   // directly at the point of relevance, same treatment as T-10/T-11/T-12 above).
   'T-14': 'Fabrication now produces Titanium-tier Hardware.',
@@ -148,6 +161,9 @@ export const NARRATIVE_TEXT: Record<string, string> = {
     'Confidence: your odds of success. It’s never fixed — investing in certification, staffing, and weather always gets you to 100%. Launching below that is a choice, not a limit.',
   'T-25':
     'This is your first ORBITAL attempt — a real satellite, not a sounding rocket. It takes longer and asks more of your program, but it’s what everything so far has been building toward.',
+  // §9 (v4.0, Sprint 10) — Flight Experience node purchase, same "previously silent
+  // purchase gets a Mission Log line" treatment as T-20.
+  'T-26': 'Flight Experience: {node} unlocked.',
 };
 
 /** Resolves an ID to its text, filling any `{name}` placeholders (T-10's open-slot

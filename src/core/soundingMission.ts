@@ -18,7 +18,8 @@ import {
 } from '../data/soundingRockets';
 import { CONTRACT_TIERS, TIER0_PAYLOAD_EXTRA_HARDWARE, TIER0_PAYLOAD_EXTRA_PROPELLANT } from '../data/contracts';
 import { markSeen } from '../data/narrative';
-import { applyGrant } from './economy';
+import { applyGrant, trackingStationFlightXpMultiplier } from './economy';
+import { recoveredPropellant } from './flightXp';
 import { creditHardware, currentHardwareTier, spendHardware } from './hardware';
 import { applyModifiers } from './modifiers';
 import type {
@@ -233,11 +234,18 @@ export function resolveSoundingChecklist(
   resources: GameState['resources'],
   engineState: EngineCertificationState,
   randomFn: () => number = Math.random,
+  modifiers: Modifier[] = [],
+  now = 0,
 ): MissionState {
   const sounding = mission.sounding;
   if (!sounding || sounding.committedRoll !== null) return mission;
 
-  const propellantReady = resources.propellant.amount >= requiredPropellant(sounding.rocketId, sounding.contractId);
+  // ECONOMY §9: the live "ready" check must reflect Efficient mixtures' same discount
+  // launchSoundingMission actually deducts, or a discounted player would be stuck unable
+  // to complete a checklist item they've already fully paid for.
+  const propellantReady =
+    resources.propellant.amount >=
+    applyModifiers(requiredPropellant(sounding.rocketId, sounding.contractId), modifiers, 'launch.propellant', now);
   const checklist = { ...sounding.checklist, propellantReady };
   const rawConfidence = computeSondaConfidence(engineState);
   // NARRATIVE §3 E-03 option B: one-shot "-10 Confidence next launch" — see
@@ -276,6 +284,10 @@ export function launchSoundingMission(
   narrativeSeen: string[],
   completedTech: string[],
   now: number,
+  modifiers: Modifier[] = [],
+  xpNodesOwned: string[] = [],
+  trackingLevel = 0,
+  antennaNetworkBought = false,
 ): LaunchSoundingMissionResult | null {
   const sounding = mission.sounding;
   if (!sounding || sounding.committedRoll === null) return null;
@@ -283,11 +295,27 @@ export function launchSoundingMission(
   const def = SOUNDING_ROCKETS[sounding.rocketId];
   const tier = currentHardwareTier(completedTech);
   const success = sounding.committedRoll < sounding.confidence / 100;
-  const propellantCost = requiredPropellant(sounding.rocketId, sounding.contractId);
+  // ECONOMY §4/§9 (Sprint 10): see core/certification.ts for the same pattern.
+  const xpMult = trackingStationFlightXpMultiplier(trackingLevel, antennaNetworkBought);
+  const grantReputation = (amount: number) => applyModifiers(amount, modifiers, 'reputation.gain', now);
+  // ECONOMY §9 (Sprint 10): Efficient mixtures' -10% Propellant/launch registers on
+  // 'launch.propellant'.
+  const propellantCost = applyModifiers(
+    requiredPropellant(sounding.rocketId, sounding.contractId),
+    modifiers,
+    'launch.propellant',
+    now,
+  );
 
   let nextResources = {
     ...resources,
     propellant: { ...resources.propellant, amount: Math.max(0, resources.propellant.amount - propellantCost) },
+  };
+  // ECONOMY §9: Partial reusability — 20% of whatever Propellant was just spent credited
+  // straight back (core/flightXp.ts).
+  nextResources = {
+    ...nextResources,
+    propellant: applyGrant(nextResources.propellant, recoveredPropellant(propellantCost, xpNodesOwned), true),
   };
   let nextContracts = contracts;
   let nextNarrativeSeen = narrativeSeen;
@@ -296,8 +324,8 @@ export function launchSoundingMission(
   if (success) {
     nextResources = {
       ...nextResources,
-      flightxp: applyGrant(nextResources.flightxp, def.successReward.flightxp, true),
-      reputation: applyGrant(nextResources.reputation, def.successReward.reputation, true),
+      flightxp: applyGrant(nextResources.flightxp, def.successReward.flightxp * xpMult, true),
+      reputation: applyGrant(nextResources.reputation, grantReputation(def.successReward.reputation), true),
       research: applyGrant(nextResources.research, def.successReward.flightData, true),
     };
     nextNarrativeSeen = markSeen(nextNarrativeSeen, def.narrativeIdOnSuccess);
@@ -313,18 +341,20 @@ export function launchSoundingMission(
       };
       nextResources = {
         ...nextResources,
-        funding: applyGrant(nextResources.funding, contractReward.funding, true),
-        reputation: applyGrant(nextResources.reputation, contractReward.reputation, true),
+        // ECONOMY §9: Trusted brand's +25% contract pay — funding only ("pay" reads as
+        // the monetary reward, not XP/Rep/Flight Data).
+        funding: applyGrant(nextResources.funding, applyModifiers(contractReward.funding, modifiers, 'contract.pay', now), true),
+        reputation: applyGrant(nextResources.reputation, grantReputation(contractReward.reputation), true),
         // ECONOMY §8: "Contract fulfilled" pays its own Flight XP/Flight Data on top of
         // the underlying S-1 flight's own reward (already granted above).
-        flightxp: applyGrant(nextResources.flightxp, contractReward.flightxp, true),
+        flightxp: applyGrant(nextResources.flightxp, contractReward.flightxp * xpMult, true),
         research: applyGrant(nextResources.research, contractReward.flightData, true),
       };
     }
   } else {
     nextResources = {
       ...nextResources,
-      flightxp: applyGrant(nextResources.flightxp, def.successReward.flightxp * FAILURE_XP_RATE, true),
+      flightxp: applyGrant(nextResources.flightxp, def.successReward.flightxp * FAILURE_XP_RATE * xpMult, true),
       research: applyGrant(nextResources.research, def.successReward.flightData * FAILURE_FLIGHT_DATA_RATE, true),
       hardware: creditHardware(
         nextResources.hardware,

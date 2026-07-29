@@ -112,6 +112,22 @@ export function refineryConsumeMultiplier(recoveryLoopBought: boolean): number {
   return recoveryLoopBought ? 1 - RECOVERY_LOOP_REDUCTION : 1;
 }
 
+// ECONOMY §4: Tracking Station "+25% Flight Experience per level from every flight" +
+// Antenna Network internal upgrade "+25% Flight XP" (flat, on top). Building-level/
+// upgrade-based, so — same precedent as certificationDurationMultiplier/
+// fabricationConsumeMultiplier above — computed directly here rather than through
+// core/modifiers.ts's registry (reserved for research/XP-tree effects). Stacks
+// multiplicatively, same "linear per-level, stacks with the matching upgrade" pattern
+// Test Stand/Instrumentation already established. Level 0 (unbuilt) correctly yields a
+// 1x no-op multiplier (every pre-Sprint-10 flightxp grant already reads as if this
+// existed and always returned 1).
+export const TRACKING_STATION_XP_BONUS_PER_LEVEL = 0.25;
+const ANTENNA_NETWORK_XP_MULT = 1.25;
+export function trackingStationFlightXpMultiplier(level: number, antennaNetworkBought: boolean): number {
+  const levelMult = 1 + TRACKING_STATION_XP_BONUS_PER_LEVEL * Math.max(0, level);
+  return antennaNetworkBought ? levelMult * ANTENNA_NETWORK_XP_MULT : levelMult;
+}
+
 /**
  * Resolves a consumption-based producer (Fabrication, Refinery — ECONOMY §4b step 3):
  * claims its full tick's Materials requirement or produces nothing this tick (binary
@@ -181,7 +197,11 @@ export function resolveEconomyTick(
 ): EconomyTickResult {
   const deltaSec = (deltaMs / 1000) * rateMultiplier;
   const salaryFlatPerSecond = applyModifiers(0, modifiers, 'salary.flat', now);
-  const salaryCost = (totalSalaryPerSecond(staff) + salaryFlatPerSecond) * deltaSec;
+  // ECONOMY §9 (Sprint 10): Team culture's -5% salaries registers on 'salary.rate' —
+  // scales the per-hire total, not the flat add-on (E-04's premium is a fixed cost, not
+  // a rate to discount).
+  const salaryRateMult = applyModifiers(1, modifiers, 'salary.rate', now);
+  const salaryCost = (totalSalaryPerSecond(staff) * salaryRateMult + salaryFlatPerSecond) * deltaSec;
   const canPaySalaries = resources.funding.amount >= salaryCost;
 
   if (!canPaySalaries) {

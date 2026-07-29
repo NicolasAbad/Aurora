@@ -22,7 +22,8 @@ import {
 import { markSeen } from '../data/narrative';
 import { canAffordCost, payCost } from './actions';
 import { computeConfidenceBreakdown } from './confidence';
-import { applyGrant } from './economy';
+import { applyGrant, trackingStationFlightXpMultiplier } from './economy';
+import { recoveredPropellant } from './flightXp';
 import { creditHardware, currentHardwareTier } from './hardware';
 import { applyModifiers } from './modifiers';
 import { buildingStaffRatio } from './staff';
@@ -118,6 +119,7 @@ export function startNextContractStage(
   completedTech: string[],
   modifiers: Modifier[],
   now: number,
+  xpNodesOwned: string[] = [],
 ): StartContractStageResult | null {
   const pad = mission.pads[padId];
   if (!pad) return null;
@@ -145,14 +147,33 @@ export function startNextContractStage(
 
   const stageId = nextContractStageId(pad.stagesDone);
   if (!stageId) return null;
-  const def = contractStageDef(tier, stageId);
+  const rawDef = contractStageDef(tier, stageId);
+  // ECONOMY §9 (Sprint 10): Efficient mixtures' -10% Propellant/launch — same
+  // 'launch.propellant' target Aurora's own propellantLoad stage applies.
+  const cost =
+    stageId === 'propellantLoad' && rawDef.cost.propellant
+      ? { ...rawDef.cost, propellant: applyModifiers(rawDef.cost.propellant, modifiers, 'launch.propellant', now) }
+      : rawDef.cost;
+  const def = { ...rawDef, cost };
   if (!canAffordCost(resources, def.cost, def.minHardwareTier)) return null;
 
-  const nextResources = payCost(resources, def.cost, def.minHardwareTier);
+  let nextResources = payCost(resources, def.cost, def.minHardwareTier);
+  // ECONOMY §9: Partial reusability — 20% of whatever Propellant was just spent credited
+  // straight back (core/flightXp.ts).
+  if (stageId === 'propellantLoad' && def.cost.propellant) {
+    nextResources = {
+      ...nextResources,
+      propellant: applyGrant(nextResources.propellant, recoveredPropellant(def.cost.propellant, xpNodesOwned), true),
+    };
+  }
   const halfDuration = mission.auroraHalfDurationNext?.[padId] ?? false;
   const autoRefuel = stageId === 'propellantLoad' && completedTech.includes('autoRefuel');
   const baseDurationMs =
-    stageId === 'padTransfer' ? applyModifiers(def.durationMs, modifiers, 'transfer.duration', now) : def.durationMs;
+    stageId === 'padTransfer'
+      ? applyModifiers(def.durationMs, modifiers, 'transfer.duration', now)
+      : stageId === 'payloadIntegration'
+        ? applyModifiers(def.durationMs, modifiers, 'integration.duration', now) // ECONOMY §9: Procedures -10%
+        : def.durationMs;
   const durationMs =
     applyModifiers(baseDurationMs, modifiers, 'process.duration', now) *
     (halfDuration ? FAILURE_REINTEGRATION_DURATION_RATE : 1) *
@@ -345,6 +366,9 @@ export function launchContractMission(
   narrativeSeen: string[],
   completedTech: string[],
   now: number,
+  modifiers: Modifier[] = [],
+  trackingLevel = 0,
+  antennaNetworkBought = false,
 ): LaunchContractMissionResult | null {
   const pad = mission.pads[padId];
   if (!pad || pad.contractId == null || pad.committedRoll === null) return null;
@@ -358,6 +382,9 @@ export function launchContractMission(
   const hwTier = currentHardwareTier(completedTech);
 
   const success = pad.committedRoll < pad.confidence / 100;
+  // ECONOMY §4/§9 (Sprint 10): see core/certification.ts for the same pattern.
+  const xpMult = trackingStationFlightXpMultiplier(trackingLevel, antennaNetworkBought);
+  const grantReputation = (amount: number) => applyModifiers(amount, modifiers, 'reputation.gain', now);
   let nextResources = resources;
   let nextNarrativeSeen = narrativeSeen;
   const halfDurationNext = { ...mission.auroraHalfDurationNext };
@@ -365,9 +392,10 @@ export function launchContractMission(
   if (success) {
     nextResources = {
       ...nextResources,
-      funding: applyGrant(nextResources.funding, reward.funding, true),
-      reputation: applyGrant(nextResources.reputation, reward.reputation, true),
-      flightxp: applyGrant(nextResources.flightxp, reward.flightxp, true),
+      // ECONOMY §9: Trusted brand's +25% contract pay — funding only.
+      funding: applyGrant(nextResources.funding, applyModifiers(reward.funding, modifiers, 'contract.pay', now), true),
+      reputation: applyGrant(nextResources.reputation, grantReputation(reward.reputation), true),
+      flightxp: applyGrant(nextResources.flightxp, reward.flightxp * xpMult, true),
       research: applyGrant(nextResources.research, reward.flightData, true),
     };
     nextNarrativeSeen = markSeen(nextNarrativeSeen, 'N-14'); // First contract fulfilled (idempotent if not first)
@@ -378,7 +406,7 @@ export function launchContractMission(
     // failure case (core/certification.ts's ORBITAL1_FAILURE_FLIGHT_XP comment).
     nextResources = {
       ...nextResources,
-      flightxp: applyGrant(nextResources.flightxp, reward.flightxp * FAILURE_XP_RATE, true),
+      flightxp: applyGrant(nextResources.flightxp, reward.flightxp * FAILURE_XP_RATE * xpMult, true),
       research: applyGrant(nextResources.research, reward.flightData * FAILURE_FLIGHT_DATA_RATE, true),
       hardware: creditHardware(nextResources.hardware, build.hardware * FAILURE_HARDWARE_RECOVERY_RATE, hwTier, true),
     };

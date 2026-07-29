@@ -360,6 +360,30 @@ describe('launchSoundingMission', () => {
     expect(result!.mission.launches[0].contractId).toBe('contract-0-1');
   });
 
+  // ECONOMY §9 (Sprint 10): Trusted brand's +25% contract pay (funding only), Public
+  // relations' +20% reputation.gain, Efficient mixtures' -10% Propellant, and Tracking
+  // Station's Flight XP multiplier — all applied at once on a contract-linked launch.
+  it('applies Trusted brand, Public relations, Efficient mixtures, and Tracking Station together', () => {
+    const state = createInitialState();
+    state.resources.propellant.amount = 100;
+    const contracts = {
+      offers: [{ id: 'contract-0-1', tier: 0 as const, client: 'Test Client', offeredAt: 0, deadlineMs: 999999 }],
+      active: [{ offerId: 'contract-0-1', acceptedAt: 0, padId: null, fulfilled: false }],
+    };
+    const m = completeMission({ committedRoll: 0.1, confidence: 90, contractId: 'contract-0-1' });
+    const modifiers = [
+      { id: 'xp:trustedBrand', source: 'trustedBrand', target: 'contract.pay', op: 'mult' as const, value: 1.25 },
+      { id: 'xp:publicRelations', source: 'publicRelations', target: 'reputation.gain', op: 'mult' as const, value: 1.2 },
+      { id: 'xp:efficientMixtures', source: 'efficientMixtures', target: 'launch.propellant', op: 'mult' as const, value: 0.9 },
+    ];
+
+    const result = launchSoundingMission(state.resources, m, contracts, [], [], 5000, modifiers, [], 1, false);
+    expect(result!.resources.funding.amount).toBe(400 * 1.25); // Trusted brand: funding only
+    expect(result!.resources.reputation.amount).toBe((1 + 3) * 1.2); // flight's + contract's Rep, both scaled
+    expect(result!.resources.flightxp.amount).toBe((15 + 40) * 1.25); // Tracking Station level 1: +25%
+    expect(result!.resources.propellant.amount).toBe(100 - 40 * 0.9); // Efficient mixtures -10%
+  });
+
   it('a failed contract-linked flight leaves the contract active and unfulfilled', () => {
     const state = createInitialState();
     state.resources.propellant.amount = 100;

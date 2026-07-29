@@ -39,10 +39,11 @@ export interface Astronaut {
   missionsFlown: number;
 }
 
-// 'research' (Sprint 9.5, UI_SPEC §2g): a tab identity only — no BuildingDef ever sets
-// `complex: 'research'`, since Research isn't a building complex, just a top-level tab
-// sibling to the four that are.
-export type ComplexId = 'campus' | 'production' | 'testing' | 'launch' | 'research';
+// 'research' (Sprint 9.5, UI_SPEC §2g) / 'flightXp' (Sprint 10, same reasoning): tab
+// identities only — no BuildingDef ever sets `complex: 'research'` or `complex:
+// 'flightXp'`, since neither is a building complex, just a top-level tab sibling to the
+// four that are.
+export type ComplexId = 'campus' | 'production' | 'testing' | 'launch' | 'research' | 'flightXp';
 
 // Stable building ids (GDD §3 / ECONOMY_MODEL §4) — 18 buildings across 4 complexes.
 export type BuildingId =
@@ -384,4 +385,10 @@ export interface GameState {
   // read as `state.events ?? { activeMsAccumulated: 0, lastEventAt: null, pending: null }`
   // at every call site (core/events.ts exports the same default).
   events?: EventsState;
+  // Sprint 10 (ECONOMY §9): Flight Experience trees, the prestige replacement. Additive
+  // optional (rule 5) — absent means no node purchased yet, no migration needed; read as
+  // `state.flightXpTree ?? { purchased: [] }` (core/flightXp.ts exports the same default).
+  // Purchases are instant one-time spends of Flight XP (no timer, no Process), same
+  // "buy it, own it forever" shape as InternalUpgradeDef ownership.
+  flightXpTree?: { purchased: string[] };
 }

@@ -15,6 +15,10 @@ export function ComplexTabs({ active, onSelect }: ComplexTabsProps) {
   const testingUnlocked = useGameStore((s) => s.research.completed.includes(TESTING_UNLOCK_TECH));
   const launchUnlocked = useGameStore((s) => s.research.completed.includes(LAUNCH_UNLOCK_TECH));
   const researchUnlocked = useGameStore((s) => s.buildings.rndLab.level >= 1);
+  // ECONOMY §9 (Sprint 10): appears the moment there's anything to spend, same "hidden
+  // until relevant" default (UI_SPEC §2b) the Research tab's own gate follows — Flight
+  // XP starts accruing from the first certification test, well before Tracking Station.
+  const flightXpUnlocked = useGameStore((s) => s.resources.flightxp.lifetimeEarned > 0);
 
   const complexes = [
     { id: 'campus' as const, label: 'Campus', unlocked: true, condition: '' },
@@ -41,6 +45,12 @@ export function ComplexTabs({ active, onSelect }: ComplexTabsProps) {
     // Sprint 7: state-driven like Testing (VAB/Pad/Launch Control/Tracking Station now
     // have real panel content to unlock onto).
     { id: 'launch' as const, label: 'Launch', unlocked: launchUnlocked, condition: 'Unlocks with tech: Flight program' },
+    {
+      id: 'flightXp' as const,
+      label: 'Flight XP',
+      unlocked: flightXpUnlocked,
+      condition: 'Unlocks once you earn Flight Experience',
+    },
   ];
 
   return (

@@ -191,18 +191,22 @@ export interface HireStaffResult {
   staff: StaffState;
 }
 
-/** Hires one more `role`, per ECONOMY §3 — tech-gated, staff-cap-gated, cost-gated. */
+/** Hires one more `role`, per ECONOMY §3 — tech-gated, staff-cap-gated, cost-gated.
+ * `modifiers`/`now` (default `[]`/`0`, ECONOMY §9 Sprint 10): Recruiting's -15% hiring
+ * cost — see core/staff.ts's hiringCost. */
 export function hireStaff(
   resources: GameState['resources'],
   staff: StaffState,
   completedTech: string[],
   crewQuartersLevel: number,
   role: RoleId,
+  modifiers: Modifier[] = [],
+  now = 0,
 ): HireStaffResult | null {
   if (!isRoleUnlocked(role, completedTech)) return null;
   if (totalHired(staff) >= totalStaffCap(crewQuartersLevel)) return null;
 
-  const cost = hiringCost(role, staff.pools[role].hired);
+  const cost = hiringCost(role, staff.pools[role].hired, modifiers, now);
   if (resources.funding.amount < cost) return null;
 
   return {
@@ -375,9 +379,17 @@ export function startCertification(
 
   // NARRATIVE §3 E-05: temporary +10% process-duration modifier, stacked with Test
   // Stand/Instrumentation's existing reduction (default [] keeps every pre-Sprint-9 call
-  // site's exact old behavior).
+  // site's exact old behavior). ECONOMY §9 (Sprint 10): Optimized ignition's -20%
+  // registers on 'certification.duration' specifically — applied before the generic
+  // 'process.duration' bucket, same two-step stacking as auroraMission.ts's
+  // 'transfer.duration' -> 'process.duration' pattern.
   const durationMs = applyModifiers(
-    test.durationMs * certificationDurationMultiplier(testStandLevel, instrumentationBought),
+    applyModifiers(
+      test.durationMs * certificationDurationMultiplier(testStandLevel, instrumentationBought),
+      modifiers,
+      'certification.duration',
+      now,
+    ),
     modifiers,
     'process.duration',
     now,

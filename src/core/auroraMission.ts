@@ -19,7 +19,8 @@ import {
 import { markSeen } from '../data/narrative';
 import { canAffordCost, payCost } from './actions';
 import { computeConfidenceBreakdown } from './confidence';
-import { applyGrant } from './economy';
+import { applyGrant, trackingStationFlightXpMultiplier } from './economy';
+import { recoveredPropellant } from './flightXp';
 import { creditHardware, currentHardwareTier } from './hardware';
 import { applyModifiers } from './modifiers';
 import { buildingStaffRatio } from './staff';
@@ -119,6 +120,7 @@ export function startNextAuroraStage(
   completedTech: string[],
   modifiers: Modifier[],
   now: number,
+  xpNodesOwned: string[] = [],
 ): StartAuroraStageResult | null {
   const pad = mission.pads[padId];
   if (!pad || pad.contractId != null) return null; // Sprint 9: pad is a contract mission's, not Aurora's
@@ -130,15 +132,32 @@ export function startNextAuroraStage(
   if (stageId === 'engines' && !engineState.certified) return null;
 
   const stageDef = AURORA_I_STAGES_BY_ID.get(stageId)!;
-  if (!canAffordCost(resources, stageDef.cost)) return null;
+  // ECONOMY §9 (Sprint 10): Efficient mixtures' -10% Propellant/launch registers on
+  // 'launch.propellant' — only the propellantLoad stage ever spends Propellant, so this
+  // only ever touches that one stage's cost.
+  const cost =
+    stageId === 'propellantLoad' && stageDef.cost.propellant
+      ? { ...stageDef.cost, propellant: applyModifiers(stageDef.cost.propellant, modifiers, 'launch.propellant', now) }
+      : stageDef.cost;
+  if (!canAffordCost(resources, cost)) return null;
 
-  const nextResources = payCost(resources, stageDef.cost);
+  let nextResources = payCost(resources, cost);
+  // ECONOMY §9: Partial reusability — 20% of whatever Propellant was just spent is
+  // credited straight back, unconditional of outcome (core/flightXp.ts).
+  if (stageId === 'propellantLoad' && cost.propellant) {
+    nextResources = {
+      ...nextResources,
+      propellant: applyGrant(nextResources.propellant, recoveredPropellant(cost.propellant, xpNodesOwned), true),
+    };
+  }
   const halfDuration = mission.auroraHalfDurationNext?.[padId] ?? false;
   const autoRefuel = stageId === 'propellantLoad' && completedTech.includes('autoRefuel');
   const baseDurationMs =
     stageId === 'padTransfer'
       ? applyModifiers(stageDef.durationMs, modifiers, 'transfer.duration', now)
-      : stageDef.durationMs;
+      : (VAB_STAGE_IDS as string[]).includes(stageId)
+        ? applyModifiers(stageDef.durationMs, modifiers, 'integration.duration', now) // ECONOMY §9: Procedures -10%
+        : stageDef.durationMs;
   const durationMs =
     applyModifiers(baseDurationMs, modifiers, 'process.duration', now) *
     (halfDuration ? FAILURE_REINTEGRATION_DURATION_RATE : 1) *
@@ -194,6 +213,7 @@ export function maybeAutoQueueAuroraStage(
   completedTech: string[],
   modifiers: Modifier[],
   now: number,
+  xpNodesOwned: string[] = [],
 ): StartAuroraStageResult {
   const unchanged = { resources, mission, processes };
   if (!completedTech.includes('vabQueues')) return unchanged;
@@ -202,7 +222,10 @@ export function maybeAutoQueueAuroraStage(
   const stageId = nextAuroraStageId(pad.stagesDone);
   if (!stageId || !(VAB_STAGE_IDS as string[]).includes(stageId)) return unchanged;
 
-  return startNextAuroraStage(resources, mission, padId, processes, engineState, completedTech, modifiers, now) ?? unchanged;
+  return (
+    startNextAuroraStage(resources, mission, padId, processes, engineState, completedTech, modifiers, now, xpNodesOwned) ??
+    unchanged
+  );
 }
 
 /** Flips `stagesDone`/`rocketStatus` for whichever pad's stage just completed — mirrors
@@ -347,12 +370,18 @@ export function launchAuroraMission(
   completedTech: string[],
   narrativeSeen: string[],
   now: number,
+  modifiers: Modifier[] = [],
+  trackingLevel = 0,
+  antennaNetworkBought = false,
 ): LaunchAuroraMissionResult | null {
   const pad = mission.pads[padId];
   if (!pad || pad.contractId != null || pad.committedRoll === null) return null;
 
   const success = pad.committedRoll < pad.confidence / 100;
   const tier = currentHardwareTier(completedTech);
+  // ECONOMY §4/§9 (Sprint 10): see core/certification.ts for the same pattern.
+  const xpMult = trackingStationFlightXpMultiplier(trackingLevel, antennaNetworkBought);
+  const grantReputation = (amount: number) => applyModifiers(amount, modifiers, 'reputation.gain', now);
   let nextResources = resources;
   let nextNarrativeSeen = narrativeSeen;
   const halfDurationNext = { ...mission.auroraHalfDurationNext };
@@ -360,8 +389,8 @@ export function launchAuroraMission(
   if (success) {
     nextResources = {
       ...nextResources,
-      flightxp: applyGrant(nextResources.flightxp, AURORA_I_REWARD.flightxp, true),
-      reputation: applyGrant(nextResources.reputation, AURORA_I_REWARD.reputation, true),
+      flightxp: applyGrant(nextResources.flightxp, AURORA_I_REWARD.flightxp * xpMult, true),
+      reputation: applyGrant(nextResources.reputation, grantReputation(AURORA_I_REWARD.reputation), true),
       research: applyGrant(nextResources.research, AURORA_I_REWARD.flightData, true),
     };
     nextNarrativeSeen = markSeen(nextNarrativeSeen, 'N-11'); // First successful launch
@@ -373,7 +402,7 @@ export function launchAuroraMission(
     );
     nextResources = {
       ...nextResources,
-      flightxp: applyGrant(nextResources.flightxp, AURORA_I_REWARD.flightxp * FAILURE_XP_RATE, true),
+      flightxp: applyGrant(nextResources.flightxp, AURORA_I_REWARD.flightxp * FAILURE_XP_RATE * xpMult, true),
       research: applyGrant(nextResources.research, AURORA_I_REWARD.flightData * FAILURE_FLIGHT_DATA_RATE, true),
       hardware: creditHardware(
         nextResources.hardware,
@@ -430,6 +459,7 @@ export function resolveAuroraTick(
   processes: Process[],
   completedProcesses: Process[],
   now: number,
+  xpNodesOwned: string[] = [],
 ): ResolveAuroraTickResult {
   let nextMission = applyCompletedAuroraStages(mission, completedProcesses);
   nextMission = applyCompletedAuroraWeather(nextMission, completedProcesses);
@@ -437,7 +467,17 @@ export function resolveAuroraTick(
   let nextResources = resources;
   let nextProcesses = processes;
   for (const padId of Object.keys(nextMission.pads) as PadId[]) {
-    const autoQueued = maybeAutoQueueAuroraStage(nextResources, nextMission, padId, nextProcesses, engineState, completedTech, modifiers, now);
+    const autoQueued = maybeAutoQueueAuroraStage(
+      nextResources,
+      nextMission,
+      padId,
+      nextProcesses,
+      engineState,
+      completedTech,
+      modifiers,
+      now,
+      xpNodesOwned,
+    );
     nextResources = autoQueued.resources;
     nextMission = autoQueued.mission;
     nextProcesses = autoQueued.processes;

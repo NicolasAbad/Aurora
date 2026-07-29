@@ -14,7 +14,7 @@ import {
 } from '../data/events';
 import { applyGrant } from './economy';
 import { spendHardware } from './hardware';
-import { registerModifier } from './modifiers';
+import { applyModifiers, registerModifier } from './modifiers';
 import type { EventsState, GameState, Modifier } from './types';
 
 export const DEFAULT_EVENTS_STATE: EventsState = { activeMsAccumulated: 0, lastEventAt: null, pending: null };
@@ -147,9 +147,14 @@ export function resolveEventChoice(
         next = { ...next, funding: applyGrant(next.funding, effect.funding, true) };
       }
       if (effect.reputation) {
+        // ECONOMY §9 (Sprint 10): Public relations' +20% Reputation applies to a
+        // positive event grant, never to the negative-penalty branch below.
         next =
           effect.reputation >= 0
-            ? { ...next, reputation: applyGrant(next.reputation, effect.reputation, true) }
+            ? {
+                ...next,
+                reputation: applyGrant(next.reputation, applyModifiers(effect.reputation, state.modifiers, 'reputation.gain', now), true),
+              }
             : { ...next, reputation: { ...next.reputation, amount: Math.max(0, next.reputation.amount + effect.reputation) } };
       }
       resources = next;
@@ -178,7 +183,10 @@ export function resolveEventChoice(
       break;
     }
     case 'reputationAndTempDurationPenalty': {
-      resources = { ...resources, reputation: applyGrant(resources.reputation, effect.reputation, true) };
+      resources = {
+        ...resources,
+        reputation: applyGrant(resources.reputation, applyModifiers(effect.reputation, state.modifiers, 'reputation.gain', now), true),
+      };
       modifiers = registerModifier(modifiers, {
         id: `event-${def.id}-duration-${now}`,
         source: def.id,

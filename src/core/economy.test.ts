@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../data/initialState';
-import { applyGrant, costAtLevel, pitchYield, productionPerSecond, resolveEconomyTick } from './economy';
+import {
+  applyGrant,
+  costAtLevel,
+  pitchYield,
+  productionPerSecond,
+  resolveEconomyTick,
+  trackingStationFlightXpMultiplier,
+} from './economy';
 import type { ResourceState } from './types';
 
 describe('costAtLevel', () => {
@@ -311,5 +318,36 @@ describe('resolveEconomyTick — Materials-consumption reductions (v3.6)', () =>
     const result = resolveEconomyTick(state.resources, state.buildings, state.staff, [], 1000);
     // Base: 0.5 Propellant produced, consumes 1 M/P = 0.5 M. Recovery loop: 0.5 * 0.9 = 0.45 M.
     expect(result.resources.materials.amount).toBeCloseTo(10 - 0.45);
+  });
+});
+
+// ECONOMY §9 (Sprint 10): Team culture's -5% salaries, registered on 'salary.rate'.
+describe('resolveEconomyTick — salary.rate modifier', () => {
+  it('scales the per-hire salary total, independent of the flat add-on', () => {
+    const state = createInitialState();
+    state.staff.pools.technician.hired = 2; // 2 * 0.15/s = 0.3/s base
+    state.resources.funding.amount = 10_000;
+    state.resources.funding.cap = null;
+    const modifiers = [{ id: 'xp:teamCulture', source: 'teamCulture', target: 'salary.rate', op: 'mult' as const, value: 0.95 }];
+    const result = resolveEconomyTick(state.resources, state.buildings, state.staff, [], 1000, 1, modifiers, Date.now());
+    // 0.3/s * 0.95 * 1s = 0.285 spent this tick.
+    expect(result.resources.funding.amount).toBeCloseTo(10_000 - 0.285);
+  });
+});
+
+// ECONOMY §4 (Sprint 10): Tracking Station's own Flight XP multiplier — "+25% per
+// level", stacking multiplicatively with Antenna Network's flat "+25%".
+describe('trackingStationFlightXpMultiplier', () => {
+  it('is a 1x no-op at level 0 with no Antenna Network', () => {
+    expect(trackingStationFlightXpMultiplier(0, false)).toBe(1);
+  });
+
+  it('adds 25% per level, linear (not compounding)', () => {
+    expect(trackingStationFlightXpMultiplier(1, false)).toBeCloseTo(1.25);
+    expect(trackingStationFlightXpMultiplier(4, false)).toBeCloseTo(2);
+  });
+
+  it('stacks multiplicatively with Antenna Network', () => {
+    expect(trackingStationFlightXpMultiplier(1, true)).toBeCloseTo(1.25 * 1.25);
   });
 });

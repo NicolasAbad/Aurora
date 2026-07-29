@@ -6,7 +6,8 @@
 // this system existed (e.g. "firstIgnition" could already be true from a Sprint 5 save's
 // scripted certification failure).
 import { applyGrant } from './economy';
-import type { GameState, RecordId } from './types';
+import { applyModifiers } from './modifiers';
+import type { GameState, Modifier, RecordId } from './types';
 
 export const RECORD_DEFS: Record<RecordId, { name: string; reward: { funding: number; reputation: number } }> = {
   firstIgnition: { name: 'First ignition', reward: { funding: 200, reputation: 3 } },
@@ -65,6 +66,8 @@ export function resolveRecords(
   records: string[],
   resources: GameState['resources'],
   ctx: RecordCheckContext,
+  modifiers: Modifier[] = [],
+  now = 0,
 ): RecordsResolution {
   const newlyEarned: RecordId[] = [];
   let nextResources = resources;
@@ -76,7 +79,9 @@ export function resolveRecords(
     nextResources = {
       ...nextResources,
       funding: applyGrant(nextResources.funding, reward.funding, true),
-      reputation: applyGrant(nextResources.reputation, reward.reputation, true),
+      // ECONOMY §9 (Sprint 10): Public relations' +20% Reputation applies here too —
+      // Records are a reputation grant like any other.
+      reputation: applyGrant(nextResources.reputation, applyModifiers(reward.reputation, modifiers, 'reputation.gain', now), true),
     };
   }
 

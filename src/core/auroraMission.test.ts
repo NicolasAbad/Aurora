@@ -136,6 +136,52 @@ describe('startNextAuroraStage', () => {
     const result = startNextAuroraStage(state.resources, mission(), 'padA', [], engineState(), [], modifiers, 0);
     expect(result!.processes[0].durationMs).toBe(20 * MIN); // structure's full 20 min, unaffected
   });
+
+  // ECONOMY §9 (Sprint 10): Efficient mixtures' -10% Propellant/launch, scoped to the
+  // propellantLoad stage's own cost only.
+  it('applies Efficient mixtures to the propellantLoad stage cost only', () => {
+    const state = fundedState();
+    const stagesDone = ['structure', 'engines', 'guidance', 'satellitePayload', 'finalIntegration', 'padTransfer'];
+    const m = mission({ pads: { padA: { rocketStatus: 'on_pad', stagesDone, checklist: mission().pads.padA!.checklist, confidence: 0, committedRoll: null } } });
+    const modifiers = [{ id: 'xp:efficientMixtures', source: 'efficientMixtures', target: 'launch.propellant', op: 'mult' as const, value: 0.9 }];
+    const result = startNextAuroraStage(state.resources, m, 'padA', [], engineState({ certified: true }), [], modifiers, 0);
+    expect(result!.resources.propellant.amount).toBe(1000 - 360); // 400 * 0.9
+
+    // Unaffected: structure's cost is Hardware only, no propellant involved.
+    const structureResult = startNextAuroraStage(state.resources, mission(), 'padA', [], engineState(), [], modifiers, 0);
+    expect(structureResult!.resources.hardware.amount).toBe(170);
+  });
+
+  // ECONOMY §9: Partial reusability — 20% of whatever Propellant the propellantLoad
+  // stage just spent is credited straight back.
+  it('credits back 20% Propellant at propellantLoad when Partial reusability is owned', () => {
+    const state = fundedState();
+    const stagesDone = ['structure', 'engines', 'guidance', 'satellitePayload', 'finalIntegration', 'padTransfer'];
+    const m = mission({ pads: { padA: { rocketStatus: 'on_pad', stagesDone, checklist: mission().pads.padA!.checklist, confidence: 0, committedRoll: null } } });
+    const result = startNextAuroraStage(state.resources, m, 'padA', [], engineState({ certified: true }), [], [], 0, ['partialReusability']);
+    // Spends 400, recovers 400 * 0.2 = 80 -> net -320.
+    expect(result!.resources.propellant.amount).toBe(1000 - 400 + 80);
+  });
+
+  it('does not recover Propellant for a non-propellantLoad stage even when Partial reusability is owned', () => {
+    const state = fundedState();
+    const result = startNextAuroraStage(state.resources, mission(), 'padA', [], engineState(), [], [], 0, ['partialReusability']);
+    expect(result!.resources.hardware.amount).toBe(170); // unaffected
+  });
+
+  // ECONOMY §9: Procedures' -10% integration time, scoped to VAB stages (structure
+  // through finalIntegration) — must NOT touch padTransfer/propellantLoad/flightReview.
+  it('applies Procedures to a VAB stage but not to padTransfer', () => {
+    const state = fundedState();
+    const modifiers = [{ id: 'xp:procedures', source: 'procedures', target: 'integration.duration', op: 'mult' as const, value: 0.9 }];
+    const structureResult = startNextAuroraStage(state.resources, mission(), 'padA', [], engineState(), [], modifiers, 0);
+    expect(structureResult!.processes[0].durationMs).toBe(18 * MIN); // 20 * 0.9
+
+    const stagesDone = ['structure', 'engines', 'guidance', 'satellitePayload', 'finalIntegration'];
+    const m = mission({ pads: { padA: { rocketStatus: 'in_vab', stagesDone, checklist: mission().pads.padA!.checklist, confidence: 0, committedRoll: null } } });
+    const transferResult = startNextAuroraStage(state.resources, m, 'padA', [], engineState({ certified: true }), [], modifiers, 0);
+    expect(transferResult!.processes[0].durationMs).toBe(5 * MIN); // unaffected
+  });
 });
 
 describe('maybeAutoQueueAuroraStage', () => {
@@ -277,6 +323,17 @@ describe('launchAuroraMission', () => {
     expect(result!.mission.pads.padA).toEqual({ rocketStatus: 'none', stagesDone: [], checklist: mission().pads.padA!.checklist, confidence: 0, committedRoll: null });
     expect(result!.mission.launches).toEqual([{ id: 'aurora-launch-padA-5000', padId: 'padA', missionType: 'auroraI', success: true, timestamp: 5000 }]);
     expect(result!.mission.auroraHalfDurationNext?.padA).toBe(false);
+  });
+
+  // ECONOMY §4/§9 (Sprint 10): Tracking Station's per-level Flight XP multiplier and
+  // Public relations' 'reputation.gain' modifier both apply to a story-mission launch.
+  it('success: scales Flight XP by Tracking Station level and Reputation by Public relations', () => {
+    const state = createInitialState();
+    const m = committedMission(0.5, 90);
+    const modifiers = [{ id: 'xp:publicRelations', source: 'publicRelations', target: 'reputation.gain', op: 'mult' as const, value: 1.2 }];
+    const result = launchAuroraMission(state.resources, m, 'padA', [], [], 5000, modifiers, 1, false);
+    expect(result!.resources.flightxp.amount).toBe(250 * 1.25); // Tracking Station level 1: +25%
+    expect(result!.resources.reputation.amount).toBe(60 * 1.2);
   });
 
   it('failure: 80%/60% XP/Flight-Data, 60% recovery of the 90 H actually spent integrating, no Rep, narrates N-12, sets the re-integration bonus', () => {

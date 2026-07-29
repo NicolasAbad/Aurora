@@ -1,8 +1,9 @@
 import { CERTIFICATION_TESTS_BY_ID, type CertificationTestDef } from '../data/certifications';
 import { markSeen } from '../data/narrative';
-import { applyGrant } from './economy';
+import { applyGrant, trackingStationFlightXpMultiplier } from './economy';
 import { creditHardware, currentHardwareTier } from './hardware';
-import type { EngineCertificationState, EngineId, GameState, Process } from './types';
+import { applyModifiers } from './modifiers';
+import type { EngineCertificationState, EngineId, GameState, Modifier, Process } from './types';
 
 export interface CertificationState {
   engines: Record<EngineId, EngineCertificationState>;
@@ -84,6 +85,9 @@ export function resolveCertification(
   narrativeSeen: string[],
   completedTech: string[],
   now: number,
+  modifiers: Modifier[] = [],
+  trackingLevel = 0,
+  antennaNetworkBought = false,
 ): CertificationResolution {
   const process = certifications.inProgress;
   if (!process || now < process.startedAt + process.durationMs) {
@@ -104,6 +108,11 @@ export function resolveCertification(
   }
 
   const engineState = certifications.engines[test.engineId];
+  // ECONOMY §4/§9 (Sprint 10): Tracking Station's level+Antenna-Network Flight XP
+  // multiplier and Public relations' 'reputation.gain' modifier, applied at every reward
+  // grant below — see core/economy.ts's trackingStationFlightXpMultiplier.
+  const xpMult = trackingStationFlightXpMultiplier(trackingLevel, antennaNetworkBought);
+  const grantReputation = (amount: number) => applyModifiers(amount, modifiers, 'reputation.gain', now);
 
   if (test.stage === 'extended') {
     return {
@@ -132,8 +141,8 @@ export function resolveCertification(
         },
         resources: {
           ...resources,
-          flightxp: applyGrant(resources.flightxp, STATIC_FIRE_SUCCESS_REWARD.flightxp, true),
-          reputation: applyGrant(resources.reputation, STATIC_FIRE_SUCCESS_REWARD.reputation, true),
+          flightxp: applyGrant(resources.flightxp, STATIC_FIRE_SUCCESS_REWARD.flightxp * xpMult, true),
+          reputation: applyGrant(resources.reputation, grantReputation(STATIC_FIRE_SUCCESS_REWARD.reputation), true),
           research: applyGrant(resources.research, STATIC_FIRE_SUCCESS_REWARD.flightData, true),
         },
         narrativeSeen: markSeen(narrativeSeen, CERTIFICATION_SUCCESS_NARRATIVE_ID),
@@ -146,7 +155,7 @@ export function resolveCertification(
         engines: { ...certifications.engines, [test.engineId]: { ...engineState, attempted: true } },
         inProgress: null,
       },
-      resources: { ...resources, flightxp: applyGrant(resources.flightxp, ORBITAL1_FAILURE_FLIGHT_XP, true) },
+      resources: { ...resources, flightxp: applyGrant(resources.flightxp, ORBITAL1_FAILURE_FLIGHT_XP * xpMult, true) },
       narrativeSeen,
       justCompleted: { testId, outcome: 'failure' },
     };
@@ -162,7 +171,7 @@ export function resolveCertification(
       resources: {
         ...resources,
         hardware: creditHardware(resources.hardware, SCRIPTED_FAILURE_HARDWARE_RECOVERY, tier, true),
-        flightxp: applyGrant(resources.flightxp, SCRIPTED_FAILURE_REWARD.flightxp, true),
+        flightxp: applyGrant(resources.flightxp, SCRIPTED_FAILURE_REWARD.flightxp * xpMult, true),
         research: applyGrant(resources.research, SCRIPTED_FAILURE_REWARD.flightData, true),
       },
       narrativeSeen: markSeen(narrativeSeen, SCRIPTED_FAILURE_NARRATIVE_ID),
@@ -182,8 +191,8 @@ export function resolveCertification(
     },
     resources: {
       ...resources,
-      flightxp: applyGrant(resources.flightxp, STATIC_FIRE_SUCCESS_REWARD.flightxp, true),
-      reputation: applyGrant(resources.reputation, STATIC_FIRE_SUCCESS_REWARD.reputation, true),
+      flightxp: applyGrant(resources.flightxp, STATIC_FIRE_SUCCESS_REWARD.flightxp * xpMult, true),
+      reputation: applyGrant(resources.reputation, grantReputation(STATIC_FIRE_SUCCESS_REWARD.reputation), true),
       research: applyGrant(resources.research, STATIC_FIRE_SUCCESS_REWARD.flightData, true),
     },
     narrativeSeen: markSeen(narrativeSeen, CERTIFICATION_SUCCESS_NARRATIVE_ID),

@@ -9,6 +9,7 @@ import { ManualActionButton } from './ui/ManualActionButton';
 import { StaffHiring } from './ui/StaffHiring';
 import { PromotionPanel } from './ui/PromotionPanel';
 import { ResearchPanel } from './ui/ResearchPanel';
+import { FlightXpPanel } from './ui/FlightXpPanel';
 import { PayrollBanner } from './ui/PayrollBanner';
 import { AwayModal } from './ui/AwayModal';
 import { ActiveProcessStrip } from './ui/ActiveProcessStrip';
@@ -138,6 +139,17 @@ function ResearchTabPanel({ onSelectComplex }: ComplexPanelProps) {
     <>
       <StaffAvailabilityChip onTap={() => onSelectComplex('campus')} />
       <ResearchPanel />
+    </>
+  );
+}
+
+// ECONOMY §9 (Sprint 10): same top-level-tab treatment as Research — ComplexTabs already
+// gates entry on any Flight XP having been earned.
+function FlightXpTabPanel({ onSelectComplex }: ComplexPanelProps) {
+  return (
+    <>
+      <StaffAvailabilityChip onTap={() => onSelectComplex('campus')} />
+      <FlightXpPanel />
     </>
   );
 }
@@ -396,6 +408,7 @@ export function App() {
         {activeComplex === 'campus' && <CampusPanel onSelectComplex={setActiveComplex} />}
         {activeComplex === 'production' && <ProductionPanel onSelectComplex={setActiveComplex} />}
         {activeComplex === 'research' && <ResearchTabPanel onSelectComplex={setActiveComplex} />}
+        {activeComplex === 'flightXp' && <FlightXpTabPanel onSelectComplex={setActiveComplex} />}
         {activeComplex === 'testing' && (
           <TestingPanel
             onSelectComplex={setActiveComplex}

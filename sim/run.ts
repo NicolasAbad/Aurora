@@ -529,6 +529,16 @@ function grantFlightData(state: SimState, amount: number): void {
   }
 }
 
+// ECONOMY §4 (Sprint 10): Tracking Station "+25% Flight Experience per level" — an
+// intrinsic, automatic building effect (like Aluminum alloys' Fabrication-consumption
+// cut above), NOT an optional purchase, so unlike the internal upgrades this sim
+// deliberately doesn't model, this one IS modeled. Antenna Network's further +25% is an
+// optional internal upgrade the bot never buys, same documented restraint as every other
+// unmodeled upgrade — consistently biases the sim toward a conservative lower bound.
+function grantFlightXp(state: SimState, amount: number): void {
+  grant(state, 'flightxp', amount * (1 + 0.25 * state.buildingLevel.trackingStation), true);
+}
+
 function isUnlocked(state: SimState, cond: UnlockCondition): boolean {
   switch (cond.kind) {
     case 'start':
@@ -878,7 +888,7 @@ function startCertification(state: SimState): void {
       onComplete: () => {
         state.probe1Test1Done = true;
         grant(state, 'hardware', 6, true); // 60% recovery of the 10 spent, per GDD §7b
-        grant(state, 'flightxp', SCRIPTED_FAILURE_REWARD.flightxp, true);
+        grantFlightXp(state, SCRIPTED_FAILURE_REWARD.flightxp);
         grantFlightData(state, SCRIPTED_FAILURE_REWARD.researchFlightData);
         maybeAwardRecord(state, 'firstIgnition');
         state.day.notes.push('probe1 test1: scripted failure (N-07)');
@@ -893,7 +903,7 @@ function startCertification(state: SimState): void {
       remainingMs: CERT_DURATION * certDurationMult(state),
       onComplete: () => {
         state.probe1Test2Done = true;
-        grant(state, 'flightxp', STATIC_FIRE_SUCCESS_REWARD.flightxp, true);
+        grantFlightXp(state, STATIC_FIRE_SUCCESS_REWARD.flightxp);
         grant(state, 'reputation', STATIC_FIRE_SUCCESS_REWARD.reputation, true);
         grantFlightData(state, STATIC_FIRE_SUCCESS_REWARD.researchFlightData);
         state.day.notes.push('probe1 certified (static fire success)');
@@ -925,12 +935,12 @@ function startCertification(state: SimState): void {
       onComplete: () => {
         if (rng() < ORBITAL1_SUCCESS_RATE) {
           state.orbital1BaseDone = true;
-          grant(state, 'flightxp', STATIC_FIRE_SUCCESS_REWARD.flightxp, true);
+          grantFlightXp(state, STATIC_FIRE_SUCCESS_REWARD.flightxp);
           grantFlightData(state, STATIC_FIRE_SUCCESS_REWARD.researchFlightData);
           grant(state, 'reputation', STATIC_FIRE_SUCCESS_REWARD.reputation, true);
           state.day.notes.push('orbital1 certified');
         } else {
-          grant(state, 'flightxp', ORBITAL1_FAILURE_FLIGHT_XP, true);
+          grantFlightXp(state, ORBITAL1_FAILURE_FLIGHT_XP);
           state.day.notes.push('orbital1 cert failed (retry at half duration)');
           // Retry immediately at half duration (ECONOMY §6), no extra resource cost
           // modeled for the retry attempt itself. The sim simplifies the retry to a
@@ -942,7 +952,7 @@ function startCertification(state: SimState): void {
             remainingMs: ORBITAL1_RETRY_DURATION * certDurationMult(state),
             onComplete: () => {
               state.orbital1BaseDone = true; // retry succeeds deterministically in-sim
-              grant(state, 'flightxp', STATIC_FIRE_SUCCESS_REWARD.flightxp, true);
+              grantFlightXp(state, STATIC_FIRE_SUCCESS_REWARD.flightxp);
               grantFlightData(state, STATIC_FIRE_SUCCESS_REWARD.researchFlightData);
               grant(state, 'reputation', STATIC_FIRE_SUCCESS_REWARD.reputation, true);
               state.day.notes.push('orbital1 certified (retry)');
@@ -1029,7 +1039,7 @@ function tickSonda(state: SimState, deltaMs: number): void {
   state.resources.propellant -= propellantNeeded;
   if (state.sondaTimer.kind === 's1') {
     state.s1Flights += 1;
-    grant(state, 'flightxp', S1_REWARD.flightxp, true);
+    grantFlightXp(state, S1_REWARD.flightxp);
     grantFlightData(state, S1_REWARD.researchFlightData);
     grant(state, 'reputation', S1_REWARD.reputation, true);
     // ECONOMY §8b (v2.2): "First flight" triggers on the first S-1 sonda LAUNCH (lifted
@@ -1040,7 +1050,7 @@ function tickSonda(state: SimState, deltaMs: number): void {
   } else {
     state.s2Flown = true;
     state.s2FlownDay = Math.floor(state.nowMs / DAY_MS) + 1;
-    grant(state, 'flightxp', S2_REWARD.flightxp, true);
+    grantFlightXp(state, S2_REWARD.flightxp);
     grantFlightData(state, S2_REWARD.researchFlightData);
     grant(state, 'reputation', S2_REWARD.reputation, true);
     maybeAwardRecord(state, 'pastKarman'); // first successful S-2, ECONOMY §8b
@@ -1071,7 +1081,7 @@ function tickContract(state: SimState, deltaMs: number): void {
   const reward = CONTRACT_REWARDS[0];
   grant(state, 'funding', reward.funding, true);
   grant(state, 'reputation', reward.reputation, true);
-  grant(state, 'flightxp', reward.flightxp, true);
+  grantFlightXp(state, reward.flightxp);
   grantFlightData(state, reward.researchFlightData);
   state.day.fundingFromContracts += reward.funding;
   state.contractsFulfilled += 1;
@@ -1115,7 +1125,7 @@ function tickAurora(state: SimState, deltaMs: number): void {
   if (state.auroraStageIndex >= AURORA_I_STAGES.length) {
     state.auroraILaunched = true;
     state.auroraILaunchedDay = Math.floor(state.nowMs / DAY_MS) + 1;
-    grant(state, 'flightxp', AURORA_I_SIM_REWARD.flightxp, true);
+    grantFlightXp(state, AURORA_I_SIM_REWARD.flightxp);
     grantFlightData(state, AURORA_I_SIM_REWARD.researchFlightData);
     grant(state, 'reputation', AURORA_I_SIM_REWARD.reputation, true);
     maybeAwardRecord(state, 'firstOrbit'); // Aurora I success, ECONOMY §8b

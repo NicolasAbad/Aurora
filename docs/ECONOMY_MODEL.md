@@ -1,37 +1,26 @@
 # ECONOMY_MODEL.md — Aurora Program — Complete baseline numbers
 *Every value in the game. Claude Code does NOT invent numbers: if a value isn't here, ask and add it here first. Tick = 1 second (logical economy rate; the render loop is delta-based per CLAUDE.md rule 6). Baseline for the Sprint-0 headless simulator (`sim/run.ts`); adjust only via the simulator, updating this file.*
 
+**v3.9 changes (Sprint 10 task 1 — Flight Experience trees, no values changed):** §9's 10 XP nodes implemented as specified — 8 wired as declarative Modifiers (same registry research-tree effects use), Partial reusability as dedicated propellant-recovery logic. Tracking Station's "+25% Flight XP per level" (§4, already-documented since the building shipped) was never actually applied anywhere in code until now — same "described but unwired" gap class as Sprint 7.5's Test Stand leveling, fixed here rather than re-specified (no value changed, only real behavior added to match the existing doc line). Parallel integration's exact mechanic ("two stages at once") deferred — genuinely underspecified against the shipped strictly-sequential VAB stage model; purchase blocked in code pending a design answer, tracked as an open question, not guessed at.
+
 **v3.8 changes (owner design proposal — emotional payoff for staff growth):** new building-expansion milestone rule (§4c) — every 10 levels, a slotted building gains +1 slot per role it already employs, universal and automatic, coexisting with the already-shipped specific slot upgrades. **SCOPED UNLOCK — full sim sweep required.**
 
-**v3.7 changes (Sprint 9.5 — second manual-play pass):** rate-display precision fixed (§12 — deltas below 0.1 now show 2 decimals, closing the "+0.0/s" R&D Lab bug); Basic engineering's cost raised 15R/3min → 120R/45min to protect the promotion-bootstrap pacing (SCOPED UNLOCK, re-run sim). Hiring-cost curve (base cost / 1.15^hiredOfThatRole factor) flagged by the owner as possibly too shallow given realistic headcounts — NOT changed here; parked as a dedicated balance-pass candidate before the itch.io build (BACKLOG).
-
-**v3.6 changes (Sprint 9 blocker):** satellite contract build process specified (§10) — single VAB integration stage (not Aurora I's 5-stage breakdown), duration scaled to Aurora I's Hardware-per-minute density (tier 1 ≈33min, tier 2 ≈67min), free flight review (0 Research). Was a real doc gap, not oversight — Option 1 of three proposed. **SCOPED UNLOCK: new timing/cadence content — re-run the full sim sweep after implementing.**
-
-**v3.5 changes (owner manual-play findings — first-hour experience):** Auto-refuel and Engine Test Stand's per-level leveling both had NO defined effect at all (real gaps, not player misunderstanding) — now defined (§5, §4). Sounding rockets tech's role clarified as a pure gate (§5), matching the honest-zero-effect pattern already used for Aluminum alloys. Hardware tier production confirmed unchanged (automatic at current researched tier, §4 Fabrication row) — the "nothing happened" report was a missing UI confirmation, not a missing mechanic; fixed in UI_SPEC §4 (tier-change toast). **Test Stand's new per-level effect and Auto-refuel's duration change affect real timing outcomes — Sprint 8's sweep must re-verify the pacing floor/ceiling and salary band still hold.**
-
-**v3.4 changes (Sprint 6 ratifications — no values changed):** Propellant load for sondas confirmed as a live check consumed at launch, not a timed step (§7a's "Launch consumes" header was already explicit); GDD §7b's full failure package (60% Hardware recovery, half-duration re-integration, 80%/60% XP/Flight-Data) confirmed to apply to ALL launch failures including sondas, not Aurora I only; Program Records for "First flight" and "Past the Kármán line" confirmed to gate on a SUCCESSFUL flight — only "First ignition" carries the explicit even-on-failure carve-out.
-
-**v3.2 changes (upgrade audit):** Radar clarified as part of the base Tracking Station (not purchasable); v2-only upgrades marked [v2] and explicitly not rendered in v1; player-facing upgrade copy now mandatory (NARRATIVE §6, UI_SPEC §4). No values changed.
-
-**v3.1 changes (design review — scoped economy unlock, item-limited):** tier-0 contract Confidence clarified (sonda formula, 100% reachable); Clean Room naming collision resolved (tier renamed "constellation batches"; the VAB upgrade is a real tier-2 prerequisite); Reputation gates added to satellite tiers (tier 1 ≥ 20, tier 2 ≥ 50 — safety nets, sim-verified at Sprint 9); contract launch failure vs missed-deadline penalty disambiguated; Rush Order gate rationale confirmed. **This is a SCOPED unlock for these items only — the rest of the economy stays locked and no existing value changed.**
-
-**v3.0 changes (presentation):** player-facing display names & cost rendering defined (§12) — Funds shown as $, costs as icon+number, no resource nouns in price tags. Presentation only: no ResourceId, value, or balance change; economy lock unaffected.
-
-**v2.9 changes (Sprint 4 blocker):** Aluminum node disambiguated (§5) — renamed "Aluminum alloys", explicitly no production effect, explicitly NOT a gate on the Aluminum tier (which needs no tech, ratifying Sprint 3's `currentHardwareTier`); it exists as the Materials branch entry and Titanium's prerequisite.
-
-**v2.8 changes (owner manual-play findings + ratification):** multi-role staffRatio defined as bottleneck (min across roles) — ratifying the Sprint 3 implementation; staff slots exist only at building level ≥ 1 (assignment to unbuilt buildings was a bug); player-facing UI never shows single-letter resource abbreviations (UI_SPEC §4); pitch cooldown gets visible recharge feedback (UI_SPEC §4) — the 1 s cadence itself stays (economy lock); dev-only reset button added ahead of Sprint 8's real one.
-
-**v2.7 changes (semantics, NOT a balance unlock — no values touched):** tick resolution order and starvation/contention rules defined (§4b) — binary per-building starvation pause, fixed consumer claim order, salaries resolve first.
-
-**v2.5 changes (multi-seed sweep, seeds 1–10 × 45d):** Flight Data ×~1.7 across the board (median era shares were 14.7%/15.9% vs the 20–35% target — decision rule's "raise Flight Data, don't touch the lab" branch applied); salary sanity band widened to 30–55% (settling at ~53–55% is intended pressure — the insolvency mechanic exists to make it interactive — not a miss); day-1 `basicEngineering` stall accepted as bootstrap pacing with a contingent FTUE fix parked in BACKLOG and tooltip T-09 added.
-
-**v2.4 changes:** contract rewards specified per tier (the §8 range left tier assignment open to interpretation — surfaced when the sim had to pick a value); contract Reputation in §8 now defers to §10 (the old +10–25 range contradicted tier-0's 3 Rep).
-
-**v2.3 changes (sim-driven rebalance):** R&D Lab 0.1 → 0.03 R/s per level and Flight Data values raised ~1.5× — the v2.1 rebalance was insufficient (human-profile sim measured Flight Data at ~2% of Research income vs the ≥25% target; a 24/7 lab vs a few flights/day could never hit it at 0.1 R/s). Target reformulated as a per-era range (§8). Pacing floor codified: human profile must not reach Aurora I before simulated day 5.
-
-**v2.2 changes (Sprint-0 findings):** pitch yield unified to one formula (§2); starting staff cap documented (§1); promotion-bootstrap note added (§3); Aurora I payload/flight-review durations defined (§7); number formatting rule = 3 significant figures (§12); Program Record triggers redefined by event, not launch number (§8b).
-
-**v2.1 changes:** salaries retuned (were decorative at 5% of income); R&D Lab rate cut 0.4 → 0.1 R/s per level and Flight Data multiplied ~10× so missions genuinely fund research; sonda Confidence base 65; Orbital-1 extended certification added; failure XP = 80% of mission success XP; tier-0 contract cost defined as all-inclusive; Remote Ops research node added (offline cap 16 h); insolvency/offline-salary/cap-overflow rules referenced from GDD §1b–1c.
+**Version history (compressed — full detail only for the latest 2 versions above; older entries kept as one-liners for traceability, not routine reading):**
+- v3.7: rate-display precision fixed (2 decimals below 0.1); Basic engineering cost raised 15R/3min -> 120R/45min (SCOPED UNLOCK); hiring-cost curve flagged, not changed.
+- v3.6: satellite contract build process specified (§10) — single-stage integration, scaled duration, free flight review.
+- v3.5: Auto-refuel and Test Stand leveling given real effects (both were undefined gaps); Sounding rockets confirmed a pure gate; Hardware tier production confirmed automatic (UI feedback was the actual gap).
+- v3.4: Sprint 6 ratifications — Propellant is a live launch-time check, not timed; full failure package applies to all launches not just Aurora I; Records gate on success except "First ignition."
+- v3.2: Radar confirmed non-purchasable (base Tracking Station); [v2] upgrades hidden; upgrade copy made mandatory.
+- v3.1: tier-0 Confidence uses the sonda formula; "Clean Room" naming collision resolved; Reputation gates added to satellite tiers; contract fail-vs-deadline penalty disambiguated.
+- v3.0: player-facing display names & cost rendering defined (§12) — presentation only.
+- v2.9: Aluminum node disambiguated — no production effect, gate-only.
+- v2.8: multi-role staffRatio = bottleneck rule; slots require level ≥ 1; no single-letter abbreviations; dev reset button.
+- v2.7: tick resolution order + starvation/contention rules defined (§4b).
+- v2.5: Flight Data raised ~1.7×; salary band widened to 30-55%; day-1 stall accepted as intended pacing.
+- v2.4: contract rewards specified per tier.
+- v2.3: R&D Lab rate cut to 0.03/level with Flight Data compensated; day-5 pacing floor codified.
+- v2.2: pitch yield unified; starting staff cap documented; number formatting = 3 sig figs.
+- v2.1: initial sim-driven rebalance (salaries, R&D Lab rate, sonda Confidence base, failure XP, Remote Ops node).
 
 ## 1. Starting state
 Funding 0 · Materials 0 · Research 0 · Hardware 0 (Aluminum tier) · Propellant 0 · Reputation 0 · Flight XP 0. Buildings: Offices lv1 (free, pre-built). Staff: 0. **Starting staff cap: 2** (before any Crew Quarters; Quarters adds +3 per level). Initial caps (no Warehouse): Funding 500 · Materials 200 · Hardware 50 · Propellant 0 (requires Propellant Depot).
