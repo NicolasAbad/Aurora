@@ -502,6 +502,39 @@ describe('Mission Log generic completions (Sprint 9.5, T-18/19/20 — UI_SPEC §
     );
   });
 
+  it('T-23 fires once per employed role when a building crosses a level-10 milestone (ECONOMY §4c)', () => {
+    useGameStore.setState((s) => ({
+      buildings: { ...s.buildings, fabrication: { ...s.buildings.fabrication, level: 9 } },
+      resources: {
+        ...s.resources,
+        funding: { ...s.resources.funding, amount: 1_000_000 },
+        materials: { ...s.resources.materials, amount: 1_000_000 },
+      },
+    }));
+    useGameStore.getState().buyBuilding('fabrication'); // 9 -> 10, crosses the milestone
+    expect(useGameStore.getState().buildings.fabrication.level).toBe(10);
+    expect(useGameStore.getState().narrative.log).toContain(
+      narrativeText('T-23', { building: 'Fabrication', role: 'Engineer' }),
+    );
+    expect(useGameStore.getState().narrative.log).toContain(
+      narrativeText('T-23', { building: 'Fabrication', role: 'Technician' }),
+    );
+  });
+
+  it('T-23 does not fire on a non-milestone level (e.g. 9 -> not a multiple of 10)', () => {
+    useGameStore.setState((s) => ({
+      buildings: { ...s.buildings, fabrication: { ...s.buildings.fabrication, level: 7 } },
+      resources: {
+        ...s.resources,
+        funding: { ...s.resources.funding, amount: 1_000_000 },
+        materials: { ...s.resources.materials, amount: 1_000_000 },
+      },
+    }));
+    useGameStore.getState().buyBuilding('fabrication'); // 7 -> 8
+    expect(useGameStore.getState().buildings.fabrication.level).toBe(8);
+    expect(useGameStore.getState().narrative.log ?? []).toEqual([]);
+  });
+
   it('backfills log from existing seen history the first time an older save (no `log` field yet) fires a new event', () => {
     useGameStore.setState(() => ({
       narrative: { seen: ['N-01', 'N-02'] }, // simulates a pre-Sprint-9.5 save

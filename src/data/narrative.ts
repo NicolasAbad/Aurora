@@ -102,6 +102,10 @@ export const NARRATIVE_TEXT: Record<string, string> = {
     'A sounding rocket flight: quick, cheap, and it earns Flight Experience and Flight Data (which feeds Research) every time — your first real step toward orbit.',
   'T-22':
     'This flight can cross the Kármán line — the internationally recognized edge of space, and your program’s first Program Record.',
+  // v3.8 (Sprint 9.5, ECONOMY §4c): the level-10 building-expansion milestone's own
+  // celebration — distinct from the routine per-purchase upgrade toast, a bigger, rarer
+  // moment. One line per role affected (a multi-role building fires one per role).
+  'T-23': '{building} expanded! +1 {role} slot.',
   // §10 — manual verb descriptions (same "no purchasable without effect text" rule).
   rushOrder: 'Trade Funding for instant Materials when you need them now instead of waiting on the Depot.',
   // §3 (Sprint 9) — random events. Each event is one flavor string (title + situation)

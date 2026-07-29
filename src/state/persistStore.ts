@@ -17,6 +17,7 @@ import {
   startPromotion,
   startResearch,
 } from '../core/actions';
+import { BUILDING_EXPANSION_MILESTONE_LEVELS } from '../core/staff';
 import {
   emptyPadMissionState,
   launchAuroraMission,
@@ -528,11 +529,22 @@ export const useGameStore = create<Store>()((set, get) => ({
         seen = markSeen(seen, 'N-17'); // Launch Pad B built
         mission = { ...mission, pads: { ...mission.pads, padB: emptyPadMissionState() } };
       }
+      // T-23 (ECONOMY §4c / NARRATIVE §9 v3.8): the level-10 building-expansion
+      // milestone's own celebration, distinct from the routine upgrade toast — one line
+      // per role the building employs (a multi-role building fires one per role).
+      let log = missionLogBase(state.narrative);
+      const newLevel = result.buildings[buildingId].level;
+      if (newLevel > 0 && newLevel % BUILDING_EXPANSION_MILESTONE_LEVELS === 0) {
+        for (const role of Object.keys(BUILDINGS[buildingId].slots ?? {}) as RoleId[]) {
+          log = appendLogLine(log, narrativeText('T-23', { building: BUILDINGS[buildingId].name, role: ROLE_LABEL[role] }));
+        }
+      }
+      log = syncSeenIntoLog(state.narrative.seen.length, seen, log);
       set({
         ...result,
         mission,
         telemetry: trackFirstOccurrence(state.telemetry, 'first_building_upgrade', { buildingId }),
-        narrative: { seen, log: syncSeenIntoLog(state.narrative.seen.length, seen, missionLogBase(state.narrative)) },
+        narrative: { seen, log },
       });
     }
   },

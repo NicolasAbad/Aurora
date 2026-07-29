@@ -31,6 +31,13 @@ const SLOT_UPGRADE_BONUS: Partial<Record<string, { role: RoleId; amount: number 
   bulkContracts: { role: 'technician', amount: 1 },
 };
 
+// ECONOMY §4c (v3.8, Sprint 9.5 SCOPED UNLOCK): every 10 levels (10, 20, 30…), a slotted
+// building gains +1 slot in EACH role it already employs — universal, automatic,
+// coexisting with the specific slot-adding upgrades above (which remain the earlier,
+// targeted lever). "Already employs" means the building has a nonzero BASE slot for that
+// role — this never creates a slot for a role the building never had one for.
+export const BUILDING_EXPANSION_MILESTONE_LEVELS = 10;
+
 /** ECONOMY §4 (v2.8): "slots exist only at building level >= 1" — an unbuilt building
  * has no assignment targets at all, regardless of what its BuildingDef declares.
  * `upgrades` (default none) adds any owned slot-adding internal upgrade's bonus on top —
@@ -42,11 +49,13 @@ export function buildingSlotCount(
   upgrades: string[] = [],
 ): number {
   if (level < 1) return 0;
-  let slots = BUILDINGS[buildingId].slots?.[role] ?? 0;
+  const baseSlots = BUILDINGS[buildingId].slots?.[role] ?? 0;
+  let slots = baseSlots;
   for (const upgradeId of upgrades) {
     const bonus = SLOT_UPGRADE_BONUS[upgradeId];
     if (bonus && bonus.role === role) slots += bonus.amount;
   }
+  if (baseSlots > 0) slots += Math.floor(level / BUILDING_EXPANSION_MILESTONE_LEVELS);
   return slots;
 }
 

@@ -40,6 +40,31 @@ describe('isRoleUnlocked', () => {
   });
 });
 
+describe('buildingSlotCount — ECONOMY §4c (v3.8, Sprint 9.5 building-expansion milestone)', () => {
+  it('is unaffected below the first milestone (level 9)', () => {
+    expect(buildingSlotCount('finance', 'technician', 9)).toBe(2); // base only
+  });
+
+  it('gains +1 per role already employed at level 10, on top of the base', () => {
+    expect(buildingSlotCount('finance', 'technician', 10)).toBe(3); // 2 base + 1 milestone
+    expect(buildingSlotCount('fabrication', 'engineer', 10)).toBe(2); // 1 base + 1 milestone
+    expect(buildingSlotCount('fabrication', 'technician', 10)).toBe(2); // 1 base + 1 milestone
+  });
+
+  it('stacks every 10 levels (level 25 -> +2 milestones)', () => {
+    expect(buildingSlotCount('finance', 'technician', 25)).toBe(4); // 2 base + floor(25/10)=2
+  });
+
+  it('coexists with an owned slot-adding upgrade, additively', () => {
+    expect(buildingSlotCount('finance', 'technician', 10, ['grantsDesk'])).toBe(4); // 2 base + 1 upgrade + 1 milestone
+  });
+
+  it('never grants a slot for a role the building has no base slot for at all', () => {
+    expect(buildingSlotCount('finance', 'scientist', 10)).toBe(0);
+    expect(buildingSlotCount('warehouse', 'technician', 20)).toBe(0); // Warehouse has no slots at all
+  });
+});
+
 describe('slotUpgradeForRole (UI_SPEC §4 v3.7, T-12a/T-12b)', () => {
   it('finds the slot-adding upgrade for a building+role that has one', () => {
     expect(slotUpgradeForRole('finance', 'technician')?.id).toBe('grantsDesk');

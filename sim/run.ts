@@ -96,6 +96,7 @@ import {
 } from '../src/core/certification';
 import { costAtLevel, pitchYield, productionPerSecond } from '../src/core/economy';
 import { RECORD_DEFS } from '../src/core/records';
+import { BUILDING_EXPANSION_MILESTONE_LEVELS } from '../src/core/staff';
 import { AURORA_I_REWARD, AURORA_I_STAGES as REAL_AURORA_I_STAGES } from '../src/data/auroraI';
 import { BUILDINGS } from '../src/data/buildings';
 import { CERTIFICATION_TESTS_BY_ID } from '../src/data/certifications';
@@ -559,11 +560,20 @@ function totalHired(state: SimState): number {
   return Object.values(state.staffHired).reduce((a, b) => a + b, 0);
 }
 
+// ECONOMY §4c (v3.8, Sprint 9.5 SCOPED UNLOCK): +1 slot per role already employed, every
+// 10 levels — automatic, no purchase decision involved (unlike every other "sim doesn't
+// model this optional system" precedent elsewhere in this file), so it must be reflected
+// here for the sweep re-run to mean anything: without it, the bot's own hiring target
+// would silently diverge from core/staff.ts's buildingSlotCount (the function the REAL
+// game's economy tick actually uses), understating headcount need for any building that
+// crosses level 10 in a run — plausible well within 30 days for Finance/R&D Lab/Supply
+// Depot at this bot's pace.
 function requiredSlots(state: SimState, role: RoleId): number {
   let total = 0;
   for (const def of Object.values(BUILDINGS)) {
     if (!def.slots?.[role]) continue;
-    if (state.buildingLevel[def.id] > 0) total += def.slots[role]!;
+    const level = state.buildingLevel[def.id];
+    if (level > 0) total += def.slots[role]! + Math.floor(level / BUILDING_EXPANSION_MILESTONE_LEVELS);
   }
   return total;
 }
@@ -571,7 +581,7 @@ function requiredSlots(state: SimState, role: RoleId): number {
 function passiveFundingRate(state: SimState): number {
   const def = BUILDINGS.finance;
   const level = state.buildingLevel.finance;
-  const required = def.slots!.technician!;
+  const required = def.slots!.technician! + Math.floor(level / BUILDING_EXPANSION_MILESTONE_LEVELS);
   const assigned = Math.min(state.staffHired.technician, required);
   return productionPerSecond(def.production!.basePerSec, level, assigned / required || 0);
 }
@@ -581,9 +591,10 @@ function passiveFundingRate(state: SimState): number {
 // same pattern as passiveFundingRate() above.
 function rndLabRate(state: SimState): number {
   const def = BUILDINGS.rndLab;
-  const required = def.slots!.scientist!;
+  const level = state.buildingLevel.rndLab;
+  const required = def.slots!.scientist! + Math.floor(level / BUILDING_EXPANSION_MILESTONE_LEVELS);
   const assigned = Math.min(state.staffHired.scientist, required);
-  return productionPerSecond(def.production!.basePerSec, state.buildingLevel.rndLab, assigned / required || 0);
+  return productionPerSecond(def.production!.basePerSec, level, assigned / required || 0);
 }
 
 // ---------------------------------------------------------------------------
