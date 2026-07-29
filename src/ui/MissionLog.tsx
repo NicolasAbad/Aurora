@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../state/persistStore';
-import { NARRATIVE_TEXT } from '../data/narrative';
+import { missionLogBase } from '../data/narrative';
 import { RECORD_DEFS } from '../core/records';
 import type { RecordId } from '../core/types';
 
@@ -37,28 +37,42 @@ function RecordsBoard() {
 type Tab = 'log' | 'records';
 
 /** UI_SPEC §3.4: "collapsible bottom panel, last entry always visible as one italic
- * line; expands to scrollable feed." Reads straight off GameState.narrative.seen — every
- * beat is appended there the moment its trigger fires (pitch, hire, a certification
- * resolving, etc.), so this component has no logic of its own beyond display + expand.
- * UI_SPEC §8: "Records board lives as a tab inside this panel." */
+ * line; expands to scrollable feed." UI_SPEC §2f (Sprint 9.5): gained an unread-count
+ * badge (entries added since the panel was last opened this session — like the FTUE
+ * tooltips' dismiss-set, this is session-local, not persisted to GameState) and generic
+ * process completions (T-18/19/20) alongside the flavor-heavy N-* beats, both through the
+ * same `missionLogBase` feed (data/narrative.ts) so this component has no logic of its
+ * own beyond display + expand + the unread count. UI_SPEC §8: "Records board lives as a
+ * tab inside this panel." */
 export function MissionLog() {
-  const seen = useGameStore(useShallow((s) => s.narrative.seen));
+  const narrative = useGameStore(useShallow((s) => s.narrative));
   const [expanded, setExpanded] = useState(false);
   const [tab, setTab] = useState<Tab>('log');
+  const feed = missionLogBase(narrative);
+  const [lastReadCount, setLastReadCount] = useState(feed.length);
 
-  if (seen.length === 0) return null; // nothing has happened yet — no empty panel to show
+  if (feed.length === 0) return null; // nothing has happened yet — no empty panel to show
 
-  const lastId = seen[seen.length - 1];
+  const unreadCount = Math.max(0, feed.length - lastReadCount);
+
+  function toggle() {
+    setExpanded((e) => {
+      const next = !e;
+      if (next) setLastReadCount(feed.length); // opening clears the badge
+      return next;
+    });
+  }
 
   return (
     <div className="mission-log">
       <button
         type="button"
         className="mission-log__last-entry"
-        onClick={() => setExpanded((e) => !e)}
+        onClick={toggle}
         aria-expanded={expanded}
       >
-        <em>{NARRATIVE_TEXT[lastId]}</em>
+        <em>{feed[feed.length - 1]}</em>
+        {!expanded && unreadCount > 0 && <span className="mission-log__badge">{unreadCount}</span>}
       </button>
       {expanded && (
         <div className="mission-log__panel">
@@ -80,9 +94,9 @@ export function MissionLog() {
           </div>
           {tab === 'log' ? (
             <div className="mission-log__feed">
-              {[...seen].reverse().map((id) => (
-                <p key={id} className="mission-log__entry">
-                  {NARRATIVE_TEXT[id]}
+              {[...feed].reverse().map((text, i) => (
+                <p key={`${feed.length - i}-${text}`} className="mission-log__entry">
+                  {text}
                 </p>
               ))}
             </div>

@@ -3,6 +3,7 @@ import { createInitialState } from '../data/initialState';
 import { launchAuroraMission, resolveAuroraChecklist } from '../core/auroraMission';
 import { hardResetSave, importSave, loadGame, saveGame, SAVE_KEY, useGameStore } from './persistStore';
 import { CURRENT_SCHEMA_VERSION } from './migrations';
+import { narrativeText } from '../data/narrative';
 import type { Process } from '../core/types';
 
 beforeEach(() => {
@@ -450,6 +451,69 @@ describe('Mission Log narrative triggers (Sprint 5)', () => {
     useGameStore.getState().launchAurora('padA');
     expect(useGameStore.getState().narrative.seen).toContain('N-12');
     expect(useGameStore.getState().mission.launches[0].success).toBe(false);
+  });
+});
+
+describe('Mission Log generic completions (Sprint 9.5, T-18/19/20 — UI_SPEC §2f)', () => {
+  beforeEach(() => {
+    useGameStore.setState(createInitialState());
+  });
+
+  it('a narrative beat (N-01) also lands in narrative.log, resolved to its display text', () => {
+    useGameStore.getState().pitch();
+    expect(useGameStore.getState().narrative.log).toEqual([narrativeText('N-01')]);
+  });
+
+  it('T-18 logs a line when a promotion process completes via applyTick', () => {
+    useGameStore.setState((s) => ({
+      staff: {
+        ...s.staff,
+        pools: { ...s.staff.pools, technician: { ...s.staff.pools.technician, hired: 1 } },
+      },
+      processes: [
+        { id: 'p1', kind: 'training', startedAt: 0, durationMs: 1000, payload: { from: 'technician', to: 'engineer' } },
+      ] as Process[],
+    }));
+    useGameStore.getState().applyTick(10_000);
+    expect(useGameStore.getState().narrative.log).toContain(
+      narrativeText('T-18', { fromRole: 'Technician', toRole: 'Engineer' }),
+    );
+  });
+
+  it('T-19 logs a line when a research node completes via applyTick', () => {
+    useGameStore.setState((s) => ({
+      research: {
+        completed: [],
+        inProgress: { id: 'r1', kind: 'research', startedAt: 0, durationMs: 1000, payload: { nodeId: 'aluminum' } },
+      },
+      resources: { ...s.resources, research: { ...s.resources.research, amount: 0 } },
+    }));
+    useGameStore.getState().applyTick(10_000);
+    expect(useGameStore.getState().narrative.log).toContain(narrativeText('T-19', { node: 'Aluminum alloys' }));
+  });
+
+  it('T-20 logs a line when an internal upgrade is bought', () => {
+    useGameStore.setState((s) => ({
+      resources: { ...s.resources, funding: { ...s.resources.funding, amount: 1000 } },
+    }));
+    useGameStore.getState().buyInternalUpgrade('finance', 'grantsDesk');
+    expect(useGameStore.getState().narrative.log).toContain(
+      narrativeText('T-20', { building: 'Finance', upgrade: 'Grants desk' }),
+    );
+  });
+
+  it('backfills log from existing seen history the first time an older save (no `log` field yet) fires a new event', () => {
+    useGameStore.setState(() => ({
+      narrative: { seen: ['N-01', 'N-02'] }, // simulates a pre-Sprint-9.5 save
+      resources: { ...useGameStore.getState().resources, funding: { ...useGameStore.getState().resources.funding, amount: 200 } },
+    }));
+    expect(useGameStore.getState().narrative.log).toBeUndefined();
+    useGameStore.getState().buyBuilding('finance'); // fires N-03, not already in `seen`
+    expect(useGameStore.getState().narrative.log).toEqual([
+      narrativeText('N-01'),
+      narrativeText('N-02'),
+      narrativeText('N-03'),
+    ]);
   });
 });
 

@@ -370,7 +370,12 @@ export interface GameState {
   economyFlags: EconomyFlags;
   contracts: ContractState;
   records: string[];
-  narrative: { seen: string[] };
+  // `seen` stays the append-only dedup/gate array it always was. `log` (Sprint 9.5,
+  // additive optional — rule 5, no migration) is the Mission Log's derived DISPLAY feed:
+  // narrative beats and generic process completions (T-18/19/20) in true chronological
+  // order — see data/narrative.ts's missionLogBase/syncSeenIntoLog for how it's kept in
+  // sync with `seen` without touching any of the many markSeen call sites across core/.
+  narrative: { seen: string[]; log?: string[] };
   telemetry: TelemetryEvent[];
   // Sprint 9, additive optional (rule 5): absent means never checked/no pending event —
   // read as `state.events ?? { activeMsAccumulated: 0, lastEventAt: null, pending: null }`

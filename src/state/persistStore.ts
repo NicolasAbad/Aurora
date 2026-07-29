@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { createInitialState } from '../data/initialState';
 import type { BuildingId, GameState, PadId, RoleId, SoundingRocketId } from '../core/types';
 import { CURRENT_SCHEMA_VERSION, migrate } from './migrations';
+import { BUILDINGS } from '../data/buildings';
 import {
   adjustStaffAssignment,
   applyCompletedProcesses,
@@ -57,7 +58,9 @@ import {
   startSoundingWeatherCheck,
 } from '../core/soundingMission';
 import { resolveProcesses } from '../core/time';
-import { markSeen } from '../data/narrative';
+import { RESEARCH_BY_ID } from '../data/researchTree';
+import { ROLE_LABEL } from '../data/roles';
+import { appendLogLine, markSeen, missionLogBase, narrativeText, syncSeenIntoLog } from '../data/narrative';
 import { trackFirstOccurrence } from './telemetry';
 
 const COMPLEX_B_UNLOCK_FUNDING = 300; // ECONOMY §4, matches ComplexTabs' own gate
@@ -367,7 +370,18 @@ function computeBootOffline(): { initialState: GameState; awaySummary: AwaySumma
     mission: missionsResolution.mission,
     contracts: missionsResolution.contracts,
     records: missionsResolution.records,
-    narrative: { ...loaded.narrative, seen: certificationResolution.narrativeSeen },
+    // Sprint 9.5: offline-earned beats also feed the Mission Log's `log` feed (see
+    // data/narrative.ts's header note) — generic completions (T-18/19/20) are
+    // deliberately NOT backfilled for an offline gap, since the away-modal already
+    // reports those; this only keeps narrative BEATS in sync with the unified feed.
+    narrative: {
+      seen: certificationResolution.narrativeSeen,
+      log: syncSeenIntoLog(
+        loaded.narrative.seen.length,
+        certificationResolution.narrativeSeen,
+        missionLogBase(loaded.narrative),
+      ),
+    },
     // Modifier.expiresAt contract: pruned again here (not just at load) against the
     // POST-GAP `now` — a modifier that expired partway through an offline gap must not
     // survive into the fresh boot state just because it was still alive at load time.
@@ -492,11 +506,14 @@ export const useGameStore = create<Store>()((set, get) => ({
   ...boot.initialState,
 
   pitch: () => {
-    set((state) => ({
-      resources: applyPitch(state.resources, state.buildings.offices.level),
-      telemetry: trackFirstOccurrence(state.telemetry, 'first_pitch'),
-      narrative: { ...state.narrative, seen: markSeen(state.narrative.seen, 'N-01') }, // First manual pitch
-    }));
+    set((state) => {
+      const seen = markSeen(state.narrative.seen, 'N-01'); // First manual pitch
+      return {
+        resources: applyPitch(state.resources, state.buildings.offices.level),
+        telemetry: trackFirstOccurrence(state.telemetry, 'first_pitch'),
+        narrative: { seen, log: syncSeenIntoLog(state.narrative.seen.length, seen, missionLogBase(state.narrative)) },
+      };
+    });
   },
 
   buyBuilding: (buildingId) => {
@@ -515,7 +532,7 @@ export const useGameStore = create<Store>()((set, get) => ({
         ...result,
         mission,
         telemetry: trackFirstOccurrence(state.telemetry, 'first_building_upgrade', { buildingId }),
-        narrative: { ...state.narrative, seen },
+        narrative: { seen, log: syncSeenIntoLog(state.narrative.seen.length, seen, missionLogBase(state.narrative)) },
       });
     }
   },
@@ -523,7 +540,16 @@ export const useGameStore = create<Store>()((set, get) => ({
   buyInternalUpgrade: (buildingId, upgradeId) => {
     const state = get();
     const result = buyInternalUpgrade(state.resources, state.buildings, buildingId, upgradeId);
-    if (result) set(result);
+    if (result) {
+      // T-20 (NARRATIVE §9 v3.7): "previously silent" — an internal-upgrade purchase
+      // (has a real, discrete name, unlike a routine building level-up) now logs a line.
+      const upgradeDef = BUILDINGS[buildingId].internalUpgrades?.find((u) => u.id === upgradeId);
+      const log = appendLogLine(
+        missionLogBase(state.narrative),
+        narrativeText('T-20', { building: BUILDINGS[buildingId].name, upgrade: upgradeDef?.name ?? upgradeId }),
+      );
+      set({ ...result, narrative: { ...state.narrative, log } });
+    }
   },
 
   gatherMaterials: () => {
@@ -555,11 +581,12 @@ export const useGameStore = create<Store>()((set, get) => ({
       const staffCapReachedOnce =
         state.staffCapReachedOnce ||
         totalHired(result.staff) >= totalStaffCap(state.buildings.crewQuarters.level);
+      const seen = markSeen(state.narrative.seen, 'N-02'); // First hire
       set({
         ...result,
         staffCapReachedOnce,
         telemetry: trackFirstOccurrence(state.telemetry, 'first_hire', { role }),
-        narrative: { ...state.narrative, seen: markSeen(state.narrative.seen, 'N-02') }, // First hire
+        narrative: { seen, log: syncSeenIntoLog(state.narrative.seen.length, seen, missionLogBase(state.narrative)) },
       });
     }
   },
@@ -664,7 +691,10 @@ export const useGameStore = create<Store>()((set, get) => ({
         resources: result.resources,
         mission: result.mission,
         contracts: result.contracts,
-        narrative: { ...state.narrative, seen: result.narrativeSeen },
+        narrative: {
+          seen: result.narrativeSeen,
+          log: syncSeenIntoLog(state.narrative.seen.length, result.narrativeSeen, missionLogBase(state.narrative)),
+        },
         telemetry: trackFirstOccurrence(state.telemetry, 'first_sounding_launch'),
       });
     }
@@ -725,7 +755,10 @@ export const useGameStore = create<Store>()((set, get) => ({
         resources: result.resources,
         mission: result.mission,
         contracts: result.contracts,
-        narrative: { ...state.narrative, seen: result.narrativeSeen },
+        narrative: {
+          seen: result.narrativeSeen,
+          log: syncSeenIntoLog(state.narrative.seen.length, result.narrativeSeen, missionLogBase(state.narrative)),
+        },
         telemetry: trackFirstOccurrence(state.telemetry, 'first_contract_launch', { padId }),
       });
     }
@@ -778,7 +811,10 @@ export const useGameStore = create<Store>()((set, get) => ({
       set({
         resources: result.resources,
         mission: result.mission,
-        narrative: { ...state.narrative, seen: result.narrativeSeen },
+        narrative: {
+          seen: result.narrativeSeen,
+          log: syncSeenIntoLog(state.narrative.seen.length, result.narrativeSeen, missionLogBase(state.narrative)),
+        },
         telemetry: trackFirstOccurrence(state.telemetry, 'first_aurora_launch', { padId }),
       });
     }
@@ -833,6 +869,20 @@ export const useGameStore = create<Store>()((set, get) => ({
           }
         : state.research;
     const researchResolution = resolveResearch(shiftedResearch, state.modifiers, Date.now());
+
+    // T-18/T-19 (NARRATIVE §9 v3.7): promotions and research completions previously
+    // produced no Mission Log entry at all during live play (only the away-modal's
+    // offline summary described them, and only for a gap the player already missed).
+    let log = missionLogBase(state.narrative);
+    for (const process of completedProcesses) {
+      if (process.kind !== 'training') continue;
+      const { from, to } = process.payload as { from: RoleId; to: RoleId };
+      log = appendLogLine(log, narrativeText('T-18', { fromRole: ROLE_LABEL[from], toRole: ROLE_LABEL[to] }));
+    }
+    for (const nodeId of researchResolution.justCompletedIds) {
+      const node = RESEARCH_BY_ID.get(nodeId);
+      log = appendLogLine(log, narrativeText('T-19', { node: node?.name ?? nodeId }));
+    }
 
     // Certifications: same warp-shift, same dedicated-slot pattern as research above.
     const shiftedCertifications =
@@ -924,7 +974,7 @@ export const useGameStore = create<Store>()((set, get) => ({
       contracts: missionsResolution.contracts,
       records: missionsResolution.records,
       certifications: certificationResolution.certifications,
-      narrative: { ...state.narrative, seen },
+      narrative: { seen, log: syncSeenIntoLog(state.narrative.seen.length, seen, log) },
       modifiers: researchResolution.modifiers,
       economyFlags: { ...state.economyFlags, payrollUnpaid },
       events: eventsTick.events,

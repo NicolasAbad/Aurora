@@ -91,6 +91,11 @@ export const NARRATIVE_TEXT: Record<string, string> = {
   'T-15': 'Release this {role}? No refund of hiring cost. Confirm?',
   'T-16': 'The Test Stand certifies engines before they fly — every engine, every time. Certifications run as timed processes; track them in the strip above.',
   'T-17': 'This is where rockets fly. Build the VAB, integrate a rocket, and complete the launch checklist — every item, every time — to unlock the countdown.',
+  // v3.7 (Sprint 9.5): closes the "silent completion" gap — promotions, research and
+  // internal-upgrade purchases previously produced no Mission Log entry at all.
+  'T-18': 'Promotion complete: one of your {fromRole}s is now a(n) {toRole}.',
+  'T-19': 'Research complete: {node}.',
+  'T-20': 'Upgrade complete: {building} — {upgrade}.',
   // §10 — manual verb descriptions (same "no purchasable without effect text" rule).
   rushOrder: 'Trade Funding for instant Materials when you need them now instead of waiting on the Depot.',
   // §3 (Sprint 9) — random events. Each event is one flavor string (title + situation)
@@ -132,4 +137,36 @@ export function narrativeText(id: string, vars?: Record<string, string | number>
  * append, mirrors registerModifier's same-shape idempotency in core/modifiers.ts. */
 export function markSeen(seen: string[], id: string): string[] {
   return seen.includes(id) ? seen : [...seen, id];
+}
+
+// UI_SPEC §2f (Sprint 9.5): the Mission Log's real chronological display feed. `seen`
+// stays exactly what it always was — an append-only dedup/gate array, never touched by
+// any of the code below. `log` is a SEPARATE, additive-optional (rule 5) derived feed
+// that interleaves narrative beats (resolved from `seen`'s ids) with generic process
+// completions (T-18/19/20, pre-resolved via narrativeText with their own vars) in true
+// insertion order — built entirely at the state/persistStore.ts layer, so none of the
+// many markSeen call sites scattered across core/ need to change. Capped so a long save's
+// log doesn't grow the save file forever.
+const MISSION_LOG_MAX_ENTRIES = 40;
+
+/** The log to start building from this tick/action: the existing `log` if this save has
+ * one already, or — the FIRST time this ever runs for an older save — every beat already
+ * in `seen`, backfilled once so upgrading never shows an empty panel where real history
+ * used to be visible (the same "old save, new field, no silent regression" spirit as
+ * every other additive-optional field in this codebase). */
+export function missionLogBase(narrative: { seen: string[]; log?: string[] }): string[] {
+  return narrative.log ?? narrative.seen.map((id) => NARRATIVE_TEXT[id] ?? id);
+}
+
+export function appendLogLine(log: string[], text: string): string[] {
+  return [...log, text].slice(-MISSION_LOG_MAX_ENTRIES);
+}
+
+/** Call once `seen` has (possibly) grown this tick/action: appends whatever new beat
+ * text just fired, in order — a no-op if `seen` didn't change. `seen` is strictly
+ * append-only (markSeen never removes/reorders), so the suffix past `prevSeenLen` is
+ * exactly the beat(s) that just fired. */
+export function syncSeenIntoLog(prevSeenLen: number, nextSeen: string[], log: string[]): string[] {
+  const newLines = nextSeen.slice(prevSeenLen).map((id) => NARRATIVE_TEXT[id] ?? id);
+  return newLines.length ? [...log, ...newLines].slice(-MISSION_LOG_MAX_ENTRIES) : log;
 }

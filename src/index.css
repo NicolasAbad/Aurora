@@ -742,7 +742,10 @@ body {
 }
 
 .mission-log__last-entry {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   width: 100%;
   text-align: left;
   background: none;
@@ -756,6 +759,18 @@ body {
 
 .mission-log__last-entry:hover {
   color: var(--text);
+}
+
+/* UI_SPEC §2f (Sprint 9.5): unread-count badge, cleared the instant the panel opens. */
+.mission-log__badge {
+  flex: none;
+  background: var(--accent);
+  color: #1a1200;
+  font-weight: 600;
+  font-size: 0.8em;
+  line-height: 1;
+  border-radius: 999px;
+  padding: 3px 7px;
 }
 
 .mission-log__feed {
