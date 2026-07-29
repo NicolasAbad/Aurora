@@ -128,22 +128,27 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
           : narrativeText('T-12b');
         return (
           <div key={role} className="building-tile__staff-row">
-            <span>{ROLE_LABEL[role]}</span>
-            <div className="stepper">
-              <button
-                type="button"
-                disabled={assigned === 0}
-                onClick={() => assign(role, buildingId, -1)}
-              >
-                −
-              </button>
-              <span>
-                {assigned}/{slots}
-              </span>
-              <button type="button" disabled={!canAssign} onClick={() => assign(role, buildingId, 1)}>
-                +
-              </button>
+            <div className="building-tile__staff-row-main">
+              <span>{ROLE_LABEL[role]}</span>
+              <div className="stepper">
+                <button
+                  type="button"
+                  disabled={assigned === 0}
+                  onClick={() => assign(role, buildingId, -1)}
+                >
+                  −
+                </button>
+                <span>
+                  {assigned}/{slots}
+                </span>
+                <button type="button" disabled={!canAssign} onClick={() => assign(role, buildingId, 1)}>
+                  +
+                </button>
+              </div>
             </div>
+            {/* Own line below the stepper row — squeezing this sentence-length text into
+                the same flex row as the stepper wrapped awkwardly (found via Playwright
+                screenshot verification, Sprint 9.5). */}
             {fullyStaffed && <div className="building-tile__slot-note">{fullyStaffedText}</div>}
           </div>
         );

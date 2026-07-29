@@ -113,18 +113,18 @@ export function StaffHiring() {
               </span>
               <span className="staff-panel__row-actions">
                 {unlocked ? (
-                  <>
-                    <button type="button" disabled={!canHire} onClick={() => hire(role)}>
-                      {hireLabel}
-                    </button>
-                    {wouldBeIdle && <span className="staff-panel__idle-flag">{narrativeText('T-11')}</span>}
-                  </>
+                  <button type="button" disabled={!canHire} onClick={() => hire(role)}>
+                    {hireLabel}
+                  </button>
                 ) : (
                   <span className="staff-panel__locked">Requires tech: {ROLES[role].unlockTech}</span>
                 )}
                 <ReleaseButton role={role} hired={roleHired} />
               </span>
             </div>
+            {/* Own line below the row, not squeezed alongside the button — wrapped
+                awkwardly there (found via Playwright screenshot verification, Sprint 9.5). */}
+            {wouldBeIdle && <div className="staff-panel__idle-flag">{narrativeText('T-11')}</div>}
             {cheaperHint && <div className="staff-panel__promotion-hint">{cheaperHint}</div>}
           </div>
         );

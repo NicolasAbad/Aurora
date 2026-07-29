@@ -2483,3 +2483,253 @@ whichever option was picked:
   expired for the whole gap rather than partially applied — a pre-existing architectural
   characteristic of the offline chunking system, not a Sprint 9 regression, and out of
   this sprint's scope to redesign.
+
+## Sprint 9.5 — Second discovery & clarity pass — COMPLETE (2026-07-29)
+
+All 14 SPRINTS.md tasks done, verified through the integrated path (real store, real
+resolution, live browser — CLAUDE.md step 5). Owner's five pre-authored doc updates
+(ECONOMY_MODEL v3.7/v3.8, NARRATIVE_EVENTS v3.7-v3.9, UI_SPEC v3.4, SPRINTS.md's own
+Sprint 9.5/10.5 sections, BACKLOG) were committed as a docs-only commit at the start of
+this sprint (`78c9aa9`) after diffing all six pending doc changes against the repo per
+rule 5b — five were clean additive content; the sixth (a stale, pre-Sprint-5/6/7 copy of
+CLAUDE.md's own schema block, working-tree-only, never committed) was discarded per the
+owner's explicit confirmation, not applied. See the session's own exchange for the full
+diff review — flagged as "precisely what rule 5b exists for."
+
+### Task 1: Training Center timing (UI_SPEC §2d)
+
+Moved from "visible at game start" to appearing alongside Crew Quarters + R&D Lab, gated
+on the same `staffCapReachedOnce` latch those two already used. One-line change in
+`App.tsx`'s `CampusPanel`.
+
+### Task 2: Production staged reveal (UI_SPEC §2e, new)
+
+Step 1: Supply Depot only. Step 2: Fabrication + Warehouse once Supply Depot is built.
+Step 3: Refinery + Propellant Depot once "Sounding rockets" is researched. Same staged-
+reveal bug class Campus had before Sprint 7.5, now closed for Production.
+
+### Task 3: Copy & display fixes (UI_SPEC §4, NARRATIVE §7/§9)
+
+- Dropped the redundant "(currently X)" from upgrade-delta previews (`core/upgradePreview.ts`).
+- "Fully staffed" now names the real slot-adding upgrade when one exists (T-12a) instead
+  of the old generically-wrong "raise the level" line (T-12b when none exists) — new
+  `slotUpgradeForRole` helper in `core/staff.ts`.
+- T-11 shortened to a terse inline flag next to the Hire button (no longer a `confirm()`
+  interruption); T-13 adds a permanent per-role salary line, always visible.
+- Real rate-rounding bug fixed: `formatRate` renders 2 decimals for any nonzero magnitude
+  below 0.1 instead of rounding to "+0.0/s" (was hitting R&D Lab's 0.03/level). Audited
+  Fabrication (0.3/level) and Refinery (0.5/level) — both comfortably above the threshold.
+
+### Task 4: Mission Log unread badge + generic completions (UI_SPEC §2f)
+
+Unread-count badge on the collapsed header, session-scoped (like the FTUE dismiss set —
+not persisted), clears on open. Promotions, research nodes, and internal-upgrade
+purchases now log a line on completion (T-18/T-19/T-20) — previously silent during live
+play. New `GameState.narrative.log?: string[]` (additive optional, rule 5) is the Mission
+Log's true chronological display feed, unifying narrative beats and generic completions
+**without touching any of the many core-module `markSeen` call sites**: since `seen` is
+strictly append-only, `data/narrative.ts`'s `missionLogBase`/`syncSeenIntoLog` diff it at
+the `state/persistStore.ts` layer only, wherever `set()` already assigns a new `seen`
+value. An older save with no `log` field yet backfills once from its existing `seen`
+history the first time either helper runs, instead of showing an empty panel post-upgrade.
+T-20 scoped to internal-upgrade purchases only (has a real, discrete name) — not routine
+building level-ups, which would flood the log and don't fit T-20's own
+"[Building] — [Upgrade Name]" template anyway.
+
+### Task 5: Research as its own top-level tab, lane layout (UI_SPEC §2g, §3)
+
+`ComplexId` gained `'research'` (tab identity only). `ComplexTabs` gained a 5th tab, same
+unlock condition Research always had (R&D Lab built). Design B ("timeline lanes", chosen
+over a radial "orbit map" per the doc's mobile-first requirement): each branch is now a
+horizontal, independently-scrollable lane with a connecting-line effect between nodes, all
+4 lanes stacked vertically so the whole tree fits without opening anything — replaces the
+v1.1 attempt's side-by-side vertical-chain columns. Detail-on-tap (`NodeDetail`) unchanged.
+
+### Task 6: Sonda flights get real feedback (UI_SPEC §3 screen 5)
+
+S-1/S-2 now get the same dedicated result view Aurora I already has
+(`LaunchSequencePanel`'s `ResultCard` pattern, mirrored exactly — `showResult`/
+`dismissedLaunchId` against `mission.launches`) instead of ending in an easy-to-miss
+Mission Log line. Contract-linked S-1 flights show the tier-0 reward as additional to the
+flight's own. Purpose blurb (T-21 S-1 / T-22 S-2) shown above the checklist.
+
+**Scope note, not a silent guess:** "the SAME full-screen countdown+result takeover
+Aurora I already has" is read as Aurora's actual shipped `ResultCard` treatment (a
+dedicated result view that takes over the panel's content) rather than a literal animated
+10→0 countdown, which Aurora itself doesn't have either — that was deliberately deferred
+to Sprint 11 polish territory per `auroraMission.ts`/`LaunchSequencePanel.tsx`'s own prior
+comments. This sprint's acceptance criterion ("ends in a full-screen result, not just a
+log line") is satisfied without inventing countdown-animation scope neither the task text
+nor the acceptance criterion actually asks for.
+
+### Task 7: Warehouse "Inventory system" upgrade — audited, confirmed working
+
+Code-audited first (the mechanic was already unit-tested from Sprint 8 —
+`actions.test.ts`'s `capBonusMultiplier`/Warehouse coverage — and wired through the same
+`buyBuildingUpgrade` every building uses, no special-casing gap). Confirmed live via
+Playwright: Warehouse at level 1 with `inventorySystem` owned shows a delta preview of
+"+625 Funding cap, +375 Materials cap, +94 Hardware cap" (exactly the base 500/300/75
+scaled ×1.25), matching what the next `Upgrade` purchase would actually grant. No bug
+found, mechanic confirmed genuinely working — the owner's "no way to expand capacity"
+report is most plausibly a discoverability read from before this sprint's own clarity
+passes (T-12a/b, the delta-preview line) landed, not a broken mechanic.
+
+### Task 8: Dev time-warp gains a ×5 preset
+
+`TimeWarpMultiplier` gained `5`; `TimeWarpControl`'s `OPTIONS` now `[1, 5, 60, 600]`. For
+the owner's own manual playtesting — fast enough to skip dead air, slow enough to still
+feel the game's real pacing. Still dev-only/build-excluded (confirmed absent from the
+production bundle, same grep check every prior sprint has run).
+
+### Task 9 (SCOPED UNLOCK): Basic engineering cost raised (ECONOMY §5 v3.7)
+
+15R/3min → 120R/45min. At the old cost it was reachable almost immediately, letting
+direct Engineer/Scientist hiring skip the promotion-bootstrap pacing the game has
+repeatedly defended (E-04's precondition, the day-5 pacing floor).
+
+### Task 10 (SCOPED UNLOCK): building expansion milestones (ECONOMY §4c v3.8)
+
+Every slotted building gains +1 slot per role it already employs, every 10 levels,
+universal and automatic, coexisting with the existing specific slot-adding upgrades.
+`buildingSlotCount` (`core/staff.ts`) is the single implementation every staffing-ratio
+consumer already reads through (`economy.ts`, `BuildingTile`, and — updated this
+sprint — the sim's own bot), so the milestone applies everywhere for free once wired
+there. T-23 fires a Mission Log celebration line per role affected when a building
+crosses the boundary (`buyBuilding` action).
+
+`sim/run.ts` also updated: its own `requiredSlots`/`passiveFundingRate`/`rndLabRate`
+previously duplicated the pre-milestone slot math directly rather than calling the shared
+function, and unlike every other "sim doesn't model this optional system" precedent in
+this file, the milestone is *automatic* (no purchase decision to skip) — leaving the sim
+unaware of it would have made the sweep re-run measure nothing real. Fixed for both the
+bot's hiring-decision logic and its own production-rate calculations.
+
+### Task 11: Disclosure audit — Testing and Launch complexes
+
+**Testing** (Test Stand, Launch Rail, Payload Processing): audited, essentially clean.
+Only 2 buildings appear unconditionally — a much smaller surface than Campus/Production's
+original 4-5, both co-equal/parallel unlocks with no natural sequential story (a player
+can build either first), and Payload Processing was already correctly gated on Aurora I
+success. No staged-reveal change applied.
+
+**Launch** (VAB, Pad, Control, Tracking Station, Pad B): did have the same problem — 4
+buildings appeared simultaneously the instant the tab unlocked, the same magnitude as
+Campus/Production's original bug. Fixed: VAB/Launch Pad/Launch Control (needed to START
+an integration) appear together as before; Tracking Station (only needed to COMPLETE the
+checklist, plus its orbital-mission XP multiplier) now appears once the VAB is built —
+the natural next-step moment. Pad B was already correctly gated, unchanged.
+
+### Task 12: Current Directive indicator (UI_SPEC §2h, NARRATIVE §11, new)
+
+A persistent "what now" line near the ticker, no dismiss button, recomputed live every
+render (`core/directive.ts`'s `currentDirective` — same "first true condition in priority
+order wins" shape as `core/ftue.ts`'s `nextFtueTooltip`, but with no dismiss set:
+directives aren't one-time, they just change). Ships the D-01..D-12 initial set exactly
+as specified. D-01/D-02 and D-04 include their own affordability checks so the broad "not
+built yet" condition doesn't permanently swallow the more specific "now affordable"
+follow-up, since directives have no dismiss-set fallback to lean on the way FTUE tooltips
+do — each condition has to be self-contained.
+
+### Task 13: Two narrative beats T-24/T-25 (NARRATIVE §9)
+
+T-24 (Confidence explainer): first time Confidence shows below 100% for any in-flight
+mission. T-25 (first-orbital-attempt beat): fires the same moment T-08 does (the first VAB
+stage starting). Both wired as ordinary entries in the existing FTUE tooltip queue
+(`core/ftue.ts`) — dismissible, at most one shown at a time, same rendering App.tsx
+already had for T-01..T-09.
+
+### Task 14: Progressive rocket blueprint assembly (UI_SPEC screen 4, new)
+
+New `RocketBlueprint` component: a geometric technical-schematic SVG (UI_SPEC §1b's
+blueprint aesthetic) that builds up stage by stage as Aurora I's VAB integration
+progresses — empty dashed outline → Structure → Engines → Guidance → payload fairing →
+final-integration dimension marks. **No prior blueprint/SVG code existed anywhere in the
+codebase** despite §1b describing the technique since early in the project — this is the
+first real implementation of it, not an extension of existing art. Generic over
+`stagesDone`, so Aurora II's integration can reuse it once it exists (no Aurora-II-
+specific code added now, since that content doesn't exist yet). Mounted for Aurora-story
+missions only — contract satellites use a single lump "Payload integration" stage, so
+there's nothing to progressively reveal there.
+
+### Real bug found and fixed during Playwright verification, not by a unit test
+
+Screenshot review (CLAUDE.md step 5's "screenshot-verify at least one multi-word/edge-case
+label") caught T-12a's new sentence-length text ("Fully staffed. Buy 'Grants desk' to add
+another slot.") and T-13's longer hire-button label wrapping awkwardly, squeezed into the
+same flex row as the stepper/button they sit beside. Fixed by giving both their own line
+below the row (`BuildingTile.tsx`'s `building-tile__staff-row` split into a `-main` row +
+sibling note; `StaffHiring.tsx`'s idle flag moved out of `staff-panel__row-actions`).
+Re-verified via screenshot — clean single-line layout.
+
+### Economy sweep results — both SCOPED UNLOCKs (tasks 9 + 10), seed 42, 30 days
+
+| Profile | Days to Aurora I | Salary ratio (settles) | Flight Data (sonda / satellite) |
+|---|---|---|---|
+| optimal | 3 (unchanged) | ~53% | n/a / 63.2% |
+| human | **6** (was 5) | 53.6%→55.0% | 35.8% / 24.8% |
+| casual | 13 (was 12) | 22.9%→55.0% | 35.6% / 18.1% |
+
+**Pacing floor: PASS** (human reached day 6, still within the 5-12 floor/ceiling band).
+Task 10's own re-run (after fixing `sim/run.ts`'s slot-count duplication, see above)
+produced numbers **identical** to task 9's alone — not a sign the milestone change is
+inert: both bot policies already eagerly hire into any open slot the moment one exists,
+so a milestone-grown `requiredSlots` just gets filled immediately, same as any other slot.
+That's the intended "earned capacity to grow into" response; a real player who leaves the
+new slots empty would see a staffing-ratio dip, which neither bot ever does.
+
+**Two things flagged, not retuned, per instruction:**
+1. **Human sonda-era Flight Data share (35.8%) is marginally over the 20-35% target
+   band** by 0.8pp. The sonda era is only ~2 simulated days wide for this bot/seed (Aurora
+   I follows fast once the campaign starts) — the same small-sample caveat already on
+   record from the v2.3-era sweep. Reporting, not tuning.
+2. **Casual profile's Day-6 salary-ratio checkpoint dropped to 22.9%** (below the 30%
+   floor), recovering to within-band by Day 12 — a real, measurable, directly-attributable
+   side effect of Basic engineering's cost increase (task 9): the promotion bootstrap now
+   takes noticeably longer before direct hiring unlocks, and casual's very infrequent
+   sessions (~once per 30h) feel that delay hardest at the earliest checkpoint. The
+   human-profile pacing floor/ceiling — the check both tasks' own instructions named
+   explicitly — still passes throughout. Not retuned; flagging per instruction.
+
+### Verification
+
+- 476 tests passing (up from 434 at Sprint 9's close — new: `directive.test.ts` (11),
+  `narrative.test.ts` (11), plus new cases in `staff.test.ts`, `ftue.test.ts`,
+  `upgradePreview.test.ts`, `format.test.ts`, `persistStore.test.ts`, `ComplexTabs.test.tsx`).
+  Typecheck (`tsc -b`), lint, and production build all clean; `time-warp-control`/
+  `dev-reset-button` confirmed absent from the production bundle.
+- `npm run sim` (all three profiles) re-run twice (once per SCOPED UNLOCK) — results
+  above; both re-runs used the same seed 42 / 30-day baseline every prior sprint's table
+  uses.
+- Playwright, through a real browser, six phases against freshly-injected saves at
+  different progress points (fresh game; staff-cap-reached; mid-game with R&D Lab +
+  researched techs; a completed S-1 launch; VAB integration in progress; a live
+  time-warped promotion + a live building-milestone purchase): confirmed every task above
+  end to end through the real store — Current Directive text changes correctly across
+  states (D-01 → D-04 confirmed), Training Center/Production/Testing/Launch staged
+  reveals all fire at the documented triggers, the rate-rounding fix renders sub-0.1
+  deltas with 2 decimals, T-12a names the real upgrade, the Research tab renders exactly
+  4 horizontal lanes with working detail-on-tap, the sonda result card and rocket
+  blueprint both render and read correctly (screenshotted), a live promotion produces a
+  real-time T-18 Mission Log line + unread badge, a live Finance level-9→10 purchase
+  produces the T-23 milestone line and grows its slot count 2→3, and the Warehouse
+  Inventory system's cap scaling is confirmed live (+625/+375/+94, exactly ×1.25 of
+  base). Zero console errors across the entire six-phase pass. One genuine layout bug
+  found and fixed (see above), one test-script false alarm diagnosed and corrected before
+  concluding anything about the app (an injected process with `startedAt: 0` resolves via
+  the boot/offline path, not the live tick — matches the standing "verification timing
+  traps" pattern, not a new class of bug).
+
+### Scope notes
+
+- Task 5's Research detail panel renders below the lanes on all viewport widths (not
+  side-by-side on desktop specifically) — a reasonable simplification given the doc's
+  "mobile bottom / desktop side" distinction isn't otherwise implemented anywhere else in
+  this codebase's existing screens either.
+- Task 11's audit found Testing's surface too small to constitute "the same problem" as
+  Campus/Production/Launch — reported clean per the task's own "report findings even if
+  clean" instruction, not forced into an unnecessary change.
+- T-25's live trigger wasn't chained through a full 9-tooltip dismissal in the Playwright
+  pass (T-01 always wins first on a fresh page, per FTUE_TOOLTIP_ORDER) — the trigger
+  LOGIC itself is unit-tested directly (`ftue.test.ts`, 2 new cases) and the rendering
+  mechanism is unchanged/already-proven (same `GlobalFtueTooltip` that correctly rendered
+  T-01 in the same pass).

@@ -434,6 +434,12 @@ body {
 
 .building-tile__staff-row {
   display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.building-tile__staff-row-main {
+  display: flex;
   justify-content: space-between;
   align-items: center;
 }
@@ -443,10 +449,12 @@ body {
   font-size: 0.85em;
 }
 
+/* v3.7 (Sprint 9.5): its own line below the stepper row, not squeezed alongside it —
+ * T-12a's sentence-length "name the real upgrade" text wrapped awkwardly otherwise
+ * (found via Playwright screenshot verification). */
 .building-tile__slot-note {
   color: var(--text-dim);
   font-size: 0.8em;
-  margin-top: -8px;
 }
 
 .building-tile__locked-badge {
