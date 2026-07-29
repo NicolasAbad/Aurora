@@ -96,6 +96,12 @@ export const NARRATIVE_TEXT: Record<string, string> = {
   'T-18': 'Promotion complete: one of your {fromRole}s is now a(n) {toRole}.',
   'T-19': 'Research complete: {node}.',
   'T-20': 'Upgrade complete: {building} — {upgrade}.',
+  // v3.7 (Sprint 9.5): purpose blurbs shown above the sonda mini-checklist — a real gap
+  // found in play, "why am I launching this" was unclear from the checklist alone.
+  'T-21':
+    'A sounding rocket flight: quick, cheap, and it earns Flight Experience and Flight Data (which feeds Research) every time — your first real step toward orbit.',
+  'T-22':
+    'This flight can cross the Kármán line — the internationally recognized edge of space, and your program’s first Program Record.',
   // §10 — manual verb descriptions (same "no purchasable without effect text" rule).
   rushOrder: 'Trade Funding for instant Materials when you need them now instead of waiting on the Depot.',
   // §3 (Sprint 9) — random events. Each event is one flavor string (title + situation)

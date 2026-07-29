@@ -1,14 +1,17 @@
+import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../state/persistStore';
 import { activePendingContracts } from '../core/contracts';
 import { isSoundingRocketUnlocked } from '../core/soundingMission';
 import { progressFraction, remainingMs } from '../core/time';
 import { SOUNDING_ROCKETS, type SoundingRocketDef } from '../data/soundingRockets';
-import { TIER0_PAYLOAD_EXTRA_HARDWARE, TIER0_PAYLOAD_EXTRA_PROPELLANT } from '../data/contracts';
+import { CONTRACT_TIERS, TIER0_PAYLOAD_EXTRA_HARDWARE, TIER0_PAYLOAD_EXTRA_PROPELLANT } from '../data/contracts';
+import { FAILURE_FLIGHT_DATA_RATE, FAILURE_HARDWARE_RECOVERY_RATE, FAILURE_XP_RATE } from '../data/launch';
+import { narrativeText } from '../data/narrative';
 import { formatDuration, formatPercent } from '../core/format';
 import { CostLabel } from './CostLabel';
 import { useNow } from './useNow';
-import type { Process, SoundingChecklistItemId } from '../core/types';
+import type { LaunchRecord, Process, SoundingChecklistItemId } from '../core/types';
 
 function findProcess(processes: Process[], kind: 'integration' | 'weather_window'): Process | undefined {
   return processes.find((p) => p.kind === kind && p.payload.missionKind === 'sounding');
@@ -87,6 +90,37 @@ function RocketOption({ rocket, contractId }: { rocket: SoundingRocketDef; contr
   );
 }
 
+/** UI_SPEC §3 screen 5 (Sprint 9.5): S-1/S-2 now get the same dedicated result treatment
+ * Aurora I already has (LaunchSequencePanel's own ResultCard) instead of ending in an
+ * easy-to-miss Mission Log line. `launch.contractId` set means this S-1 also fulfilled
+ * the accepted tier-0 contract — its reward is ADDITIONAL to the flight's own reward,
+ * same "Contract fulfilled is on top of the underlying flight" rule Aurora's contract
+ * variant already follows (ECONOMY §8). */
+function ResultCard({ launch, onDismiss }: { launch: LaunchRecord; onDismiss: () => void }) {
+  const rocket = SOUNDING_ROCKETS[launch.missionType as 's1' | 's2'];
+  const headline = launch.success ? `${rocket.name} flight successful.` : "It didn't make it.";
+  const detail = launch.success
+    ? `+${rocket.successReward.flightxp} Flight XP, +${rocket.successReward.reputation} Reputation, +${rocket.successReward.flightData} Flight Data.`
+    : `Recovered ${Math.round(FAILURE_HARDWARE_RECOVERY_RATE * 100)}% Hardware as debris. +${Math.round(rocket.successReward.flightxp * FAILURE_XP_RATE)} Flight XP, +${Math.round(rocket.successReward.flightData * FAILURE_FLIGHT_DATA_RATE)} Flight Data. Next assembly of this rocket runs at half duration.`;
+  const contractDetail =
+    launch.success && launch.contractId
+      ? ` Contract fulfilled: +$${CONTRACT_TIERS[0].reward.funding.toLocaleString()}, +${CONTRACT_TIERS[0].reward.reputation} Reputation, +${CONTRACT_TIERS[0].reward.flightxp} Flight XP, +${CONTRACT_TIERS[0].reward.flightData} Flight Data.`
+      : '';
+
+  return (
+    <div className={`launch-result ${launch.success ? 'launch-result--success' : 'launch-result--failure'}`}>
+      <div className="launch-result__headline">{headline}</div>
+      <div className="launch-result__detail">
+        {detail}
+        {contractDetail}
+      </div>
+      <button type="button" className="upgrade-button" onClick={onDismiss}>
+        Continue
+      </button>
+    </div>
+  );
+}
+
 function MissionPicker() {
   const contracts = useGameStore(useShallow((s) => s.contracts));
   const fulfillableContract = activePendingContracts(contracts).find(
@@ -140,6 +174,11 @@ function InFlightMission() {
       <div className="sounding-mission__header">
         {rocket.name}
         {mission.contractId && <span className="sounding-mission__contract-tag"> · contract</span>}
+      </div>
+      {/* T-21/T-22 (NARRATIVE §9 v3.7): purpose blurb — why launch this, what do I get,
+          a real gap found in play since the checklist alone doesn't say. */}
+      <div className="building-tile__description">
+        {narrativeText(mission.rocketId === 's2' ? 'T-22' : 'T-21')}
       </div>
       <div className="sounding-mission__confidence">Confidence: {formatPercent(mission.confidence)}</div>
       <div className="sounding-mission__checklist">
@@ -195,15 +234,29 @@ function InFlightMission() {
 }
 
 /** ECONOMY §7a / SPRINTS Sprint 6: the sounding-rocket mini launch loop, shown once the
- * Test Stand and Launch Rail are both built (App.tsx gates rendering this). */
+ * Test Stand and Launch Rail are both built (App.tsx gates rendering this). Sprint 9.5:
+ * gained a dedicated result view (mirrors LaunchSequencePanel's own showResult/
+ * dismissedLaunchId pattern exactly) instead of falling straight back to the picker. */
 export function SoundingMissionPanel() {
   const hasMission = useGameStore((s) => s.mission.sounding !== null);
+  const launches = useGameStore(useShallow((s) => s.mission.launches));
+  const [dismissedLaunchId, setDismissedLaunchId] = useState<string | null>(null);
+
+  const latestLaunch = [...launches].reverse().find((l) => l.missionType === 's1' || l.missionType === 's2');
+  const showResult = !hasMission && latestLaunch && latestLaunch.id !== dismissedLaunchId;
+
   return (
     <div className="research-panel sounding-mission">
       <div className="research-panel__header">
         {hasMission ? 'Sounding rocket mission' : 'Launch a sounding rocket'}
       </div>
-      {hasMission ? <InFlightMission /> : <MissionPicker />}
+      {showResult && latestLaunch ? (
+        <ResultCard launch={latestLaunch} onDismiss={() => setDismissedLaunchId(latestLaunch.id)} />
+      ) : hasMission ? (
+        <InFlightMission />
+      ) : (
+        <MissionPicker />
+      )}
     </div>
   );
 }
