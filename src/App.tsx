@@ -224,7 +224,12 @@ function LaunchPanel({
         <BuildingTile buildingId="vab" />
         <BuildingTile buildingId="launchPad" />
         <BuildingTile buildingId="launchControl" />
-        <BuildingTile buildingId="trackingStation" />
+        {/* UI_SPEC §2b (Sprint 9.5 disclosure audit): VAB/Pad/Control are needed to START
+            an integration; Tracking Station is only needed to COMPLETE the checklist (and
+            for the orbital-mission XP multiplier) — not the "everything at once" problem
+            Campus/Production had, but the same staged-reveal spirit applies: it appears
+            once the VAB is built, the natural next-step moment. */}
+        {vabLevel >= 1 && <BuildingTile buildingId="trackingStation" />}
         {launchPadBUnlocked && <BuildingTile buildingId="launchPadB" />}
       </div>
       {/* T-06 (NARRATIVE §2): "Launch checklist" is a screen-mount moment, not a
