@@ -142,6 +142,12 @@ export const NARRATIVE_TEXT: Record<string, string> = {
   'D-10': 'Build the VAB to begin your first satellite.',
   'D-11': "Keep building — Aurora I's stages integrate one at a time.",
   'D-12': 'Check the Contracts panel — client work is now available.',
+  // §9 (v3.9) — two genre-research-informed narrative beats (Sprint 9.5), same
+  // once-dismissible FTUE-tooltip treatment as T-01..T-09/T-16/T-17 (core/ftue.ts).
+  'T-24':
+    'Confidence: your odds of success. It’s never fixed — investing in certification, staffing, and weather always gets you to 100%. Launching below that is a choice, not a limit.',
+  'T-25':
+    'This is your first ORBITAL attempt — a real satellite, not a sounding rocket. It takes longer and asks more of your program, but it’s what everything so far has been building toward.',
 };
 
 /** Resolves an ID to its text, filling any `{name}` placeholders (T-10's open-slot

@@ -8,8 +8,23 @@ import { totalHired } from './staff';
 import type { GameState, ResourceState } from './types';
 
 // Priority order matches NARRATIVE §2's own table order — the natural onboarding
-// sequence (pitch -> afford a hire -> hire -> see a timer -> ...).
-export const FTUE_TOOLTIP_ORDER = ['T-01', 'T-02', 'T-03', 'T-04', 'T-05', 'T-07', 'T-08', 'T-09'] as const;
+// sequence (pitch -> afford a hire -> hire -> see a timer -> ...). T-24/T-25 (Sprint 9.5,
+// NARRATIVE §9) are appended: both are naturally later-game than the original Campus-
+// focused T-01..T-09, and between themselves, T-24 (any mission's Confidence below 100 —
+// reachable via a sonda) chronologically precedes T-25 (Aurora I's first VAB stage
+// specifically) in a typical playthrough.
+export const FTUE_TOOLTIP_ORDER = [
+  'T-01',
+  'T-02',
+  'T-03',
+  'T-04',
+  'T-05',
+  'T-07',
+  'T-08',
+  'T-09',
+  'T-24',
+  'T-25',
+] as const;
 
 /** Is this tooltip's trigger condition currently true? Pure read of GameState — no
  * "seen" bookkeeping here, that's the caller's job (App.tsx's session-scoped dismiss
@@ -42,6 +57,20 @@ export function ftueTooltipCondition(id: (typeof FTUE_TOOLTIP_ORDER)[number], st
       return Object.values(state.mission.pads).some((pad) => pad && pad.rocketStatus !== 'none');
     case 'T-09':
       return state.buildings.rndLab.level >= 1 && state.staff.pools.scientist.hired === 0;
+    case 'T-24':
+      // NARRATIVE §9 (Sprint 9.5): "the first time Confidence shows below 100%, any
+      // mission." Gated on a mission actually being in flight (not just the pad/sounding
+      // slot's resting default of 0) so this doesn't fire from frame 1 with nothing going on.
+      return (
+        (state.mission.sounding !== null && state.mission.sounding.confidence < 100) ||
+        Object.values(state.mission.pads).some((pad) => pad && pad.rocketStatus !== 'none' && pad.confidence < 100)
+      );
+    case 'T-25':
+      // "Immediately before Aurora I's VAB integration begins (its first stage started)"
+      // — same trigger T-08 already uses (rocketStatus leaves 'none' the moment the first
+      // stage starts); the FTUE queue naturally shows whichever of the two is due first
+      // and reveals the other on dismiss, same "at most one at a time" rule as always.
+      return Object.values(state.mission.pads).some((pad) => pad && pad.rocketStatus !== 'none');
   }
 }
 

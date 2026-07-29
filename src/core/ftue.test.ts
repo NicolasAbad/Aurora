@@ -70,6 +70,31 @@ describe('ftueTooltipCondition', () => {
     state.staff.pools.scientist.hired = 1;
     expect(ftueTooltipCondition('T-09', state)).toBe(false);
   });
+
+  it('T-24 (Confidence explainer) requires an in-flight mission with Confidence below 100, not just the resting default', () => {
+    const state = createInitialState();
+    expect(ftueTooltipCondition('T-24', state)).toBe(false); // no mission in flight at all
+    state.mission.pads.padA!.rocketStatus = 'integrating';
+    state.mission.pads.padA!.confidence = 0;
+    expect(ftueTooltipCondition('T-24', state)).toBe(true);
+
+    const soundingState = createInitialState();
+    soundingState.mission.sounding = {
+      rocketId: 's1',
+      contractId: null,
+      checklist: { assembled: false, propellantReady: false, weatherWindow: false, flightReview: false },
+      confidence: 65,
+      committedRoll: null,
+    };
+    expect(ftueTooltipCondition('T-24', soundingState)).toBe(true);
+  });
+
+  it('T-25 (first orbital attempt) fires the same moment T-08 does — the first VAB stage starting', () => {
+    const state = createInitialState();
+    expect(ftueTooltipCondition('T-25', state)).toBe(false);
+    state.mission.pads.padA!.rocketStatus = 'integrating';
+    expect(ftueTooltipCondition('T-25', state)).toBe(true);
+  });
 });
 
 describe('nextFtueTooltip', () => {
