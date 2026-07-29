@@ -9,6 +9,7 @@ import { CONTRACT_TIERS, SATELLITE_BUILD } from '../data/contracts';
 import { formatDuration, formatPercent } from '../core/format';
 import { progressFraction, remainingMs } from '../core/time';
 import { CostLabel } from './CostLabel';
+import { RocketBlueprint } from './RocketBlueprint';
 import { useNow } from './useNow';
 import type { ChecklistItemId, LaunchRecord, PadId, Process } from '../core/types';
 
@@ -293,6 +294,11 @@ export function LaunchSequencePanel({ padId }: { padId: PadId }) {
         <ResultCard launch={latestLaunch} tierReward={tierReward} onDismiss={() => setDismissedLaunchId(latestLaunch.id)} />
       ) : (
         <>
+          {/* UI_SPEC screen 4 (Sprint 9.5, NEW): progressive rocket blueprint — Aurora's
+              own 5-stage VAB breakdown only (contract satellites use a single lump
+              "Payload integration" stage per ECONOMY §10, so there's nothing to
+              progressively reveal there). */}
+          {!isContract && <RocketBlueprint stagesDone={pad.stagesDone} />}
           <ConfidenceBreakdownView padId={padId} />
           <div className="launch-sequence__checklist">
             {CHECKLIST_ORDER.map((item) => {

@@ -1328,6 +1328,40 @@ body {
   gap: 8px;
 }
 
+/* UI_SPEC §1b / screen 4 (Sprint 9.5, NEW): progressive rocket blueprint — geometric
+ * technical-schematic SVG, thin lines, engineering-drawing style. */
+.rocket-blueprint {
+  width: 100%;
+  max-width: 140px;
+  height: auto;
+  margin: 0 auto;
+  display: block;
+}
+
+.rocket-blueprint__outline {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+
+.rocket-blueprint__outline--solid {
+  stroke: var(--text-dim);
+  stroke-dasharray: none;
+}
+
+.rocket-blueprint__part {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+}
+
+.rocket-blueprint__marks {
+  stroke: var(--amber);
+  stroke-width: 1;
+}
+
 .confidence-breakdown__toggle {
   background: none;
   border: 1px solid var(--border);
