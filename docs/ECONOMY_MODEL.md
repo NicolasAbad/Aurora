@@ -1,6 +1,10 @@
 # ECONOMY_MODEL.md — Aurora Program — Complete baseline numbers
 *Every value in the game. Claude Code does NOT invent numbers: if a value isn't here, ask and add it here first. Tick = 1 second (logical economy rate; the render loop is delta-based per CLAUDE.md rule 6). Baseline for the Sprint-0 headless simulator (`sim/run.ts`); adjust only via the simulator, updating this file.*
 
+**v3.8 changes (owner design proposal — emotional payoff for staff growth):** new building-expansion milestone rule (§4c) — every 10 levels, a slotted building gains +1 slot per role it already employs, universal and automatic, coexisting with the already-shipped specific slot upgrades. **SCOPED UNLOCK — full sim sweep required.**
+
+**v3.7 changes (Sprint 9.5 — second manual-play pass):** rate-display precision fixed (§12 — deltas below 0.1 now show 2 decimals, closing the "+0.0/s" R&D Lab bug); Basic engineering's cost raised 15R/3min → 120R/45min to protect the promotion-bootstrap pacing (SCOPED UNLOCK, re-run sim). Hiring-cost curve (base cost / 1.15^hiredOfThatRole factor) flagged by the owner as possibly too shallow given realistic headcounts — NOT changed here; parked as a dedicated balance-pass candidate before the itch.io build (BACKLOG).
+
 **v3.6 changes (Sprint 9 blocker):** satellite contract build process specified (§10) — single VAB integration stage (not Aurora I's 5-stage breakdown), duration scaled to Aurora I's Hardware-per-minute density (tier 1 ≈33min, tier 2 ≈67min), free flight review (0 Research). Was a real doc gap, not oversight — Option 1 of three proposed. **SCOPED UNLOCK: new timing/cadence content — re-run the full sim sweep after implementing.**
 
 **v3.5 changes (owner manual-play findings — first-hour experience):** Auto-refuel and Engine Test Stand's per-level leveling both had NO defined effect at all (real gaps, not player misunderstanding) — now defined (§5, §4). Sounding rockets tech's role clarified as a pure gate (§5), matching the honest-zero-effect pattern already used for Aluminum alloys. Hardware tier production confirmed unchanged (automatic at current researched tier, §4 Fabrication row) — the "nothing happened" report was a missing UI confirmation, not a missing mechanic; fixed in UI_SPEC §4 (tier-change toast). **Test Stand's new per-level effect and Auto-refuel's duration change affect real timing outcomes — Sprint 8's sweep must re-verify the pacing floor/ceiling and salary band still hold.**
@@ -110,11 +114,20 @@ Starvation is per building, per tick, and self-recovers the moment inputs suffic
 
 **Player priority lever (by design, no priority UI in v1):** staffing IS the priority control — an unstaffed consumer neither produces nor claims inputs, so redirecting Materials (e.g. to stockpile Propellant before a launch) is done by unassigning Fabrication staff. Offline resolution uses these exact same rules (same functions, per CLAUDE.md rule 6).
 
+## 4c. Building expansion — level milestones (new, replaces "buy a slot upgrade" as the ONLY lever)
+**Every building with staff slots gains +1 slot in EACH role it already employs, every 10 levels (10, 20, 30…).** This is a universal, automatic rule — not an upgrade, not a purchase, just a milestone the player earns by leveling. It coexists with the specific slot-adding upgrades already shipped (Grants desk/Finance, Technical archive/R&D Lab, Bulk contracts/Supply Depot): those remain the early, targeted lever for a player who wants a slot sooner than level 10; the milestone is the universal long-term one every slotted building eventually gets, whether or not it has a dedicated upgrade.
+
+Rationale for 10 (not 25): `costFactor` is exponential (1.14–1.25 depending on building) — at a 25-level threshold, high-factor buildings (VAB at 1.25) would take enormously longer to reach than low-factor ones (Warehouse at 1.07), making the milestone feel unreachable for some buildings and trivial for others. 10 keeps it a real, earned event across the whole roster without becoming "never."
+
+Milestone fires a one-time celebration (NARRATIVE §9, new entry) distinct from the routine upgrade-purchase toast — this is meant to read as a bigger, rarer moment, reusing the Mission Log's unread-badge mechanism (UI_SPEC §2f).
+
+**SCOPED UNLOCK — new headcount capacity at fixed levels changes salary trajectory; requires the full sim sweep** (all three profiles) after implementation. If any building's level-10 milestone lands earlier than expected in clean play and pushes the salary ratio meaningfully outside 30–55%, report the specific building/level — don't retune the milestone cadence yourself.
+
 ## 5. Research tree v1 (cost in Research, real-time duration)
 Materials: **Aluminum alloys** (25 R, 5 min — *branch entry node: no production effect in v1; the Aluminum Hardware tier is available from the start with NO tech required. Its function is to gate Titanium and to be an early, affordable teaching node. Flavor: certifying aluminum stock for flight hardware*) → Titanium (400 R, 3 h)
 Propulsion: **Sounding rockets (20 R, 4 min — gate-only: unlocks Probe-1 engine certification at the Test Stand, no other effect, same honest-zero-effect pattern as Aluminum alloys)** → Probe-1 engine (40 R, 10 min) → Orbital-1 engine (500 R, 4 h)
 Operations: Basic logistics (60 R, 15 min: −25% pad transfer time) → **Remote Ops (120 R, 45 min: offline cap 10 h → 16 h)** → VAB queues (350 R, 2 h: auto-queue stages) → Auto-refuel (600 R, 5 h: **−50% propellant loading duration for satellite-class missions** — previously undefined, a real gap; sonda Propellant is a live check, not timed, per v3.4, so this node's effect is Aurora-I-and-beyond specific)
-Program: Basic engineering (15 R, 3 min) → Scientific method (80 R, 20 min) → Test stand (150 R, 40 min) → Flight operations (250 R, 1 h) → Flight program (400 R, 2 h) → Orbital flight (700 R, 6 h)
+Program: **Basic engineering (120 R, 45 min — bumped from 15R/3min; a real pacing bug, not a value nitpick: at the old cost it was reachable almost immediately, letting direct Engineer/Scientist hiring skip the promotion bootstrap the game spent real design effort protecting — see the E-04 precondition and the day-5 pacing floor, both of which assume that bootstrap takes real time)** → Scientific method (80 R, 20 min) → Test stand (150 R, 40 min) → Flight operations (250 R, 1 h) → Flight program (400 R, 2 h) → Orbital flight (700 R, 6 h)
 
 ## 6. Engine certification (Test Stand)
 | Test | Consumes | Duration | Result |
@@ -190,7 +203,7 @@ Random events: 15% check every 10 active min; ≥30 min between events; pool in 
 Weather window: uniform 2–5 min (fixed 2 min with Weather Station); a pending window at close resolves by timestamp on reopen.
 
 ## 12. Number formatting & player-facing names
-Suffixes from 10,000, always **3 significant figures**: 10.0K, 125K, 1.25M, 3.10B. Rates 1 decimal. Percentages integers.
+Suffixes from 10,000, always **3 significant figures**: 10.0K, 125K, 1.25M, 3.10B. Rates 1 decimal — **except any rate/delta whose magnitude is below 0.1, which renders with 2 decimals instead** (a real bug: R&D Lab's 0.03 Research/s per level rounded to "+0.0/s" and read as broken; fix applies to every rate display, not just that one case). Percentages integers.
 
 **Display names (presentation layer only — `ResourceId` values are unchanged, saves and sim unaffected):**
 

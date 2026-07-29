@@ -1,7 +1,11 @@
 # NARRATIVE_EVENTS.md — Aurora Program — Complete v1 game text (English)
 *All game text lives here, referenced by ID. Claude Code writes no new narrative: missing beats get added here first. Tone: skeptical press slowly turning believer; dry-humored internal memos.*
 
-**v3.6 changes:** U-10..U-16 added (§6) for the Sprint 8 economy-unlock's new Campus/Production internal upgrades; Aluminum alloys' §8 description updated for its new real effect (ECONOMY §5 v3.6).
+**v3.9 changes (genre research + owner-selected new features):** T-24 (Confidence explainer, first time shown below 100%) and T-25 (first-orbital-attempt distinguishing beat before Aurora I's VAB work) added. New §11: Current Directive text table (UI_SPEC §2h) — a persistent, dynamic "what now" indicator addressing a recurring root-cause confusion pattern across multiple playtests.
+
+**v3.8 changes:** T-23 added — the level-10 building-expansion milestone's celebration toast (ECONOMY §4c).
+
+**v3.7 changes (Sprint 9.5 — second manual-play pass):** T-11/T-12 rewritten (short idle flag + dynamic fully-staffed copy naming the real upgrade); T-13 adds permanent per-role salary display; T-18/T-19/T-20 close the "silent completion" gap (promotions, research, upgrades now log something, per UI_SPEC §2f); T-21/T-22 add sonda purpose blurbs (why launch this, what do I get).
 
 **v3.5 changes:** research node descriptions (§8), UI feedback toasts (§9), and manual verb copy (§10) added — closing real content gaps (Sounding rockets, Auto-refuel, VAB queues, Rush Order all previously had no player-facing text). Sections renumbered sequentially.
 
@@ -79,13 +83,6 @@ Rule: no upgrade, building or hire may be offered without plain-language copy sa
 | U-07 | Antenna Network (Tracking Station) | "More ground antennas, more telemetry recovered. +25% Flight Experience from every flight." |
 | U-08 | Weather Station (Tracking Station) | "Your own forecasting. Launch weather windows open every 2 minutes instead of 2–5." |
 | U-09 | Clean Room (VAB) | "A contamination-controlled bay. Required to accept constellation-batch contracts — the program's most lucrative clients." |
-| U-10 | Grants desk (Finance) | "A dedicated desk chasing grant money. +1 Technician slot at Finance." |
-| U-11 | Technical archive (R&D Lab) | "Organized records of every experiment run here. +1 Scientist slot at the R&D Lab." |
-| U-12 | Second research track (R&D Lab) | "A second bench, a second project. Run two research nodes at once instead of queueing them." |
-| U-13 | Bulk contracts (Supply Depot) | "Standing orders with your material suppliers. +1 Technician slot at Supply Depot." |
-| U-14 | Recovery loop (Refinery) | "Reclaims runoff from the refining process. Materials consumed per Propellant drop 10%." |
-| U-15 | QA station (Fabrication) | "Catches bad stock before it's machined. Materials consumed per Hardware drop 15%." |
-| U-16 | Inventory system (Warehouse) | "Denser shelving, better tracking. Every future Warehouse level stores 25% more." |
 
 Rules: **v2-only upgrades (Sound Suppression, Cryogenic Stand, Heavy Crane) are NOT rendered in v1 at all** — not greyed, not teased. Every building tile likewise states what it produces or enables in plain language, never only a number.
 
@@ -93,12 +90,14 @@ Rules: **v2-only upgrades (Sound Suppression, Cryogenic Stand, Heavy Crane) are 
 | ID | Moment | Text |
 |---|---|---|
 | T-10 | Hiring panel, always visible | "Open slots across the program: [N]" |
-| T-11 | About to hire with 0 open slots | "No open slots — this hire will sit idle and still draw salary. Idle staff can still be promoted (Technician → Engineer → Scientist)." |
-| T-12 | A building shows full slots (e.g. 2/2) | "Fully staffed. To produce more here, raise the building's level — slots are fixed per building." |
+| T-11 | About to hire with 0 open slots | "Idle — still costs salary." (short inline flag next to the hire button, replaces the old full-sentence warning; the hire panel shows each role's ongoing salary cost permanently instead — see below) |
+| T-12a | A building shows full slots, and a slot-adding upgrade for it exists and isn't bought yet | "Fully staffed. Buy '[Upgrade Name]' to add another slot." |
+| T-12b | A building shows full slots, and no slot-adding upgrade exists for it | "Fully staffed. This building's slots are fixed — level up to raise output instead." |
+| T-13 | Hiring panel, per role, always visible (not just on the idle-hire flag) | "Hire [Role] ($[cost]) — [salary]/s" — the recurring cost is part of the hire decision every time, not only when it's a mistake. |
 ## 8. Research node descriptions (player-facing — every node states its effect, including zero-effect gates)
 | Branch | Node | Description |
 |---|---|---|
-| Materials | Aluminum alloys | "Certifying aluminum stock for flight hardware. Fabrication wastes 10% less Material per Hardware — and unlocks Titanium research." |
+| Materials | Aluminum alloys | "Certifying aluminum stock for flight hardware. No other effect — unlocks Titanium research." |
 | Materials | Titanium | "Unlocks Titanium-tier Hardware. Fabrication starts producing at this tier automatically — no switch to flip." |
 | Propulsion | Sounding rockets | "Groundwork for suborbital flight. No other effect — unlocks Probe-1 engine certification at the Test Stand." |
 | Propulsion | Probe-1 engine | "Certify the engine that powers your S-1 and S-2 sounding rockets." |
@@ -121,6 +120,31 @@ Rules: **v2-only upgrades (Sound Suppression, Cryogenic Stand, Heavy Crane) are 
 | T-15 | Releasing a staff member (inline confirm) | "Release this [role]? No refund of hiring cost. Confirm?" |
 | T-16 | First entry into the Testing complex | "The Test Stand certifies engines before they fly — every engine, every time. Certifications run as timed processes; track them in the strip above." |
 | T-17 | First entry into the Launch complex | "This is where rockets fly. Build the VAB, integrate a rocket, and complete the launch checklist — every item, every time — to unlock the countdown." |
+| T-18 | Promotion completes (Mission Log entry, per UI_SPEC §2f — every completed process gets a line, not just the ones with full narrative beats) | "Promotion complete: one of your [Technicians/Engineers] is now a(n) [Engineer/Scientist]." |
+| T-19 | Research node completes (Mission Log entry) | "Research complete: [Node Name]." |
+| T-20 | Building upgrade purchase completes, if it was a timed process (Mission Log entry) | "Upgrade complete: [Building] — [Upgrade Name]." |
+| T-21 | S-1 mini-checklist screen, purpose blurb shown above the checklist (real gap: the player launched a sonda with no stated reason or expected outcome) | "A sounding rocket flight: quick, cheap, and it earns Flight Experience and Flight Data (which feeds Research) every time — your first real step toward orbit." |
+| T-22 | S-2 mini-checklist screen, purpose blurb | "This flight can cross the Kármán line — the internationally recognized edge of space, and your program's first Program Record." |
+| T-23 | A building crosses a level-10 milestone (ECONOMY §4c) — distinct from the routine upgrade-purchase toast, a bigger celebratory moment | "[Building] expanded! +1 [Role] slot." |
+| T-24 | First time Confidence shows below 100% (any mission, sonda or Aurora) | "Confidence: your odds of success. It's never fixed — investing in certification, staffing, and weather always gets you to 100%. Launching below that is a choice, not a limit." |
+| T-25 | Immediately before Aurora I's VAB integration begins (its first stage started) — distinguishes the orbital climax from routine sonda flights, now that sondas have their own polished result flow | "This is your first ORBITAL attempt — a real satellite, not a sounding rocket. It takes longer and asks more of your program, but it's what everything so far has been building toward." |
+
+## 11. Current Directive text (persistent "what now" indicator, UI_SPEC §2h)
+Ordered roughly by when each becomes the active directive; the engine shows whichever is most relevant to current state. Claude Code may add intermediate directives as needed, following the same terse, action-first phrasing (a directive states the NEXT action, not a status report).
+| ID | Active when | Text |
+|---|---|---|
+| D-01 | Game start, no Finance yet | "Pitch investors to start raising funds." |
+| D-02 | Finance affordable, not built | "Build Finance to start earning passively." |
+| D-03 | Finance built, no staff hired | "Hire a Technician and assign them to Finance." |
+| D-04 | Staff at cap, Crew Quarters affordable | "Build Crew Quarters to raise your staff cap." |
+| D-05 | R&D Lab built, no Scientist | "Promote a Technician to Engineer, then Scientist, to staff the R&D Lab." |
+| D-06 | Have Research, no active research node | "Pick a research node to start." |
+| D-07 | Production complex unlocked, no Supply Depot | "Build Supply Depot to start gathering Materials." |
+| D-08 | Test Stand built, engine not yet certified | "Certify an engine at the Test Stand before you can fly." |
+| D-09 | Engine certified, no sonda flown yet | "Launch your first S-1 sounding rocket." |
+| D-10 | S-2/Kármán done, VAB not yet built | "Build the VAB to begin your first satellite." |
+| D-11 | Aurora I integration in progress | "Keep building — Aurora I's stages integrate one at a time." |
+| D-12 | Aurora I complete, no contract accepted | "Check the Contracts panel — client work is now available." |
 
 ## 10. Manual verb descriptions (missing from earlier docs — same "no purchasable without effect text" rule)
 | Verb | Description |
