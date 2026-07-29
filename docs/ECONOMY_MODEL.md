@@ -1,12 +1,13 @@
 # ECONOMY_MODEL.md — Aurora Program — Complete baseline numbers
 *Every value in the game. Claude Code does NOT invent numbers: if a value isn't here, ask and add it here first. Tick = 1 second (logical economy rate; the render loop is delta-based per CLAUDE.md rule 6). Baseline for the Sprint-0 headless simulator (`sim/run.ts`); adjust only via the simulator, updating this file.*
 
-**v3.9 changes (Sprint 10 task 1 — Flight Experience trees, no values changed):** §9's 10 XP nodes implemented as specified — 8 wired as declarative Modifiers (same registry research-tree effects use), Partial reusability as dedicated propellant-recovery logic. Tracking Station's "+25% Flight XP per level" (§4, already-documented since the building shipped) was never actually applied anywhere in code until now — same "described but unwired" gap class as Sprint 7.5's Test Stand leveling, fixed here rather than re-specified (no value changed, only real behavior added to match the existing doc line). Parallel integration's exact mechanic ("two stages at once") deferred — genuinely underspecified against the shipped strictly-sequential VAB stage model; purchase blocked in code pending a design answer, tracked as an open question, not guessed at.
+**v3.9 changes (Sprint 10 design questions):** §7 restructured — Aurora II confirmed to reuse Aurora I's mechanics wholesale, no separate values; `orbitalFlight` tech gates the SECOND orbital attempt onward, NOT Aurora I's own launch (the doc's old wording was simply wrong — shipped, tested Sprint 7 behavior is authoritative); "Parallel integration" XP node clarified as auto-chaining stages with no dead time between them, not literal concurrent timers (VAB stages keep real prerequisite order).
 
 **v3.8 changes (owner design proposal — emotional payoff for staff growth):** new building-expansion milestone rule (§4c) — every 10 levels, a slotted building gains +1 slot per role it already employs, universal and automatic, coexisting with the already-shipped specific slot upgrades. **SCOPED UNLOCK — full sim sweep required.**
 
+**v3.7 changes (Sprint 9.5 — second manual-play pass):** rate-display precision fixed (§12 — deltas below 0.1 now show 2 decimals, closing the "+0.0/s" R&D Lab bug); Basic engineering's cost raised 15R/3min → 120R/45min to protect the promotion-bootstrap pacing (SCOPED UNLOCK, re-run sim). Hiring-cost curve (base cost / 1.15^hiredOfThatRole factor) flagged by the owner as possibly too shallow given realistic headcounts — NOT changed here; parked as a dedicated balance-pass candidate before the itch.io build (BACKLOG).
+
 **Version history (compressed — full detail only for the latest 2 versions above; older entries kept as one-liners for traceability, not routine reading):**
-- v3.7: rate-display precision fixed (2 decimals below 0.1); Basic engineering cost raised 15R/3min -> 120R/45min (SCOPED UNLOCK); hiring-cost curve flagged, not changed.
 - v3.6: satellite contract build process specified (§10) — single-stage integration, scaled duration, free flight review.
 - v3.5: Auto-refuel and Test Stand leveling given real effects (both were undefined gaps); Sounding rockets confirmed a pure gate; Hardware tier production confirmed automatic (UI feedback was the actual gap).
 - v3.4: Sprint 6 ratifications — Propellant is a live launch-time check, not timed; full failure package applies to all launches not just Aurora I; Records gate on success except "First ignition."
@@ -137,8 +138,10 @@ Rule: **every engine type, present and future, has an extended certification** �
 
 Sonda Confidence (simplified): **base 65** + certification (+20 / +30 extended) + optimal weather (+5). 65+30+5 = **100 reachable, guaranteed** — teaching the mechanic small before Aurora I. Same roll-commitment rule as full launches (GDD §7b).
 
-## 7. Aurora I (first satellite — v1 climax) — VAB integration
-Structure 30 H, 20 min → Engines (Orbital-1 certified) 20 H, 15 min → Guidance 15 H + 30 R, 15 min → Satellite payload 15 H, **15 min** (Payload Processing not required for own satellite) → Final integration 10 H, 10 min → Pad transfer 5 min → Propellant load 400 P, 3 min → Flight review 50 R, **instant** (pure Research spend, no timer — this applies to all flight reviews, S-2's included). Requires: Orbital flight tech + Tracking Station active + full checklist (GDD §7). **Note: the 400 P load requires Propellant Depot lv2 (cap 500) — surfaced to the player via tooltip T-08 when the VAB build starts.**
+## 7. Aurora I & Aurora II (orbital missions — v1 climax) — VAB integration
+Structure 30 H, 20 min → Engines (Orbital-1 certified) 20 H, 15 min → Guidance 15 H + 30 R, 15 min → Satellite payload 15 H, **15 min** (Payload Processing not required for own satellite) → Final integration 10 H, 10 min → Pad transfer 5 min → Propellant load 400 P, 3 min → Flight review 50 R, **instant** (pure Research spend, no timer — this applies to all flight reviews, S-2's included). Requires: Flight program tech + Tracking Station active + full checklist (GDD §7). **Note: the 400 P load requires Propellant Depot lv2 (cap 500) — surfaced to the player via tooltip T-08 when the VAB build starts.**
+
+**Aurora II reuses these mechanics wholesale — same stages, costs, durations, checklist, and reward values.** No separate cost/reward table: this IS the Aurora II section. `missionType` tags the first-ever successful orbital launch `'auroraI'`; every one after is `'auroraII'`. **`orbitalFlight` tech gates the SECOND orbital attempt onward (Aurora II), not Aurora I's own launch** — Aurora I has been playable and tested since Sprint 7 gated only on Flight program tech + VAB, and that shipped behavior is authoritative over this doc's earlier wording, which was simply wrong. `orbitalFlight`'s narrative beat (N-15) already describes it as unlocking "Aurora II and the orbital mission class" — this is that unlock made mechanical, not just narrative.
 
 ## 8. Launch rewards (Flight XP × Tracking multiplier; Flight Data = Research; one-time Funding/Rep payouts ignore caps)
 | Event | Flight XP | Reputation | Flight Data (R) |
@@ -167,7 +170,7 @@ Triggers are defined **by event, never by launch number** ("Launch 1/2" wording 
 
 ## 9. Flight Experience trees (XP cost)
 Propulsion: Efficient mixtures (100: −10% Propellant/launch) → Optimized ignition (250: certification −20%) → Partial reusability (600: recover 20% Propellant — mechanic change)
-Operations: Procedures (100: integration −10%) → Turnaround (300: pad ready −30%) → Parallel integration (700: two stages at once — mechanic change)
+Operations: Procedures (100: integration −10%) → Turnaround (300: pad ready −30%) → **Parallel integration (700: auto-chains VAB stages — the next stage's timer starts the instant the previous one finishes, no manual click between them. Not literal concurrent timers: stages keep their real prerequisite order (Structure→Engines→Guidance→Payload→Final) since each genuinely depends on the last; "parallel" describes removing dead time between them, not simultaneous construction — mechanic change)**
 Organization: Team culture (150: salaries −5%) → Recruiting (400: hiring −15%)
 Prestige: Public relations (150: +20% Reputation) → Trusted brand (450: contracts pay +25%)
 

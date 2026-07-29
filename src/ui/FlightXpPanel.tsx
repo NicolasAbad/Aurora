@@ -78,7 +78,7 @@ function NodeDetail({ node, onClose }: { node: XpNode; onClose: () => void }) {
         <button
           type="button"
           className="upgrade-button"
-          disabled={!canBuy || state === 'pending-design'}
+          disabled={state === 'pending-design' || !canBuy}
           onClick={() => buyFlightXpNode(node.id)}
         >
           {state === 'pending-design' ? 'Coming soon' : 'Buy'}

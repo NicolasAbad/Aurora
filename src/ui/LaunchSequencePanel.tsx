@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../state/persistStore';
 import { canAffordCost } from '../core/actions';
-import { buildingForPad, nextAuroraStageId } from '../core/auroraMission';
+import { buildingForPad, hasAuroraISuccess, nextAuroraStageId } from '../core/auroraMission';
 import { computeConfidenceBreakdown } from '../core/confidence';
 import { AURORA_I_STAGES_BY_ID } from '../data/auroraI';
 import { CONTRACT_TIERS, SATELLITE_BUILD } from '../data/contracts';
+import { narrativeText } from '../data/narrative';
 import { formatDuration, formatPercent } from '../core/format';
 import { progressFraction, remainingMs } from '../core/time';
 import { CostLabel } from './CostLabel';
@@ -76,6 +77,8 @@ function NextStageWidget({ padId }: { padId: PadId }) {
   const resources = useGameStore(useShallow((s) => s.resources));
   const startAuroraStage = useGameStore((s) => s.startAuroraStage);
   const orbital1Certified = useGameStore((s) => s.certifications.engines.orbital1.certified);
+  const completedTech = useGameStore(useShallow((s) => s.research.completed));
+  const launches = useGameStore(useShallow((s) => s.mission.launches));
 
   const stageId = nextAuroraStageId(pad.stagesDone);
   const process = findPadProcess(processes, padId, 'integration', 'auroraI');
@@ -92,6 +95,10 @@ function NextStageWidget({ padId }: { padId: PadId }) {
 
   const stage = AURORA_I_STAGES_BY_ID.get(stageId)!;
   const blockedOnEngines = stageId === 'engines' && !orbital1Certified;
+  // ECONOMY §7 (v3.9): orbitalFlight gates Aurora II onward, never Aurora I's own launch —
+  // only ever relevant at 'structure' (a fresh integration start) once a prior success exists.
+  const blockedOnOrbitalFlight =
+    stageId === 'structure' && hasAuroraISuccess(launches) && !completedTech.includes('orbitalFlight');
   const canAfford = canAffordCost(resources, stage.cost);
 
   return (
@@ -102,10 +109,11 @@ function NextStageWidget({ padId }: { padId: PadId }) {
         {stage.durationMs > 0 ? `, ${formatDuration(stage.durationMs)}` : ' (instant)'}
       </div>
       {blockedOnEngines && <div className="research-node__condition">Requires: Orbital-1 certified</div>}
+      {blockedOnOrbitalFlight && <div className="research-node__condition">Requires: Orbital flight tech</div>}
       <button
         type="button"
         className="upgrade-button"
-        disabled={blockedOnEngines || !canAfford}
+        disabled={blockedOnEngines || blockedOnOrbitalFlight || !canAfford}
         onClick={() => startAuroraStage(padId)}
       >
         {stage.durationMs > 0 ? 'Start' : 'Pay'}
@@ -213,19 +221,26 @@ function ConfidenceBreakdownView({ padId }: { padId: PadId }) {
 
 function ResultCard({ launch, tierReward, onDismiss }: { launch: LaunchRecord; tierReward?: string; onDismiss: () => void }) {
   const isContract = launch.missionType === 'contract';
+  // ECONOMY §7 (v3.9): Aurora II reuses the same reward values, but must not claim to be
+  // "Aurora I" / "First orbit" (that Program Record is Aurora I's alone) — real gap found
+  // in Playwright verification, harmless while Aurora I could only ever happen once.
   const headline = isContract
     ? launch.success
       ? 'Contract delivered.'
       : "It didn't make it."
     : launch.success
-      ? 'Aurora I is flying.'
+      ? launch.missionType === 'auroraII'
+        ? narrativeText('T-27')
+        : 'Aurora I is flying.'
       : "It didn't make it.";
   const detail = isContract
     ? launch.success
       ? `Contract fulfilled. Rewards: ${tierReward}.`
       : 'Recovered 60% of integration Hardware as debris. The contract stays active — rebuild and retry before its deadline. The next integration on this pad runs at half duration.'
     : launch.success
-      ? 'First orbit. Rewards: +250 Flight XP, +60 Reputation, +2,000 Flight Data.'
+      ? launch.missionType === 'auroraII'
+        ? narrativeText('T-28')
+        : 'First orbit. Rewards: +250 Flight XP, +60 Reputation, +2,000 Flight Data.'
       : 'Recovered 60% of integration Hardware as debris. +200 Flight XP, +1,200 Flight Data. The next integration on this pad runs at half duration.';
 
   return (

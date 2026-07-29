@@ -28,6 +28,7 @@ import type {
   ChecklistItemId,
   EngineCertificationState,
   GameState,
+  LaunchRecord,
   MissionState,
   Modifier,
   PadId,
@@ -72,6 +73,13 @@ export function nextAuroraStageId(stagesDone: string[]): AuroraStageId | null {
     if (!stagesDone.includes(id)) return id;
   }
   return null;
+}
+
+/** ECONOMY §7 (v3.9): whether the program has ever completed a successful orbital
+ * launch — the line between "still working toward Aurora I" and "attempting Aurora II
+ * onward" (missionType tagging, the orbitalFlight tech gate below). */
+export function hasAuroraISuccess(launches: LaunchRecord[]): boolean {
+  return launches.some((l) => l.missionType === 'auroraI' && l.success);
 }
 
 function rocketStatusAfterStarting(stageId: AuroraStageId): PadMissionState['rocketStatus'] {
@@ -130,6 +138,13 @@ export function startNextAuroraStage(
   const stageId = nextAuroraStageId(pad.stagesDone);
   if (!stageId) return null;
   if (stageId === 'engines' && !engineState.certified) return null;
+  // ECONOMY §7 (v3.9): a fresh integration (the 'structure' stage, stagesDone empty)
+  // starting a SECOND-or-later orbital attempt requires orbitalFlight tech. Aurora I
+  // itself — the program's first attempt — stays gated only on Flight program tech + VAB,
+  // exactly as shipped since Sprint 7; this only ever blocks once hasAuroraISuccess is true.
+  if (stageId === 'structure' && hasAuroraISuccess(mission.launches) && !completedTech.includes('orbitalFlight')) {
+    return null;
+  }
 
   const stageDef = AURORA_I_STAGES_BY_ID.get(stageId)!;
   // ECONOMY §9 (Sprint 10): Efficient mixtures' -10% Propellant/launch registers on
@@ -202,8 +217,10 @@ export function startNextAuroraStage(
 /** GDD's "VAB queues" auto-progression (research tree: vabQueues) — auto-starts the next
  * stage the instant one finishes, but only within the VAB itself (transfer/propellant/
  * flight review always stay manual, deliberate decision points). No-op (returns the
- * inputs unchanged) if the tech isn't researched, a stage is already running, or the
- * next stage isn't a VAB one. */
+ * inputs unchanged) if neither route is owned, a stage is already running, or the next
+ * stage isn't a VAB one. ECONOMY §9 (v3.9): Flight Experience's Parallel integration
+ * grants the exact same effect through a different currency — a second route to the
+ * same behavior, not a second mechanic — so either one is sufficient. */
 export function maybeAutoQueueAuroraStage(
   resources: GameState['resources'],
   mission: MissionState,
@@ -216,7 +233,7 @@ export function maybeAutoQueueAuroraStage(
   xpNodesOwned: string[] = [],
 ): StartAuroraStageResult {
   const unchanged = { resources, mission, processes };
-  if (!completedTech.includes('vabQueues')) return unchanged;
+  if (!completedTech.includes('vabQueues') && !xpNodesOwned.includes('parallelIntegration')) return unchanged;
   const pad = mission.pads[padId];
   if (!pad) return unchanged;
   const stageId = nextAuroraStageId(pad.stagesDone);
@@ -378,6 +395,10 @@ export function launchAuroraMission(
   if (!pad || pad.contractId != null || pad.committedRoll === null) return null;
 
   const success = pad.committedRoll < pad.confidence / 100;
+  // ECONOMY §7 (v3.9): the first-ever successful orbital launch is 'auroraI'; every
+  // attempt after that (success or failure) is 'auroraII' — reusing Aurora I's mechanics
+  // wholesale means there's no separate stage/cost data to key off, just this tag.
+  const missionType = hasAuroraISuccess(mission.launches) ? 'auroraII' : 'auroraI';
   const tier = currentHardwareTier(completedTech);
   // ECONOMY §4/§9 (Sprint 10): see core/certification.ts for the same pattern.
   const xpMult = trackingStationFlightXpMultiplier(trackingLevel, antennaNetworkBought);
@@ -393,7 +414,10 @@ export function launchAuroraMission(
       reputation: applyGrant(nextResources.reputation, grantReputation(AURORA_I_REWARD.reputation), true),
       research: applyGrant(nextResources.research, AURORA_I_REWARD.flightData, true),
     };
-    nextNarrativeSeen = markSeen(nextNarrativeSeen, 'N-11'); // First successful launch
+    // N-11 (First successful launch) is Aurora I's own beat; N-16 (v1 finale) is Aurora
+    // II's — markSeen is idempotent, so a later 'auroraII' success just re-marks N-16
+    // without re-triggering N-11.
+    nextNarrativeSeen = markSeen(nextNarrativeSeen, missionType === 'auroraI' ? 'N-11' : 'N-16');
     halfDurationNext[padId] = false;
   } else {
     const hardwareSpentOnIntegration = VAB_STAGE_IDS.reduce(
@@ -426,7 +450,7 @@ export function launchAuroraMission(
       auroraHalfDurationNext: halfDurationNext,
       launches: [
         ...mission.launches,
-        { id: `aurora-launch-${padId}-${now}`, padId, missionType: 'auroraI', success, timestamp: now },
+        { id: `aurora-launch-${padId}-${now}`, padId, missionType, success, timestamp: now },
       ],
     },
     narrativeSeen: nextNarrativeSeen,

@@ -29,14 +29,14 @@ export interface BuyXpNodeResult {
   modifiers: Modifier[];
 }
 
-// Sprint 10 design-question thread: "two stages at once" isn't resolvable without
-// design input — a literal auto-chain reading is redundant with the already-shipped
-// vabQueues research node, and a true-concurrent-timers reading needs its own overlap
-// rule specified before it can be built (see the exported Aurora II / Parallel
-// integration question set). Cost/deps/position are real ECONOMY §9 data and stay in
-// XP_TREE; only the PURCHASE is refused here, same "visible, priced, but not yet live"
-// treatment data/buildings.ts's Training Center teaser already uses for deferred content.
-export const XP_NODES_PENDING_DESIGN: readonly string[] = ['parallelIntegration'];
+// Sprint 10 design-question thread resolved (v3.9): Parallel integration auto-chains
+// VAB stages, no dead time between them — the exact reading flagged here as "redundant
+// with vabQueues" turned out to be correct; core/auroraMission.ts's
+// maybeAutoQueueAuroraStage now ORs both gates so either currency (Research or Flight
+// XP) reaches the same effect. Kept as an empty array, not deleted, so a future sprint's
+// genuinely-blocked mechanic node has the same "visible, priced, but not yet live"
+// treatment ready to reuse (data/buildings.ts's Training Center teaser uses the same idea).
+export const XP_NODES_PENDING_DESIGN: readonly string[] = [];
 
 /**
  * Instant one-time purchase — spends Flight XP, registers the node's declarative

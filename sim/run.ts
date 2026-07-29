@@ -369,6 +369,11 @@ interface SimState {
   auroraTimer: Timer | null;
   auroraILaunched: boolean;
   auroraILaunchedDay: number | null; // 1-based simulated day it happened on
+  // ECONOMY §7 (v3.9): Aurora II reuses Aurora I's mechanics wholesale (same
+  // AURORA_I_STAGES loop, gated on orbitalFlight tech instead) — this is the first day a
+  // SECOND-or-later orbital attempt succeeds. Repeatable content past this point; the
+  // sim keeps re-attempting for the rest of the run same as it does for contracts.
+  auroraIILaunchedDay: number | null;
 
   // Era boundary markers (ECONOMY §8 v2.3: Flight Data target is per-era). 1-based
   // simulated day, set once, first time either event happens — see grantFlightData()
@@ -485,6 +490,7 @@ function createState(): SimState {
     auroraTimer: null,
     auroraILaunched: false,
     auroraILaunchedDay: null,
+    auroraIILaunchedDay: null,
     firstFlightDataDay: null,
     researchStallTracking: null,
     researchStalls: [],
@@ -1091,15 +1097,19 @@ function tickContract(state: SimState, deltaMs: number): void {
 }
 
 function startAuroraStage(state: SimState): void {
-  if (state.auroraILaunched || state.auroraTimer) return;
+  if (state.auroraTimer) return;
   const complexDReady =
     state.buildingLevel.vab > 0 &&
     state.buildingLevel.launchPad > 0 &&
     state.buildingLevel.launchControl > 0 &&
     state.buildingLevel.trackingStation > 0;
   if (!complexDReady) return;
-  if (!state.techCompleted.has('orbitalFlight')) return;
   if (!state.orbital1ExtendedDone) return; // guaranteed-Confidence path only (see header)
+  // ECONOMY §7 (v3.9): orbitalFlight gates the SECOND orbital attempt onward (Aurora II),
+  // never Aurora I's own first launch — matches core/auroraMission.ts's
+  // startNextAuroraStage. The old unconditional gate here was simply wrong (same class of
+  // doc/code mismatch as ECONOMY_MODEL's own now-corrected §7 wording).
+  if (state.auroraILaunched && !state.techCompleted.has('orbitalFlight')) return;
 
   const stage = AURORA_I_STAGES[state.auroraStageIndex];
   if (!canAfford(state, stage.cost)) return;
@@ -1119,17 +1129,26 @@ function tickAurora(state: SimState, deltaMs: number): void {
   if (!state.auroraTimer) return;
   state.auroraTimer.remainingMs -= deltaMs;
   if (state.auroraTimer.remainingMs > 0) return;
-  state.day.notes.push(`Aurora I: ${AURORA_I_STAGES[state.auroraStageIndex].id} done`);
+  state.day.notes.push(`Aurora: ${AURORA_I_STAGES[state.auroraStageIndex].id} done`);
   state.auroraTimer = null;
   state.auroraStageIndex += 1;
   if (state.auroraStageIndex >= AURORA_I_STAGES.length) {
-    state.auroraILaunched = true;
-    state.auroraILaunchedDay = Math.floor(state.nowMs / DAY_MS) + 1;
+    // ECONOMY §7 (v3.9): same reward every time — Aurora II reuses Aurora I's stages,
+    // costs and reward values wholesale, no separate numbers. Reset the stage loop so a
+    // subsequent attempt (gated on orbitalFlight in startAuroraStage) can run again.
+    state.auroraStageIndex = 0;
     grantFlightXp(state, AURORA_I_SIM_REWARD.flightxp);
     grantFlightData(state, AURORA_I_SIM_REWARD.researchFlightData);
     grant(state, 'reputation', AURORA_I_SIM_REWARD.reputation, true);
-    maybeAwardRecord(state, 'firstOrbit'); // Aurora I success, ECONOMY §8b
-    state.day.notes.push('AURORA I LAUNCHED — first satellite in orbit');
+    maybeAwardRecord(state, 'firstOrbit'); // Aurora I success only, ECONOMY §8b (idempotent)
+    if (!state.auroraILaunched) {
+      state.auroraILaunched = true;
+      state.auroraILaunchedDay = Math.floor(state.nowMs / DAY_MS) + 1;
+      state.day.notes.push('AURORA I LAUNCHED — first satellite in orbit');
+    } else if (state.auroraIILaunchedDay === null) {
+      state.auroraIILaunchedDay = Math.floor(state.nowMs / DAY_MS) + 1;
+      state.day.notes.push('AURORA II LAUNCHED — v1 finale');
+    }
   }
 }
 
@@ -1469,6 +1488,9 @@ function printSummary({ profile, rows, state, outPath, seed, days }: SimulationR
   console.log(
     `  Aurora I launched:    ${state.auroraILaunched ? `yes (day ${state.auroraILaunchedDay})` : 'no'}`,
   );
+  console.log(
+    `  Aurora II launched:   ${state.auroraIILaunchedDay !== null ? `yes (day ${state.auroraIILaunchedDay})` : 'no'}`,
+  );
   console.log(`  Contracts fulfilled:  ${state.contractsFulfilled}`);
 
   // Checkpoint rows: 5 evenly spaced days across the run (arc-milestone checkpoints
@@ -1692,6 +1714,14 @@ function main(): void {
   console.log(`  Days to Aurora I — optimal: ${fmt(optimal)}`);
   console.log(`  Days to Aurora I — human:   ${fmt(human)}`);
   console.log(`  Days to Aurora I — casual:  ${fmt(casual)} (informational only — no target; see its own "Lost production" report above)`);
+
+  // ECONOMY §7 (v3.9): new — how soon orbitalFlight's gate lets a second orbital attempt
+  // start, now that the sim models Aurora II instead of stopping at Aurora I.
+  const fmtII = (r: SimulationResult) =>
+    r.state.auroraIILaunchedDay !== null ? `day ${r.state.auroraIILaunchedDay}` : `not reached within ${r.days} days`;
+  console.log(`  Days to Aurora II — optimal: ${fmtII(optimal)}`);
+  console.log(`  Days to Aurora II — human:   ${fmtII(human)}`);
+  console.log(`  Days to Aurora II — casual:  ${fmtII(casual)} (informational only — no target)`);
 
   // Codified pacing floor (ECONOMY §8 v2.3): report the fact, don't act on it. No
   // ECONOMY value is touched by this simulator, ever — see printSummary()'s per-profile

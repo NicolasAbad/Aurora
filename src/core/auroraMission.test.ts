@@ -13,7 +13,7 @@ import {
   startAuroraWeatherCheck,
   startNextAuroraStage,
 } from './auroraMission';
-import type { EngineCertificationState, MissionState, Process } from './types';
+import type { EngineCertificationState, LaunchRecord, MissionState, Process } from './types';
 
 const MIN = 60_000;
 
@@ -182,6 +182,19 @@ describe('startNextAuroraStage', () => {
     const transferResult = startNextAuroraStage(state.resources, m, 'padA', [], engineState({ certified: true }), [], modifiers, 0);
     expect(transferResult!.processes[0].durationMs).toBe(5 * MIN); // unaffected
   });
+
+  // ECONOMY §7 (v3.9): orbitalFlight gates the SECOND orbital attempt onward, never
+  // Aurora I's own first launch (shipped, tested since Sprint 7 — the doc's old wording
+  // was simply wrong, not a bug in this code).
+  it('gates a fresh integration on orbitalFlight tech once Aurora I has already succeeded, but not before', () => {
+    const state = fundedState();
+    const priorSuccess: LaunchRecord = { id: 'l0', padId: 'padA', missionType: 'auroraI', success: true, timestamp: 0 };
+    const m = mission({ launches: [priorSuccess] });
+    expect(startNextAuroraStage(state.resources, m, 'padA', [], engineState(), [], [], 0)).toBeNull();
+    expect(startNextAuroraStage(state.resources, m, 'padA', [], engineState(), ['orbitalFlight'], [], 0)).not.toBeNull();
+    // Aurora I's own first attempt (no prior success recorded) is never gated on it.
+    expect(startNextAuroraStage(state.resources, mission(), 'padA', [], engineState(), [], [], 0)).not.toBeNull();
+  });
 });
 
 describe('maybeAutoQueueAuroraStage', () => {
@@ -204,6 +217,15 @@ describe('maybeAutoQueueAuroraStage', () => {
     const m = mission({ pads: { padA: { rocketStatus: 'in_vab', stagesDone, checklist: mission().pads.padA!.checklist, confidence: 0, committedRoll: null } } });
     const result = maybeAutoQueueAuroraStage(state.resources, m, 'padA', [], engineState({ certified: true }), ['vabQueues'], [], 0);
     expect(result.processes).toEqual([]);
+  });
+
+  // ECONOMY §9 (v3.9): Parallel integration (Flight XP) grants the identical auto-chain
+  // effect through a different currency — either route is sufficient on its own.
+  it('auto-starts a VAB stage once Parallel integration is owned, with vabQueues NOT researched', () => {
+    const state = fundedState();
+    const result = maybeAutoQueueAuroraStage(state.resources, mission(), 'padA', [], engineState(), [], [], 0, ['parallelIntegration']);
+    expect(result.processes).toHaveLength(1);
+    expect(result.processes[0].payload.stageId).toBe('structure');
   });
 });
 
@@ -347,6 +369,35 @@ describe('launchAuroraMission', () => {
     expect(result!.resources.hardware.amount).toBe(54); // 60% of 90 (30+20+15+15+10 across the 5 VAB stages)
     expect(result!.narrativeSeen).toEqual(['N-12']);
     expect(result!.mission.auroraHalfDurationNext?.padA).toBe(true);
+  });
+
+  // ECONOMY §7 (v3.9): Aurora II reuses Aurora I's mechanics wholesale — same reward,
+  // same failure package — only the missionType tag and narrative beat differ, keyed off
+  // whether a successful 'auroraI' launch already exists in history.
+  describe('Aurora II (v3.9)', () => {
+    function withPriorSuccess(committedRoll: number, confidence = 90) {
+      const priorSuccess: LaunchRecord = { id: 'l0', padId: 'padA', missionType: 'auroraI', success: true, timestamp: 0 };
+      return { ...committedMission(committedRoll, confidence), launches: [priorSuccess] };
+    }
+
+    it('success after a prior Aurora I success: tags "auroraII", narrates N-16 not N-11', () => {
+      const state = createInitialState();
+      const m = withPriorSuccess(0.5, 90); // success
+      const result = launchAuroraMission(state.resources, m, 'padA', [], [], 5000);
+      expect(result!.narrativeSeen).toEqual(['N-16']);
+      expect(result!.mission.launches.at(-1)).toEqual({
+        id: 'aurora-launch-padA-5000', padId: 'padA', missionType: 'auroraII', success: true, timestamp: 5000,
+      });
+    });
+
+    it('a failed second-or-later attempt is still tagged "auroraII", same failure narrative (N-12)', () => {
+      const state = createInitialState();
+      state.resources.hardware.amount = 0;
+      const m = withPriorSuccess(0.95, 90); // failure
+      const result = launchAuroraMission(state.resources, m, 'padA', [], [], 5000);
+      expect(result!.mission.launches.at(-1)?.missionType).toBe('auroraII');
+      expect(result!.narrativeSeen).toEqual(['N-12']);
+    });
   });
 });
 

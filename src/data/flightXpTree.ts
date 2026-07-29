@@ -4,7 +4,10 @@
 // researchTree.ts's modifierForNode pattern verbatim. `mechanicChange: true` marks the
 // two nodes GDD §9 calls out as changing a mechanic rather than scaling a percentage
 // (Partial reusability, Parallel integration) — these have no declarative `effect` and
-// are handled by dedicated logic at their point of use instead.
+// are handled by dedicated logic at their point of use instead. Parallel integration's
+// mechanic (v3.9 design answer) is identical to the research tree's own vabQueues node
+// (auto-chain VAB stages, no dead time) — core/auroraMission.ts's maybeAutoQueueAuroraStage
+// ORs the two gates, a second currency-route to the same effect rather than a new one.
 import type { Modifier } from '../core/types';
 
 export interface XpNode {
@@ -68,7 +71,7 @@ export const XP_TREE: XpNode[] = [
     branch: 'operations',
     costXp: 700,
     deps: ['turnaround'],
-    mechanicChange: true, // deferred — see Sprint 10 design-question thread
+    mechanicChange: true, // auto-chains VAB stages — same effect as research's vabQueues (see core/auroraMission.ts)
   },
   // --- Organization ---
   {

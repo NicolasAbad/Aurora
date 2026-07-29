@@ -99,19 +99,21 @@ describe('buyXpNode', () => {
     expect(result!.modifiers).toEqual([]);
   });
 
-  // Sprint 10 design-question thread: Parallel integration's exact mechanic isn't
-  // resolvable without design input yet — refused outright even when otherwise available
-  // and affordable, same "visible, priced, but not yet live" treatment as a v2-marked
-  // upgrade never rendering a working purchase path.
-  it('refuses Parallel integration — pending design, per XP_NODES_PENDING_DESIGN', () => {
-    expect(XP_NODES_PENDING_DESIGN).toContain('parallelIntegration');
+  // Sprint 10 design-question thread resolved (v3.9): Parallel integration auto-chains
+  // VAB stages (core/auroraMission.ts's maybeAutoQueueAuroraStage), same as Partial
+  // reusability a mechanic-change node with no declarative modifier — purchase itself
+  // just spends XP and records ownership; the effect is checked directly by id.
+  it('purchases Parallel integration (mechanic-change, no modifier registered)', () => {
+    expect(XP_NODES_PENDING_DESIGN).not.toContain('parallelIntegration');
     const result = buyXpNode(
       resourcesWithFlightXp(1000),
       { purchased: ['efficientMixtures', 'optimizedIgnition', 'partialReusability', 'procedures', 'turnaround'] },
       [],
       'parallelIntegration',
     );
-    expect(result).toBeNull();
+    expect(result).not.toBeNull();
+    expect(result!.flightXpTree.purchased).toContain('parallelIntegration');
+    expect(result!.modifiers).toEqual([]);
   });
 });
 

@@ -93,7 +93,7 @@ export const NARRATIVE_TEXT: Record<string, string> = {
   partialReusability: 'Recover unused propellant after every launch. +20% Propellant refunded per launch.',
   procedures: 'Tighter VAB workflows. -10% stage integration time.',
   turnaround: 'Faster pad handling. -30% pad transfer time (stacks with Basic logistics).',
-  parallelIntegration: 'Run two VAB stages side by side. Coming soon — exact behavior still being finalized.',
+  parallelIntegration: 'Stages integrate automatically once the previous one finishes — no manual click between them.',
   teamCulture: 'A program people want to stay at. -5% effective salaries.',
   recruiting: 'A reputation that hires itself. -15% hiring cost.',
   publicRelations: 'The program gets noticed. +20% Reputation earned.',
@@ -164,6 +164,11 @@ export const NARRATIVE_TEXT: Record<string, string> = {
   // §9 (v4.0, Sprint 10) — Flight Experience node purchase, same "previously silent
   // purchase gets a Mission Log line" treatment as T-20.
   'T-26': 'Flight Experience: {node} unlocked.',
+  // §9 (v4.1, Sprint 10 — Aurora II): ui/LaunchSequencePanel.tsx's ResultCard hardcoded
+  // "Aurora I is flying" / "First orbit" for every success — correct while Aurora I could
+  // only ever happen once, wrong the moment a second orbital attempt (Aurora II) is real.
+  'T-27': 'Aurora II is flying.',
+  'T-28': 'Rewards: +250 Flight XP, +60 Reputation, +2,000 Flight Data.',
 };
 
 /** Resolves an ID to its text, filling any `{name}` placeholders (T-10's open-slot
