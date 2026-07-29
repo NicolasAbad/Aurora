@@ -57,11 +57,15 @@ export const NARRATIVE_TEXT: Record<string, string> = {
   'U-14': 'Reclaims runoff from the refining process. Materials consumed per Propellant drop 10%.',
   'U-15': 'Catches bad stock before it’s machined. Materials consumed per Hardware drop 15%.',
   'U-16': 'Denser shelving, better tracking. Every future Warehouse level stores 25% more.',
-  // §7 — staff & slot copy (the idle-staff trap)
+  // §7 — staff & slot copy (the idle-staff trap). v3.7 (Sprint 9.5): T-11 shortened to
+  // an inline flag (no longer a confirm() interruption — the hire panel's permanent T-13
+  // salary line does the "acknowledge the cost" job proactively instead); T-12 split into
+  // T-12a/T-12b so "fully staffed" names the real slot-adding upgrade when one exists.
   'T-10': 'Open slots across the program: {n}',
-  'T-11':
-    'No open slots — this hire will sit idle and still draw salary. Idle staff can still be promoted (Technician → Engineer → Scientist).',
-  'T-12': 'Fully staffed. To produce more here, raise the building’s level — slots are fixed per building.',
+  'T-11': 'Idle — still costs salary.',
+  'T-12a': "Fully staffed. Buy '{upgradeName}' to add another slot.",
+  'T-12b': 'Fully staffed. This building’s slots are fixed — level up to raise output instead.',
+  'T-13': 'Hire {role} ({cost}) — {salary}/s',
   // §8 (v3.5) — research node descriptions, keyed by the node's own id (RESEARCH_TREE /
   // researchTree.ts) rather than a T-/N-/U- id: §8's table has no separate ID column,
   // and every node id is already a stable, unique key — reusing it is the natural

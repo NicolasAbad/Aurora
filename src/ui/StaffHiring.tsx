@@ -14,7 +14,6 @@ import {
   totalStaffCap,
 } from '../core/staff';
 import { formatCostEntry, formatRate } from '../core/format';
-import { CostLabel } from './CostLabel';
 import type { RoleId } from '../core/types';
 
 /** UI_SPEC §4b: Release action per pool member — inline confirm (single tap + inline
@@ -76,16 +75,6 @@ export function StaffHiring() {
   const hired = totalHired(staff);
   const openSlots = totalOpenSlots(staff, buildings);
 
-  // NARRATIVE §7 / UI_SPEC §4 (the idle-staff trap): hiring is NEVER blocked — the
-  // player keeps the choice — but a hire that would land with nowhere to go requires
-  // acknowledging it first (T-11), so idle salary burn is a choice, not a surprise.
-  function handleHire(role: RoleId) {
-    if (openSlotsForRole(staff, buildings, role) === 0 && !window.confirm(narrativeText('T-11'))) {
-      return;
-    }
-    hire(role);
-  }
-
   return (
     <div className="staff-panel">
       <div className="staff-panel__header">
@@ -105,6 +94,17 @@ export function StaffHiring() {
         const cost = hiringCost(role, roleHired);
         const canHire = unlocked && hired < cap && funding >= cost;
         const cheaperHint = unlocked ? promotionCheaperHint(role, roleHired) : null;
+        // T-13 (NARRATIVE §7 v3.7): the recurring cost is part of the hire decision every
+        // time, not just when it's a mistake — shown permanently, not only on the idle flag.
+        const hireLabel = narrativeText('T-13', {
+          role: ROLE_LABEL[role],
+          cost: formatCostEntry('funding', cost),
+          salary: formatRate(ROLES[role].salaryPerSec),
+        });
+        // T-11 (idle-staff trap): hiring is NEVER blocked (the player keeps the choice),
+        // but a hire that would land with nowhere to go shows a terse inline flag next to
+        // the button — visible before the click, not a confirm() interruption after it.
+        const wouldBeIdle = unlocked && openSlotsForRole(staff, buildings, role) === 0;
         return (
           <div key={role} className="staff-panel__row-group">
             <div className="staff-panel__row">
@@ -113,9 +113,12 @@ export function StaffHiring() {
               </span>
               <span className="staff-panel__row-actions">
                 {unlocked ? (
-                  <button type="button" disabled={!canHire} onClick={() => handleHire(role)}>
-                    Hire (<CostLabel cost={{ funding: cost }} />)
-                  </button>
+                  <>
+                    <button type="button" disabled={!canHire} onClick={() => hire(role)}>
+                      {hireLabel}
+                    </button>
+                    {wouldBeIdle && <span className="staff-panel__idle-flag">{narrativeText('T-11')}</span>}
+                  </>
                 ) : (
                   <span className="staff-panel__locked">Requires tech: {ROLES[role].unlockTech}</span>
                 )}

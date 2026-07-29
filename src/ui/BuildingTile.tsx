@@ -16,6 +16,7 @@ import {
   assignedToBuilding,
   buildingSlotCount,
   buildingStaffRatio,
+  slotUpgradeForRole,
   unassignedCount,
 } from '../core/staff';
 import { upgradeDeltaPreview } from '../core/upgradePreview';
@@ -117,6 +118,14 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
         const slots = buildingSlotCount(buildingId, role, level, ownedUpgrades);
         const canAssign = assigned < slots && unassignedCount(staff, role) > 0;
         const fullyStaffed = slots > 0 && assigned === slots;
+        // T-12a/T-12b (NARRATIVE §7 v3.7, idle-staff trap companion): explains WHY the +
+        // is disabled — naming the real slot-adding upgrade when one exists and isn't
+        // bought yet, rather than the old generically-wrong "raise the level" line.
+        const slotUpgrade = slotUpgradeForRole(buildingId, role);
+        const slotUpgradeAvailable = slotUpgrade && !ownedUpgrades.includes(slotUpgrade.id);
+        const fullyStaffedText = slotUpgradeAvailable
+          ? narrativeText('T-12a', { upgradeName: slotUpgrade.name })
+          : narrativeText('T-12b');
         return (
           <div key={role} className="building-tile__staff-row">
             <span>{ROLE_LABEL[role]}</span>
@@ -135,9 +144,7 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
                 +
               </button>
             </div>
-            {/* T-12 (NARRATIVE §7, idle-staff trap companion): explains WHY the + is
-                disabled here specifically, rather than leaving it a silent dead button. */}
-            {fullyStaffed && <div className="building-tile__slot-note">{narrativeText('T-12')}</div>}
+            {fullyStaffed && <div className="building-tile__slot-note">{fullyStaffedText}</div>}
           </div>
         );
       })}

@@ -11,6 +11,7 @@ import { RESOURCE_NAME } from '../data/resourceNames';
 import { capBonusMultiplier } from './actions';
 import { certificationDurationMultiplier, TEST_STAND_DURATION_REDUCTION_PER_LEVEL } from './certification';
 import { productionPerSecond } from './economy';
+import { formatRate } from './format';
 import type { BuildingId, ResourceId } from './types';
 
 export function upgradeDeltaPreview(
@@ -25,7 +26,9 @@ export function upgradeDeltaPreview(
     const current = productionPerSecond(def.production.basePerSec, level, staffRatio);
     const next = productionPerSecond(def.production.basePerSec, level + 1, staffRatio);
     const delta = next - current;
-    return `Level ${level + 1} → +${delta.toFixed(1)}/s ${RESOURCE_NAME[def.production.resource]} (currently +${current.toFixed(1)}/s)`;
+    // UI_SPEC §4 (v3.7): "preview the NEXT level's delta ONLY" — the tile's own
+    // production line already shows the current rate; repeating it here was redundant.
+    return `Level ${level + 1} → +${formatRate(delta)}/s ${RESOURCE_NAME[def.production.resource]}`;
   }
 
   if (def.capBonus) {
@@ -43,12 +46,11 @@ export function upgradeDeltaPreview(
   }
 
   if (buildingId === 'testStand') {
-    const currentPct = Math.round((1 - certificationDurationMultiplier(level, false)) * 100);
     const nextPct = Math.round((1 - certificationDurationMultiplier(level + 1, false)) * 100);
     if (level < 1) {
       return `Level ${level + 1} → enables certifications; each level after that: -${Math.round(TEST_STAND_DURATION_REDUCTION_PER_LEVEL * 100)}% certification duration`;
     }
-    return `Level ${level + 1} → -${nextPct}% certification duration (currently -${currentPct}%)`;
+    return `Level ${level + 1} → -${nextPct}% certification duration`;
   }
 
   return null;

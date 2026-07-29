@@ -23,7 +23,7 @@ describe('upgradeDeltaPreview — UI_SPEC §4 v3.5 clarity rule', () => {
     const atZero = upgradeDeltaPreview('testStand', 0, 1);
     expect(atZero).toContain('enables certifications');
     const atFour = upgradeDeltaPreview('testStand', 4, 1);
-    expect(atFour).toBe('Level 5 → -12% certification duration (currently -9%)');
+    expect(atFour).toBe('Level 5 → -12% certification duration');
   });
 
   it('buildings with no wired numeric effect return null, not an invented claim', () => {

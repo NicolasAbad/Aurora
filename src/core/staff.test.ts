@@ -8,6 +8,7 @@ import {
   isRoleUnlocked,
   staffRatioForBuilding,
   openSlotsForRole,
+  slotUpgradeForRole,
   totalHired,
   totalOpenSlots,
   totalSalaryPerSecond,
@@ -36,6 +37,20 @@ describe('isRoleUnlocked', () => {
     expect(isRoleUnlocked('technician', [])).toBe(true);
     expect(isRoleUnlocked('engineer', [])).toBe(false);
     expect(isRoleUnlocked('engineer', ['basicEngineering'])).toBe(true);
+  });
+});
+
+describe('slotUpgradeForRole (UI_SPEC §4 v3.7, T-12a/T-12b)', () => {
+  it('finds the slot-adding upgrade for a building+role that has one', () => {
+    expect(slotUpgradeForRole('finance', 'technician')?.id).toBe('grantsDesk');
+    expect(slotUpgradeForRole('rndLab', 'scientist')?.id).toBe('technicalArchive');
+    expect(slotUpgradeForRole('supplyDepot', 'technician')?.id).toBe('bulkContracts');
+  });
+
+  it('returns undefined for a role the building has no slot-adding upgrade for', () => {
+    expect(slotUpgradeForRole('finance', 'scientist')).toBeUndefined();
+    expect(slotUpgradeForRole('rndLab', 'technician')).toBeUndefined();
+    expect(slotUpgradeForRole('testStand', 'engineer')).toBeUndefined();
   });
 });
 

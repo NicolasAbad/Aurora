@@ -623,6 +623,13 @@ body {
   font-size: 0.85em;
 }
 
+/* UI_SPEC §4 (v3.7, T-11): terse inline flag next to the Hire button, visible before the
+ * click — replaces the old confirm() interruption after it. */
+.staff-panel__idle-flag {
+  color: var(--amber);
+  font-size: 0.8em;
+}
+
 /* UI_SPEC §2c: staff chip in every complex tab's panel header. */
 .staff-availability-chip {
   align-self: flex-start;

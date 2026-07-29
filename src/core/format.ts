@@ -23,8 +23,14 @@ export function formatAmount(value: number): string {
   return Math.floor(value).toLocaleString('en-US');
 }
 
+// ECONOMY §12 (v3.7, Sprint 9.5): "any rate/delta whose magnitude is below 0.1 renders
+// with 2 decimals instead of 1" — real bug fix, R&D Lab's 0.03 Research/s per level
+// rounded to "+0.0/s" and read as broken. `value !== 0` keeps a genuine zero at the usual
+// one decimal ("0.0") — the bug is about a REAL nonzero delta disappearing, not about 0
+// itself gaining spurious precision.
 export function formatRate(value: number): string {
-  return value.toFixed(1);
+  const decimals = value !== 0 && Math.abs(value) < 0.1 ? 2 : 1;
+  return value.toFixed(decimals);
 }
 
 export function formatPercent(value: number): string {

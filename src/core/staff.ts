@@ -1,6 +1,6 @@
 import { BUILDINGS } from '../data/buildings';
 import { ROLES, STARTING_STAFF_CAP } from '../data/roles';
-import type { BuildingId, GameState, RoleId, StaffState } from './types';
+import type { BuildingId, GameState, InternalUpgradeDef, RoleId, StaffState } from './types';
 
 /** Cost to hire the next unit of `role`, per ECONOMY §3 (`base × 1.15^hiredOfRole`). */
 export function hiringCost(role: RoleId, hiredOfRole: number): number {
@@ -48,6 +48,14 @@ export function buildingSlotCount(
     if (bonus && bonus.role === role) slots += bonus.amount;
   }
   return slots;
+}
+
+/** UI_SPEC §4 (v3.7, T-12a/T-12b): the slot-adding internal upgrade for this
+ * building+role, if one is defined (regardless of whether it's already owned — the
+ * caller decides what to show based on ownership). Returns undefined for a building/role
+ * with no such upgrade, in which case "fully staffed" has no further lever to name. */
+export function slotUpgradeForRole(buildingId: BuildingId, role: RoleId): InternalUpgradeDef | undefined {
+  return BUILDINGS[buildingId].internalUpgrades?.find((u) => SLOT_UPGRADE_BONUS[u.id]?.role === role);
 }
 
 export function assignedToBuilding(staff: StaffState, role: RoleId, buildingId: BuildingId): number {
