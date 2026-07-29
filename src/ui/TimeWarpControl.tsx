@@ -1,6 +1,6 @@
 import { useDevTools, type TimeWarpMultiplier } from '../state/devTools';
 
-const OPTIONS: TimeWarpMultiplier[] = [1, 60, 600];
+const OPTIONS: TimeWarpMultiplier[] = [1, 5, 60, 600];
 
 // CLAUDE.md rule 11: render this only behind `__DEV_TOOLS__` at the call site (App.tsx)
 // — this component itself doesn't gate anything, the caller decides whether to mount it.
