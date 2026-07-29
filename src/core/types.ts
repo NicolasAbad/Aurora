@@ -39,7 +39,10 @@ export interface Astronaut {
   missionsFlown: number;
 }
 
-export type ComplexId = 'campus' | 'production' | 'testing' | 'launch';
+// 'research' (Sprint 9.5, UI_SPEC §2g): a tab identity only — no BuildingDef ever sets
+// `complex: 'research'`, since Research isn't a building complex, just a top-level tab
+// sibling to the four that are.
+export type ComplexId = 'campus' | 'production' | 'testing' | 'launch' | 'research';
 
 // Stable building ids (GDD §3 / ECONOMY_MODEL §4) — 18 buildings across 4 complexes.
 export type BuildingId =

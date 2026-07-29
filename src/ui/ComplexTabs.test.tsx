@@ -63,4 +63,19 @@ describe('ComplexTabs — every unlock is state-driven (regression: 2 prior sile
     rerender(<ComplexTabs active="campus" onSelect={() => {}} />);
     expect(isLocked('Launch')).toBe(false);
   });
+
+  // Sprint 9.5 (UI_SPEC §2g): Research promoted to its own top-level tab, same unlock
+  // condition it always had (R&D Lab built).
+  it('Research locks/unlocks with R&D Lab being built (level >= 1)', () => {
+    const { rerender } = render(<ComplexTabs active="campus" onSelect={() => {}} />);
+    expect(isLocked('Research')).toBe(true);
+
+    act(() => {
+      useGameStore.setState((s) => ({
+        buildings: { ...s.buildings, rndLab: { ...s.buildings.rndLab, level: 1 } },
+      }));
+    });
+    rerender(<ComplexTabs active="campus" onSelect={() => {}} />);
+    expect(isLocked('Research')).toBe(false);
+  });
 });

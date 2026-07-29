@@ -929,37 +929,37 @@ body {
   font-weight: 400;
 }
 
-/* UI_SPEC §3 (v1.1 redesign): compact vertical tree, replaces the old always-expanded
- * card grid (.research-panel__branches). Branch columns + a docked detail panel that
- * appears once a node is tapped — .research-node__* classes below are still shared with
+/* UI_SPEC §3 (v1.2 redesign, Sprint 9.5, Design B — "timeline lanes"): each branch is
+ * its own horizontal, independently-scrollable lane, all 4 stacked vertically so the
+ * ENTIRE tree fits in view without opening anything — replaces the v1.1 compact-tree
+ * attempt (branch COLUMNS side by side, each a vertical chain) that still didn't satisfy
+ * the owner. .research-node__* classes below are still shared with
  * CertificationPanel/SoundingMissionPanel/LaunchSequencePanel's own card language;
  * nothing here touches those. */
 .research-tree {
   display: flex;
-  gap: 20px;
-  align-items: flex-start;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .research-tree__branches {
   display: flex;
-  gap: 20px;
-  flex: 2;
-  min-width: 280px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .research-tree__chain {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  border-left: 2px solid var(--border);
-  padding-left: 10px;
-  margin-left: 4px;
+  flex-direction: row;
+  align-items: center;
+  gap: 20px;
+  overflow-x: auto;
+  padding: 6px 4px 10px;
 }
 
 .research-tree__node {
   position: relative;
+  flex: none;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -968,10 +968,23 @@ body {
   border-radius: 4px;
   color: var(--text);
   text-align: left;
+  white-space: nowrap;
   font: inherit;
   font-size: 0.9em;
   padding: 6px 8px;
   cursor: pointer;
+}
+
+/* The "connected by dependency lines" line — a horizontal segment bridging this node
+ * back to the previous one in its lane (first node in each lane has none). */
+.research-tree__node:not(:first-child)::before {
+  content: '';
+  position: absolute;
+  left: -20px;
+  top: 50%;
+  width: 20px;
+  height: 2px;
+  background: var(--border);
 }
 
 .research-tree__node:hover {
@@ -1064,9 +1077,7 @@ body {
 .research-branch {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  min-width: 200px;
-  flex: 1;
+  gap: 6px;
 }
 
 /* UI_SPEC §2b: "Branch column headers are always visible" regardless of node visibility. */

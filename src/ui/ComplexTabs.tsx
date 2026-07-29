@@ -14,6 +14,7 @@ export function ComplexTabs({ active, onSelect }: ComplexTabsProps) {
   const lifetimeFunding = useGameStore((s) => s.resources.funding.lifetimeEarned);
   const testingUnlocked = useGameStore((s) => s.research.completed.includes(TESTING_UNLOCK_TECH));
   const launchUnlocked = useGameStore((s) => s.research.completed.includes(LAUNCH_UNLOCK_TECH));
+  const researchUnlocked = useGameStore((s) => s.buildings.rndLab.level >= 1);
 
   const complexes = [
     { id: 'campus' as const, label: 'Campus', unlocked: true, condition: '' },
@@ -22,6 +23,14 @@ export function ComplexTabs({ active, onSelect }: ComplexTabsProps) {
       label: 'Production',
       unlocked: lifetimeFunding >= PRODUCTION_UNLOCK_FUNDING,
       condition: 'Unlocks at 300 lifetime Funding',
+    },
+    // UI_SPEC §2g (Sprint 9.5): Research promoted from a panel inside Campus to its own
+    // top-level tab — same unlock condition (R&D Lab built) it always had.
+    {
+      id: 'research' as const,
+      label: 'Research',
+      unlocked: researchUnlocked,
+      condition: 'Unlocks when R&D Lab is built',
     },
     {
       id: 'testing' as const,

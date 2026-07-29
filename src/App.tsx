@@ -71,9 +71,6 @@ function CampusPanel({ onSelectComplex }: ComplexPanelProps) {
         {staffPanelRevealed && <StaffHiring />}
         {staffPanelRevealed && <PromotionPanel />}
       </div>
-      {/* UI_SPEC §2d: "Research panel is hidden entirely until R&D Lab is built." Moves
-          to its own top-level tab in Sprint 9.5 task 5 (UI_SPEC §2g) — unchanged here. */}
-      {rndLabLevel >= 1 && <ResearchPanel />}
     </>
   );
 }
@@ -129,6 +126,17 @@ function ProductionPanel({ onSelectComplex }: ComplexPanelProps) {
         {refineryAndPropDepotRevealed && <BuildingTile buildingId="refinery" />}
         {refineryAndPropDepotRevealed && <BuildingTile buildingId="propellantDepot" />}
       </div>
+    </>
+  );
+}
+
+// UI_SPEC §2g (Sprint 9.5): Research's own top-level tab — ComplexTabs already gates
+// entry on R&D Lab being built, so this panel has nothing further to gate itself.
+function ResearchTabPanel({ onSelectComplex }: ComplexPanelProps) {
+  return (
+    <>
+      <StaffAvailabilityChip onTap={() => onSelectComplex('campus')} />
+      <ResearchPanel />
     </>
   );
 }
@@ -380,6 +388,7 @@ export function App() {
       <main className="complex-panel">
         {activeComplex === 'campus' && <CampusPanel onSelectComplex={setActiveComplex} />}
         {activeComplex === 'production' && <ProductionPanel onSelectComplex={setActiveComplex} />}
+        {activeComplex === 'research' && <ResearchTabPanel onSelectComplex={setActiveComplex} />}
         {activeComplex === 'testing' && (
           <TestingPanel
             onSelectComplex={setActiveComplex}
