@@ -78,12 +78,20 @@ function CampusPanel({ onSelectComplex }: ComplexPanelProps) {
   );
 }
 
+// UI_SPEC §2e (Sprint 9.5, NEW): same staged-reveal bug class as Campus before Sprint
+// 7.5, now closed for Production too — the complex tab unlocking must not dump all 5
+// buildings at once. Step 2 (Fabrication + Warehouse) is naturally monotonic on Supply
+// Depot's own level; step 3 (Refinery + Propellant Depot) on the "Sounding rockets" tech.
 function ProductionPanel({ onSelectComplex }: ComplexPanelProps) {
   const supplyDepotLevel = useGameStore((s) => s.buildings.supplyDepot.level);
   const fabricationLevel = useGameStore((s) => s.buildings.fabrication.level);
   const funding = useGameStore((s) => s.resources.funding.amount);
+  const soundingRocketsResearched = useGameStore((s) => s.research.completed.includes('soundingRockets'));
   const gatherMaterials = useGameStore((s) => s.gatherMaterials);
   const rushOrder = useGameStore((s) => s.rushOrder);
+
+  const fabAndWarehouseRevealed = supplyDepotLevel >= 1;
+  const refineryAndPropDepotRevealed = soundingRocketsResearched;
 
   return (
     <>
@@ -99,25 +107,27 @@ function ProductionPanel({ onSelectComplex }: ComplexPanelProps) {
             />
           )}
         </BuildingTile>
-        <BuildingTile buildingId="fabrication">
-          {fabricationLevel >= 1 && (
-            <>
-              {/* UI_SPEC §4 / NARRATIVE §10: "nothing purchasable without effect text" —
-                  Rush Order's own description, previously missing entirely. */}
-              <div className="building-tile__description">{narrativeText('rushOrder')}</div>
-              <ManualActionButton
-                label={`Rush Order (${formatCost({ funding: RUSH_ORDER_COST_FUNDING })})`}
-                cooldownMs={5 * 60_000}
-                disabled={funding < RUSH_ORDER_COST_FUNDING}
-                feedbackText="+100"
-                onAction={rushOrder}
-              />
-            </>
-          )}
-        </BuildingTile>
-        <BuildingTile buildingId="refinery" />
-        <BuildingTile buildingId="warehouse" />
-        <BuildingTile buildingId="propellantDepot" />
+        {fabAndWarehouseRevealed && (
+          <BuildingTile buildingId="fabrication">
+            {fabricationLevel >= 1 && (
+              <>
+                {/* UI_SPEC §4 / NARRATIVE §10: "nothing purchasable without effect text" —
+                    Rush Order's own description, previously missing entirely. */}
+                <div className="building-tile__description">{narrativeText('rushOrder')}</div>
+                <ManualActionButton
+                  label={`Rush Order (${formatCost({ funding: RUSH_ORDER_COST_FUNDING })})`}
+                  cooldownMs={5 * 60_000}
+                  disabled={funding < RUSH_ORDER_COST_FUNDING}
+                  feedbackText="+100"
+                  onAction={rushOrder}
+                />
+              </>
+            )}
+          </BuildingTile>
+        )}
+        {fabAndWarehouseRevealed && <BuildingTile buildingId="warehouse" />}
+        {refineryAndPropDepotRevealed && <BuildingTile buildingId="refinery" />}
+        {refineryAndPropDepotRevealed && <BuildingTile buildingId="propellantDepot" />}
       </div>
     </>
   );
