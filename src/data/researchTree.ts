@@ -122,8 +122,12 @@ export const RESEARCH_TREE: ResearchNode[] = [
     id: 'basicEngineering',
     name: 'Basic engineering',
     branch: 'program',
-    costR: 15,
-    durationMs: 3 * MIN,
+    // ECONOMY §5 v3.7 (Sprint 9.5 SCOPED UNLOCK): raised 15R/3min -> 120R/45min. At the
+    // old cost this was reachable almost immediately, letting direct Engineer/Scientist
+    // hiring skip the promotion-bootstrap pacing the game has repeatedly defended (the
+    // E-04 precondition, the day-5 pacing floor).
+    costR: 120,
+    durationMs: 45 * MIN,
     deps: [],
   },
   {
