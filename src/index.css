@@ -311,9 +311,16 @@ body {
   margin-top: 6px;
 }
 
+/* UI_SPEC §2 ("mobile: horizontal scrollable tab bar") / Sprint 11: the scheduled fix
+ * for the overflow found during Sprint 10.5's own Playwright pass — once 6 tabs are
+ * unlocked at once at a narrow viewport, the row's natural width exceeds it and (without
+ * its own scroll container) the whole PAGE gained horizontal scroll instead. Scoping the
+ * scroll to this row alone keeps everything below it fixed-width regardless. */
 .complex-tabs {
   display: flex;
   border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .complex-tabs__tab {
@@ -328,6 +335,7 @@ body {
   flex-direction: column;
   align-items: center;
   gap: 2px;
+  flex: none;
 }
 
 .complex-tabs__tab--active {
