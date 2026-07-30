@@ -391,6 +391,11 @@ interface SimState {
 
   recordsAwarded: Set<keyof typeof RECORDS>;
 
+  // Sprint 11 balance pass: lifetime total (never reset, unlike day.fundingSpentOnHires)
+  // — needed to answer "is the 1.15^hiredOfRole hiring-cost curve actually the
+  // constraint, or is it slots/salary-budget?" with real numbers instead of a guess.
+  lifetimeFundingSpentOnHires: number;
+
   // Per-day accumulators, reset at each day boundary
   day: {
     fundingFromPitch: number;
@@ -495,6 +500,7 @@ function createState(): SimState {
     researchStallTracking: null,
     researchStalls: [],
     recordsAwarded: new Set(),
+    lifetimeFundingSpentOnHires: 0,
     day: freshDayAccumulator(),
   };
 }
@@ -639,6 +645,7 @@ function resolveHiring(state: SimState): void {
 
       state.resources.funding -= cost;
       state.day.fundingSpentOnHires += cost;
+      state.lifetimeFundingSpentOnHires += cost;
       state.staffHired[role] += 1;
       hired = true;
     }
@@ -660,6 +667,7 @@ function resolvePromotions(state: SimState): void {
   if (state.staffHired.engineer > 0 && canAfford(state, { funding: 300 })) {
     pay(state, { funding: 300 });
     state.day.fundingSpentOnHires += 300;
+    state.lifetimeFundingSpentOnHires += 300;
     state.promotionTimer = {
       remainingMs: 45 * MIN,
       onComplete: () => {
@@ -677,6 +685,7 @@ function resolvePromotions(state: SimState): void {
   if (!canAfford(state, { funding: techHireCost + 100 })) return;
   pay(state, { funding: techHireCost + 100 });
   state.day.fundingSpentOnHires += techHireCost + 100;
+  state.lifetimeFundingSpentOnHires += techHireCost + 100;
   state.staffHired.technician += 1;
   state.promotionTimer = {
     remainingMs: 15 * MIN,
@@ -1492,6 +1501,16 @@ function printSummary({ profile, rows, state, outPath, seed, days }: SimulationR
     `  Aurora II launched:   ${state.auroraIILaunchedDay !== null ? `yes (day ${state.auroraIILaunchedDay})` : 'no'}`,
   );
   console.log(`  Contracts fulfilled:  ${state.contractsFulfilled}`);
+
+  // Sprint 11 balance-pass data gathering: real final headcount + lifetime hiring/
+  // promotion spend, to check whether the 1.15^hiredOfRole cost curve is actually ever
+  // the binding constraint (vs. the staff cap / per-role slot ceiling / the 50%-of-
+  // passive-income salary budget resolveHiring() itself enforces).
+  console.log(`\nStaffing (end of run, staff cap ${staffCap(state)}):`);
+  console.log(
+    `  Hired: ${totalHired(state)} total — technician ${state.staffHired.technician}, engineer ${state.staffHired.engineer}, scientist ${state.staffHired.scientist}, controller ${state.staffHired.controller}`,
+  );
+  console.log(`  Lifetime Funding spent on hiring/promotion: ${Math.round(state.lifetimeFundingSpentOnHires).toLocaleString()}`);
 
   // Checkpoint rows: 5 evenly spaced days across the run (arc-milestone checkpoints
   // would need those milestones to land inside DAYS; falling back to evenly-spaced
