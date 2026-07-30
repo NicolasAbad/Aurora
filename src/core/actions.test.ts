@@ -136,14 +136,24 @@ describe('hireStaff', () => {
   it('refuses a tech-gated role without its tech researched', () => {
     const state = createInitialState();
     state.resources.funding.amount = 1000;
-    expect(hireStaff(state.resources, state.staff, [], 0, 'engineer')).toBeNull();
+    expect(hireStaff(state.resources, state.staff, [], 0, 'controller')).toBeNull();
   });
 
   it('allows a tech-gated role once its tech is completed', () => {
     const state = createInitialState();
     state.resources.funding.amount = 1000;
-    const result = hireStaff(state.resources, state.staff, ['basicEngineering'], 0, 'engineer');
+    const result = hireStaff(state.resources, state.staff, ['flightOperations'], 0, 'controller');
     expect(result).not.toBeNull();
+  });
+
+  // ECONOMY §3 v4.1 (Sprint 11.5, GDD §2 v2.11): Engineer/Scientist have no direct-hire
+  // path at all anymore — refused unconditionally, even with ample Funding and their old
+  // unlock tech completed.
+  it('refuses Engineer/Scientist unconditionally — promotion-only, no direct-hire path', () => {
+    const state = createInitialState();
+    state.resources.funding.amount = 100_000;
+    expect(hireStaff(state.resources, state.staff, ['basicEngineering'], 10, 'engineer')).toBeNull();
+    expect(hireStaff(state.resources, state.staff, ['scientificMethod'], 10, 'scientist')).toBeNull();
   });
 
   it('refuses to hire past the staff cap', () => {

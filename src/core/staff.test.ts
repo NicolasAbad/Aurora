@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../data/initialState';
+import { PROMOTIONS } from '../data/roles';
 import {
   assignedToBuilding,
   buildingSlotCount,
@@ -8,6 +9,8 @@ import {
   isRoleUnlocked,
   staffRatioForBuilding,
   openSlotsForRole,
+  promotionCost,
+  promotionDurationMs,
   slotUpgradeForRole,
   totalHired,
   totalOpenSlots,
@@ -20,7 +23,7 @@ describe('hiringCost', () => {
   it('matches ECONOMY §3 formula', () => {
     expect(hiringCost('technician', 0)).toBe(50);
     expect(hiringCost('technician', 1)).toBeCloseTo(50 * 1.15);
-    expect(hiringCost('scientist', 2)).toBeCloseTo(400 * 1.15 ** 2);
+    expect(hiringCost('controller', 2)).toBeCloseTo(250 * 1.15 ** 2);
   });
 
   // ECONOMY §9 (Sprint 10): Recruiting's -15% hiring cost, registered on 'hiring.cost'.
@@ -43,10 +46,50 @@ describe('totalStaffCap', () => {
 });
 
 describe('isRoleUnlocked', () => {
-  it('technician is always unlocked; gated roles need their tech', () => {
+  it('technician is always unlocked; a tech-gated hireable role needs its tech', () => {
     expect(isRoleUnlocked('technician', [])).toBe(true);
+    expect(isRoleUnlocked('controller', [])).toBe(false);
+    expect(isRoleUnlocked('controller', ['flightOperations'])).toBe(true);
+  });
+
+  // ECONOMY §3 v4.1 (Sprint 11.5, GDD §2 v2.11): Engineer/Scientist are promotion-ONLY —
+  // never directly hireable, regardless of tech (basicEngineering/scientificMethod no
+  // longer unlock hiring; they're promotion accelerators now, see core/staff.test.ts's
+  // promotionCost/promotionDurationMs tests below).
+  it('engineer/scientist are never hireable, even with their old unlock tech completed', () => {
     expect(isRoleUnlocked('engineer', [])).toBe(false);
-    expect(isRoleUnlocked('engineer', ['basicEngineering'])).toBe(true);
+    expect(isRoleUnlocked('engineer', ['basicEngineering'])).toBe(false);
+    expect(isRoleUnlocked('scientist', ['scientificMethod'])).toBe(false);
+  });
+});
+
+describe('promotionCost / promotionDurationMs (ECONOMY §5 v4.1 promotion accelerators)', () => {
+  const techToEngineer = PROMOTIONS.find((p) => p.to === 'engineer')!;
+  const engineerToScientist = PROMOTIONS.find((p) => p.to === 'scientist')!;
+
+  it('is the plain documented cost/duration with no accelerator owned', () => {
+    expect(promotionCost(techToEngineer)).toBe(100);
+    expect(promotionDurationMs(techToEngineer)).toBe(15 * 60_000);
+    expect(promotionCost(engineerToScientist)).toBe(300);
+    expect(promotionDurationMs(engineerToScientist)).toBe(45 * 60_000);
+  });
+
+  it('basicEngineering only discounts Technician->Engineer, not Engineer->Scientist', () => {
+    const modifiers = [
+      { id: 'research:basicEngineering', source: 'basicEngineering', target: 'promotion.technicianToEngineer', op: 'mult' as const, value: 0.75 },
+    ];
+    expect(promotionCost(techToEngineer, modifiers)).toBe(75); // 100 * 0.75
+    expect(promotionDurationMs(techToEngineer, modifiers)).toBe(15 * 60_000 * 0.75);
+    expect(promotionCost(engineerToScientist, modifiers)).toBe(300); // untouched
+    expect(promotionDurationMs(engineerToScientist, modifiers)).toBe(45 * 60_000);
+  });
+
+  it('scientificMethod discounts Engineer->Scientist the same way', () => {
+    const modifiers = [
+      { id: 'research:scientificMethod', source: 'scientificMethod', target: 'promotion.engineerToScientist', op: 'mult' as const, value: 0.75 },
+    ];
+    expect(promotionCost(engineerToScientist, modifiers)).toBe(225); // 300 * 0.75
+    expect(promotionDurationMs(engineerToScientist, modifiers)).toBe(45 * 60_000 * 0.75);
   });
 });
 

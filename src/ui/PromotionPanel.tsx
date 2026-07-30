@@ -2,7 +2,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../state/persistStore';
 import { PROMOTIONS, ROLE_LABEL } from '../data/roles';
 import { formatDuration } from '../core/format';
-import { unassignedCount } from '../core/staff';
+import { promotionCost, promotionDurationMs, unassignedCount } from '../core/staff';
 import { CostLabel } from './CostLabel';
 
 // ECONOMY §3: promotions are gated ONLY by the Classroom upgrade, never by the target
@@ -12,6 +12,10 @@ export function PromotionPanel() {
   const staff = useGameStore(useShallow((s) => s.staff));
   const classroomBuilt = useGameStore((s) => s.buildings.crewQuarters.upgrades.includes('classroom'));
   const funding = useGameStore((s) => s.resources.funding.amount);
+  // ECONOMY §5 v4.1: basicEngineering/scientificMethod's -25% promotion accelerator
+  // registers on 'promotion.technicianToEngineer'/'promotion.engineerToScientist' — read
+  // here so the displayed cost/duration matches exactly what startPromotion will charge.
+  const modifiers = useGameStore((s) => s.modifiers);
   const startPromotion = useGameStore((s) => s.startPromotion);
 
   if (!classroomBuilt) return null;
@@ -22,7 +26,9 @@ export function PromotionPanel() {
         <span>Promotions</span>
       </div>
       {PROMOTIONS.map((promo) => {
-        const canPromote = unassignedCount(staff, promo.from) >= 1 && funding >= promo.costFunding;
+        const cost = promotionCost(promo, modifiers, Date.now());
+        const durationMs = promotionDurationMs(promo, modifiers, Date.now());
+        const canPromote = unassignedCount(staff, promo.from) >= 1 && funding >= cost;
         return (
           <div key={`${promo.from}-${promo.to}`} className="staff-panel__row">
             <span>
@@ -33,7 +39,7 @@ export function PromotionPanel() {
               disabled={!canPromote}
               onClick={() => startPromotion(promo.from, promo.to)}
             >
-              Promote (<CostLabel cost={{ funding: promo.costFunding }} />, {formatDuration(promo.durationMs)})
+              Promote (<CostLabel cost={{ funding: cost }} />, {formatDuration(durationMs)})
             </button>
           </div>
         );

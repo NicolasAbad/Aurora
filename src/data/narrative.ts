@@ -79,8 +79,8 @@ export const NARRATIVE_TEXT: Record<string, string> = {
   remoteOps: 'Remote monitoring while you’re away. Offline cap: 10h -> 16h.',
   vabQueues: 'Stages integrate automatically once the previous one finishes — no manual click between them.',
   autoRefuel: 'Automated propellant handling for satellite-class missions. -50% propellant loading time.',
-  basicEngineering: 'Unlocks hiring Engineers directly (promotion remains available and, at higher headcounts, cheaper — see the staff panel).',
-  scientificMethod: 'Unlocks hiring Scientists directly.',
+  basicEngineering: 'Speeds up your Technician → Engineer promotion at the Classroom: -25% cost and training time. Engineers are promotion-only — this node doesn\'t unlock hiring them directly.',
+  scientificMethod: 'Speeds up your Engineer → Scientist promotion at the Classroom: -25% cost and training time. Scientists are promotion-only — this node doesn\'t unlock hiring them directly.',
   testStand: 'Unlocks the Testing complex.',
   flightOperations: 'Unlocks hiring Controllers directly.',
   flightProgram: 'Unlocks the Launch complex.',
@@ -178,6 +178,9 @@ export const NARRATIVE_TEXT: Record<string, string> = {
   // state/persistStore.ts's loadGame()/wasLastLoadCorrupted() header notes).
   'T-30':
     "Your last save couldn't be read, so we're starting fresh. Sorry about that — exporting a save from Settings now and then is the best safety net.",
+  // §7 (v4.1, Sprint 11.5): Engineer/Scientist's hiring panel row, now that neither has a
+  // direct-hire path (ECONOMY §3 v4.1) — replaces where a Hire button used to sit.
+  'T-31': 'Promotion only — see Promotions below.',
   // §13 (v4.0, Sprint 11) — contextual job titles, keyed by `${buildingId}.${role}` (no
   // separate ID column, same "id IS the key" reasoning as §8's research node descriptions
   // immediately above). launchPadB reuses launchPad's own title (ECONOMY §4: same

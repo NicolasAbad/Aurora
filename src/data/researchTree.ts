@@ -122,21 +122,27 @@ export const RESEARCH_TREE: ResearchNode[] = [
     id: 'basicEngineering',
     name: 'Basic engineering',
     branch: 'program',
-    // ECONOMY §5 v3.7 (Sprint 9.5 SCOPED UNLOCK): raised 15R/3min -> 120R/45min. At the
-    // old cost this was reachable almost immediately, letting direct Engineer/Scientist
-    // hiring skip the promotion-bootstrap pacing the game has repeatedly defended (the
-    // E-04 precondition, the day-5 pacing floor).
+    // ECONOMY §5 v4.1 (Sprint 11.5): Engineer is now promotion-ONLY (GDD §2 v2.11) — this
+    // node no longer unlocks direct hiring (there is no direct-hire path to unlock).
+    // Repurposed as the Technician->Engineer promotion accelerator: -25% cost and
+    // duration, applied in core/staff.ts's promotionCost/promotionDurationMs. Cost/
+    // duration below are unchanged from v3.7 (still real pacing protection, just for the
+    // promotion itself rather than for a hiring-unlock race).
     costR: 120,
     durationMs: 45 * MIN,
     deps: [],
+    effect: { target: 'promotion.technicianToEngineer', op: 'mult', value: 0.75 },
   },
   {
     id: 'scientificMethod',
     name: 'Scientific method',
     branch: 'program',
+    // ECONOMY §5 v4.1: same repurposing as basicEngineering above, one rung up the
+    // ladder — Engineer->Scientist promotion accelerator, -25% cost and duration.
     costR: 80,
     durationMs: 20 * MIN,
     deps: ['basicEngineering'],
+    effect: { target: 'promotion.engineerToScientist', op: 'mult', value: 0.75 },
   },
   {
     id: 'testStand',

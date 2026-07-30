@@ -9,6 +9,8 @@ import {
   buildingSlotCount,
   hiringCost,
   isRoleUnlocked,
+  promotionCost,
+  promotionDurationMs,
   totalHired,
   totalStaffCap,
   unassignedCount,
@@ -439,12 +441,16 @@ export function startPromotion(
   const def = PROMOTIONS.find((p) => p.from === from && p.to === to);
   if (!def) return null;
   if (unassignedCount(staff, from) < 1) return null;
-  if (resources.funding.amount < def.costFunding) return null;
 
-  // NARRATIVE §3 E-05: temporary +10% process-duration modifier (default [] keeps every
-  // pre-Sprint-9 call site's exact old behavior).
+  // ECONOMY §5 v4.1: basicEngineering/scientificMethod's -25% promotion accelerator
+  // (see core/staff.ts's promotionCost/promotionDurationMs) applies before the generic
+  // E-05 process-duration modifier below — same two-step stacking as
+  // startCertification's certification.duration -> process.duration.
+  const cost = promotionCost(def, modifiers, now);
+  if (resources.funding.amount < cost) return null;
+
   return {
-    resources: payCost(resources, { funding: def.costFunding }),
+    resources: payCost(resources, { funding: cost }),
     staff: {
       ...staff,
       pools: {
@@ -458,7 +464,7 @@ export function startPromotion(
         id: `promotion-${from}-${to}-${now}`,
         kind: 'training',
         startedAt: now,
-        durationMs: applyModifiers(def.durationMs, modifiers, 'process.duration', now),
+        durationMs: applyModifiers(promotionDurationMs(def, modifiers, now), modifiers, 'process.duration', now),
         payload: { from, to },
       },
     ],

@@ -116,8 +116,8 @@ Rules: **v2-only upgrades (Sound Suppression, Cryogenic Stand, Heavy Crane) are 
 | Operations | Remote Ops | "Remote monitoring while you're away. Offline cap: 10h → 16h." |
 | Operations | VAB queues | "Stages integrate automatically once the previous one finishes — no manual click between them." |
 | Operations | Auto-refuel | "Automated propellant handling for satellite-class missions. −50% propellant loading time." |
-| Program | Basic engineering | "Unlocks hiring Engineers directly (promotion remains available and, at higher headcounts, cheaper — see the staff panel)." |
-| Program | Scientific method | "Unlocks hiring Scientists directly." |
+| Program | Basic engineering | "Speeds up your Technician → Engineer promotion at the Classroom: -25% cost and training time. Engineers are promotion-only — this node doesn't unlock hiring them directly." (v4.1: repurposed from a hiring-unlock, ECONOMY §5) |
+| Program | Scientific method | "Speeds up your Engineer → Scientist promotion at the Classroom: -25% cost and training time. Scientists are promotion-only — this node doesn't unlock hiring them directly." (v4.1: repurposed from a hiring-unlock, ECONOMY §5) |
 | Program | Test stand | "Unlocks the Testing complex." |
 | Program | Flight operations | "Unlocks hiring Controllers directly." |
 | Program | Flight program | "Unlocks the Launch complex." |
@@ -142,6 +142,7 @@ Rules: **v2-only upgrades (Sound Suppression, Cryogenic Stand, Heavy Crane) are 
 | T-27/T-28 | Aurora I vs Aurora II success result screens — added directly in-repo (Sprint 10, commit bc2b679) to fix a real bug where every orbital success showed Aurora I's text | *(text as shipped in NARRATIVE_EVENTS.md — not duplicated here; this doc's copy should be synced from the repo the next time it's regenerated)* |
 | T-29 | v1 milestone screen (UI_SPEC §3 screen 8), crewed-mission teaser line | "The next chapter — crewed missions, the Moon, a station in orbit — is still ahead. For now: the program you built got something into space, on purpose, more than once." |
 | T-30 | Sprint 11, save-migration audit: boot found a save on disk that couldn't be read (corrupt JSON or an unrecognized schema version) — a real save, not just "no save yet," so this must never be silent | "Your last save couldn't be read, so we're starting fresh. Sorry about that — exporting a save from Settings now and then is the best safety net." |
+| T-31 | Sprint 11.5, Engineer/Scientist's hiring-panel row, in place of the old Hire button (ECONOMY §3 v4.1: neither has a direct-hire path anymore) | "Promotion only — see Promotions below." |
 
 ## 10. Manual verb descriptions (missing from earlier docs — same "no purchasable without effect text" rule)
 | Verb | Description |

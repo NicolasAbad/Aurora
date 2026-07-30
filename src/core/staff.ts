@@ -1,14 +1,15 @@
 import { BUILDINGS } from '../data/buildings';
-import { ROLES, STARTING_STAFF_CAP } from '../data/roles';
+import { ROLES, STARTING_STAFF_CAP, type PromotionDef } from '../data/roles';
 import { applyModifiers } from './modifiers';
 import type { BuildingId, GameState, InternalUpgradeDef, Modifier, RoleId, StaffState } from './types';
 
 /** Cost to hire the next unit of `role`, per ECONOMY §3 (`base × 1.15^hiredOfRole`).
  * `modifiers`/`now` (default `[]`/`0`, ECONOMY §9 Sprint 10): Recruiting's -15% hiring
  * cost registers on 'hiring.cost' — every pre-Sprint-10 call site that omits them keeps
- * the exact old value (applyModifiers with no matching modifiers is a no-op). */
+ * the exact old value (applyModifiers with no matching modifiers is a no-op). Only ever
+ * called for a hireable role (ROLES[role].baseCost is defined) — see isRoleUnlocked. */
 export function hiringCost(role: RoleId, hiredOfRole: number, modifiers: Modifier[] = [], now = 0): number {
-  return applyModifiers(ROLES[role].baseCost * 1.15 ** hiredOfRole, modifiers, 'hiring.cost', now);
+  return applyModifiers(ROLES[role].baseCost! * 1.15 ** hiredOfRole, modifiers, 'hiring.cost', now);
 }
 
 /** Total staff cap: starting cap + Crew Quarters' staffCapBonus × level (ECONOMY §1). */
@@ -20,10 +21,35 @@ export function totalHired(staff: StaffState): number {
   return (Object.keys(ROLES) as RoleId[]).reduce((sum, role) => sum + staff.pools[role].hired, 0);
 }
 
-/** Direct hiring is tech-gated (ECONOMY §3); promotion is not (Sprint 1 doesn't need promotion). */
+/** Direct hiring: promotion-only roles (Engineer/Scientist, ECONOMY §3 v4.1) are never
+ * hireable regardless of tech; everything else is tech-gated (Sprint 1 doesn't need
+ * promotion). */
 export function isRoleUnlocked(role: RoleId, completedTech: string[]): boolean {
+  if (!ROLES[role].hireable) return false;
   const unlockTech = ROLES[role].unlockTech;
   return unlockTech === null || completedTech.includes(unlockTech);
+}
+
+// ECONOMY §5 v4.1 (Sprint 11.5): basicEngineering/scientificMethod, repurposed from
+// hiring-unlock techs into promotion accelerators, each register ONE modifier (CLAUDE.md
+// rule 4) targeting the promotion they speed up — applied against BOTH the Funding cost
+// and the duration below, since a single 'mult' modifier composes fine against either
+// base value independently (no separate cost/duration target needed).
+function promotionAcceleratorTarget(to: RoleId): string {
+  return to === 'scientist' ? 'promotion.engineerToScientist' : 'promotion.technicianToEngineer';
+}
+
+/** Effective Funding cost for `promo`, net of any owned accelerator (basicEngineering/
+ * scientificMethod). `modifiers`/`now` default to `[]`/`0` — omitting them yields the
+ * plain documented cost, same optional-tail pattern as hiringCost above. */
+export function promotionCost(promo: PromotionDef, modifiers: Modifier[] = [], now = 0): number {
+  return Math.ceil(applyModifiers(promo.costFunding, modifiers, promotionAcceleratorTarget(promo.to), now));
+}
+
+/** Effective training duration for `promo`, net of any owned accelerator — same
+ * accelerator target as promotionCost, applied to the duration instead of the cost. */
+export function promotionDurationMs(promo: PromotionDef, modifiers: Modifier[] = [], now = 0): number {
+  return applyModifiers(promo.durationMs, modifiers, promotionAcceleratorTarget(promo.to), now);
 }
 
 // ECONOMY §4 v3.6 (Sprint 8 economy unlock): slot-adding internal upgrades. Generic
