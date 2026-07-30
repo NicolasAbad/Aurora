@@ -2850,3 +2850,140 @@ re-fire on that same page's own reload) fixed the test, not the product.
   (the owner's working copy predates those Sprint 10 additions) — confirmed intentional
   by the owner, syncs at their next regeneration, no action taken here per their explicit
   instruction.
+
+## Sprint 10.5 — Visual Identity 2.0 — COMPLETE (2026-07-29)
+
+Five presentation-only features (UI_SPEC v3.4), zero economy impact, no scoped unlock,
+no sim re-run needed (no `/core` or `/data` value changed — only new pure-presentational
+components and CSS). Placed after Sprint 10 per the doc's own reasoning: the Constellation
+View needed Aurora II and satellite contracts to exist to show real variety.
+
+### Task 4: Building Pictograms (UI_SPEC §2 building-tile rule) — built first, foundational
+
+One consistent blueprint-style line icon per building (`ui/BuildingIcon.tsx`), all 18
+buildings, same stroke-only/no-illustration language `RocketBlueprint` already
+established (`stroke: var(--accent)`, no fill). Built first since both the tile header
+(`BuildingTile.tsx`) and the Site Map (task 3) consume it — glyph choices (gear for
+Fabrication, dish for Tracking Station, flask for R&D Lab, etc.) were this session's call
+within the style per the doc's own explicit "exact glyph choices are Claude Code's call"
+line; the gear icon's 8 teeth are computed via a rotate-transform loop rather than
+hand-authored paths.
+
+### Task 1: Confidence Dial (UI_SPEC screen 4)
+
+`ui/ConfidenceDial.tsx`: an SVG half-circle gauge (arc math via a small polar-to-Cartesian
+helper), needle sweeping 0-100, each `ConfidenceBreakdown` term (base/certification/
+flightReview/controllers/serviceTower/weather/experience) stacked as its own colored arc
+segment in formula order, clipped to a 100 total exactly like `computeConfidenceBreakdown`
+itself caps `total`. Slotted into the existing `ConfidenceBreakdownView` in
+`LaunchSequencePanel.tsx` in place of the old text-button — tap-to-expand numeric
+breakdown behavior is unchanged, the dial is just the new primary read. The doc calls for
+"colored" segments without specifying which colors; picked six small, distinguishable
+accent hues (teal/blue/green/purple alongside the existing orange/amber) scoped to the
+dial's own CSS rather than new global `--accent`-family variables, since the app's
+"one accent color" direction (UI_SPEC §1) governs the rest of the UI, not this
+one gauge.
+
+### Task 3: Program Site Map (UI_SPEC §2h amended)
+
+`ui/SiteMap.tsx`: a thumbnail (tiny dashed/solid plots, no labels) always rendered next to
+Current Directive, tap-to-expand to a full-screen dialog (larger plots + building-name
+labels), grouped into the 4 real complexes in `BUILDINGS`' own declared order. A built
+plot fades in via a CSS keyframe using the same `BuildingIcon`; unbuilt plots stay dashed
+(`var(--border)`), matching `RocketBlueprint`'s established dashed-until-built /
+solid-once-built convention. One deliberate deviation from the literal doc text: the
+thumbnail is NOT gated on `currentDirective` returning non-null — `core/directive.ts`'s
+`currentDirective` goes null once every D-01..D-12 condition has been exhausted (common
+well before end-game, e.g. any time no contract happens to be active post-firstOrbit),
+and hiding the Site Map exactly when it's most "grown" would contradict the sprint's own
+"grows as buildings are built" acceptance line. `CurrentDirective.tsx` now always renders
+its wrapper row; the directive text itself stays conditional, the Site Map thumbnail does
+not.
+
+### Task 2: Constellation View (UI_SPEC §2i, NEW)
+
+`ui/ConstellationView.tsx`: Earth-centered SVG (a simple line-art globe — outline, one
+latitude ellipse, one meridian line, same blueprint aesthetic), one dot per successful
+satellite mission via a new `core/auroraMission.ts` helper, `satelliteLaunches` (Aurora I,
+Aurora II, fulfilled contracts — success + those 3 `missionType`s only, sounding rockets
+excluded since they're sub-orbital test flights, not satellites; unit-tested in
+`auroraMission.test.ts`). Dots placed on a deterministic golden-angle spiral (radius grows
+per dot) so an arbitrary count never overlaps and never needs a fixed grid size. Tapping a
+dot shows mission type + timestamp, and for contract launches, the client name and tier
+(looked up from `contracts.offers` via the launch's own `contractId`). Reachable from two
+places per the doc: a small ticker-area icon+count (`Ticker.tsx`, rendered only once
+`satelliteLaunches(...).length > 0`, mirroring the existing optional-`onOpenSettings`-prop
+pattern) and a "View Constellation" button inside the Tracking Station tile once it's
+actually built (safe to gate that way — every pad-based launch requires
+`checklist.trackingActive`, so no dot can exist before that tile does anyway).
+
+### Task 5: Three cheap wins
+
+- **Staff role silhouette icons** (`ui/RoleIcon.tsx`): abstract filled person silhouette
+  (circle head + body arc, no face), one accent color per role (reusing the same 4 hues
+  the Confidence Dial introduced — teal for Controller lines up thematically with the
+  dial's own "controllers" segment). Deliberately solid-filled rather than the stroke-only
+  blueprint language buildings use — a different visual register for people vs. structures.
+- **Weather-window radar sweep** (`ui/WeatherRadarSweep.tsx`): a small circular scope with
+  a continuously-rotating sweep line (CSS animation, gated off under the existing
+  `data-reduced-motion` root attribute same as every other animation in the app), replacing
+  the generic progress ring for the `weatherWindow` checklist item specifically — both in
+  `LaunchSequencePanel.tsx` (Aurora/contract pads) and `SoundingMissionPanel.tsx` (sounding
+  rockets), which had its own separate `ChecklistRing`/`ChecklistRow` pair; every other
+  checklist item in both panels keeps its original ring.
+- **Mission Log category icon badges** (`core/missionLogCategory.ts` +
+  `ui/MissionLogIcon.tsx`): rocket/flask/people/building/document/star, one per feed entry.
+  `missionLogBase`'s feed stores already-RENDERED English text, not narrative IDs, so this
+  is a keyword heuristic over that text, not an ID lookup — exact and reliable for the 5
+  generic completion templates (T-18/19/20/23/26, fixed prefixes), best-effort for one-off
+  N-* flavor prose. Documented as a heuristic in the module's own header comment;
+  `missionLogCategory.test.ts` covers the 5 templates exactly plus 5 representative N-*
+  spot-checks (not exhaustive — there's no way to exhaustively test free-form prose
+  matching without coupling the test to every current narrative string).
+
+### Verification
+
+- 527 tests passing (up from 515 at Sprint 10's close: +2 for `satelliteLaunches`, +10 for
+  `categorizeLogLine`). Typecheck (`tsc -b`), lint, and production build all clean.
+- `npm run sim` not re-run — nothing in `/core` or `/data`'s numeric surface changed this
+  sprint (confirmed via `git diff HEAD`: zero touched lines outside `/ui`, one new
+  `/core` file that's pure text-categorization, and one new pure helper in
+  `auroraMission.ts` that filters existing records, computes no new economy value).
+- Playwright, through a real browser (scratchpad-only Chromium, never a project
+  dependency): 3 game-state snapshots (early — a few Campus buildings built, no Launch
+  complex yet; mid — Launch complex built, pad partway through its checklist with a live
+  weather-window process, a few Mission Log entries; post-Aurora-II — Aurora I + Aurora II
+  + a fulfilled contract all successful). State was set directly via the live store's own
+  `useGameStore.setState(...)` (dynamically imported in-page from the Vite dev server,
+  `import('/src/state/persistStore.ts')`) rather than hand-built localStorage save JSON —
+  simpler and less error-prone than replicating `GameState`'s full nested shape by hand,
+  and it's the same partial-override technique the existing test suite already uses
+  (`ComplexTabs.test.tsx` etc.). 20 checks across the 3 snapshots, all passing, zero
+  console/page errors. Confirmed pixel-level via targeted screenshots (not just the
+  automated locator counts): Building Pictograms render distinctly and consistently
+  between the tile header and the expanded Site Map; the Confidence Dial's stacked
+  segments and needle render correctly at a 61%-style partial fill; Mission Log badges
+  render correctly next to a multi-word edge-case line ("Promotion complete: one of your
+  Technicians is now a(n) Engineer."); the Constellation View's 3 dots and tap-to-detail
+  (including the multi-word "Helios Corp (Tier 1)" contract label) all render correctly.
+
+### Scope notes
+
+- **Real bug found, NOT fixed (flagged to `docs/BACKLOG.md`):** `.complex-tabs` (index.css)
+  is a plain non-wrapping flex row with no overflow handling; once 6 tabs are unlocked
+  simultaneously (reachable by mid-game) at a ~420px mobile viewport, the row's natural
+  width (~620px) exceeds the viewport and the whole page gains horizontal scroll —
+  Playwright's own auto-scroll-into-view on a tab click then shifts the entire page,
+  which is what actually surfaced this during this sprint's own verification pass.
+  Confirmed unrelated to Sprint 10.5 via `git diff HEAD`: `ComplexTabs.tsx` and every
+  `.complex-tabs`/`.complex-tabs__tab` CSS rule are byte-identical to the pre-sprint
+  commit. Not fixed here — out of scope for a presentation-only visual-identity sprint,
+  and deserves its own small pass (scroll container vs. wrap vs. an overflow menu like
+  `ActiveProcessStrip`'s own `+N` pattern) rather than a drive-by tweak. The Playwright
+  verification pass itself was run at an 800px viewport instead of a narrower mobile one
+  specifically to route around this pre-existing, unrelated bug rather than let it block
+  verifying this sprint's actual features.
+- Site Map's built-plot fade-in animation replays every time the full-screen dialog is
+  opened (a fresh `SiteMapGrid` mount each time, not an incremental one) rather than only
+  once when a building is newly completed — cosmetic only, not worth the added state
+  needed to track "already seen built" per building for a presentation-only replay effect.
