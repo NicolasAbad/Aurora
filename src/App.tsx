@@ -312,7 +312,11 @@ function TierChangeToast() {
   }, [hasTitanium]);
 
   if (!visible) return null;
-  return <div className="tier-toast">{narrativeText('T-14')}</div>;
+  return (
+    <div className="tier-toast" role="status" aria-live="polite">
+      {narrativeText('T-14')}
+    </div>
+  );
 }
 
 /**
@@ -351,7 +355,7 @@ function MilestoneCallout() {
 
   if (!callout) return null;
   return (
-    <div className="milestone-callout">
+    <div className="milestone-callout" role="status" aria-live="polite">
       <div className="milestone-callout__title">{callout.title}</div>
       {callout.line && <div className="milestone-callout__line">{callout.line}</div>}
     </div>

@@ -176,6 +176,7 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
                 <button
                   type="button"
                   disabled={assigned === 0}
+                  aria-label={`Unassign a ${ROLE_LABEL[role]} from ${def.name}`}
                   onClick={() => assign(role, buildingId, -1)}
                 >
                   −
@@ -183,7 +184,12 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
                 <span>
                   {assigned}/{slots}
                 </span>
-                <button type="button" disabled={!canAssign} onClick={() => assign(role, buildingId, 1)}>
+                <button
+                  type="button"
+                  disabled={!canAssign}
+                  aria-label={`Assign a ${ROLE_LABEL[role]} to ${def.name}`}
+                  onClick={() => assign(role, buildingId, 1)}
+                >
                   +
                 </button>
               </div>
