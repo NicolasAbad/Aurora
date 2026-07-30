@@ -672,13 +672,30 @@ const PROMOTION_ACCELERATOR_MULT = 0.75;
 const TECH_TO_ENGINEER = PROMOTIONS.find((p) => p.to === 'engineer')!;
 const ENGINEER_TO_SCIENTIST = PROMOTIONS.find((p) => p.to === 'scientist')!;
 
+// Bug found via task 7's sim-verification: resolvePromotions previously only ever
+// promoted toward R&D Lab's scientist requirement, funneling EVERY engineer onward the
+// moment one existed — since direct-hire is gone (task 3), that left Fabrication/
+// Refinery's own engineer slots permanently unfilled once the scientist target was met,
+// so Hardware production (and everything downstream of it, including this sprint's new
+// Test-Stand buildingDep gate) silently stalled at zero for the "optimal" profile.
+// Fixed by holding back requiredSlots('engineer') worth of Fabrication/Refinery's own
+// need as a reserve, never promoted away, before any surplus goes to Scientist.
 function resolvePromotions(state: SimState): void {
   if (state.promotionTimer || !state.classroomBuilt) return;
-  if (requiredSlots(state, 'scientist') <= state.staffHired.scientist) return;
+  const scientistTarget = requiredSlots(state, 'scientist');
+  const engineerReserve = requiredSlots(state, 'engineer'); // Fabrication + Refinery's own slots
+  const scientistNeeded = state.staffHired.scientist < scientistTarget;
+  const reserveUnmet = state.staffHired.engineer < engineerReserve;
+  // Stop only once BOTH are satisfied — checking scientistNeeded alone was the bug: once
+  // R&D Lab's target was met, this returned immediately and never touched the reserve at
+  // all if it hadn't happened to already be filled by then (exactly what starved
+  // Fabrication for the fast-moving "optimal" profile).
+  if (!scientistNeeded && !reserveUnmet) return;
 
   const scientistMult = state.techCompleted.has('scientificMethod') ? PROMOTION_ACCELERATOR_MULT : 1;
   const scientistCost = Math.ceil(ENGINEER_TO_SCIENTIST.costFunding * scientistMult);
-  if (state.staffHired.engineer > 0 && canAfford(state, { funding: scientistCost })) {
+  const spareEngineer = state.staffHired.engineer > engineerReserve;
+  if (scientistNeeded && spareEngineer && canAfford(state, { funding: scientistCost })) {
     pay(state, { funding: scientistCost });
     state.day.fundingSpentOnHires += scientistCost;
     state.lifetimeFundingSpentOnHires += scientistCost;
@@ -693,9 +710,10 @@ function resolvePromotions(state: SimState): void {
     return;
   }
 
-  // No spare Engineer yet (or one exists but the Scientist promotion isn't affordable
-  // yet): hire + promote a Technician toward Engineer instead — same fall-through the
-  // original `&&`-combined condition always had, now just with the accelerator applied.
+  // No engineer spare beyond Fabrication/Refinery's own reserve (or one exists but the
+  // Scientist promotion isn't affordable yet): hire + promote a Technician toward
+  // Engineer instead — same fall-through the original `&&`-combined condition always
+  // had, now gated on the reserve instead of just ">0".
   const engineerMult = state.techCompleted.has('basicEngineering') ? PROMOTION_ACCELERATOR_MULT : 1;
   const engineerPromoCost = Math.ceil(TECH_TO_ENGINEER.costFunding * engineerMult);
   const techHireCost = ROLES.technician.baseCost! * 1.15 ** state.staffHired.technician;
@@ -848,14 +866,18 @@ function runDecisions(state: SimState): void {
 }
 
 // The next research node the bot would start, in priority order — the first not-yet-
-// completed node whose deps are satisfied. Shared by startResearch() (to start it once
-// affordable) and updateResearchStallTracking() (to notice when it ISN'T affordable for
-// a long stretch — a "duration gate clear, blocked on Research points" scarcity signal).
+// completed node whose deps (tech AND, v4.1, buildingDep) are satisfied. Shared by
+// startResearch() (to start it once affordable) and updateResearchStallTracking() (to
+// notice when it ISN'T affordable for a long stretch — a "duration gate clear, blocked
+// on Research points" scarcity signal).
 function findNextResearchNode(state: SimState): ResearchNode | null {
   for (const id of RESEARCH_PRIORITY) {
     if (state.techCompleted.has(id)) continue;
     const node = RESEARCH_BY_ID.get(id)!;
     if (!node.deps.every((d) => state.techCompleted.has(d))) continue;
+    // ECONOMY §5b v4.1 (Sprint 11.5): a building prerequisite, on top of the tech deps
+    // above — e.g. Probe-1 engine now also needs the Test Stand actually built.
+    if (node.buildingDep && state.buildingLevel[node.buildingDep as BuildingId] < 1) continue;
     return node;
   }
   return null;
@@ -865,8 +887,11 @@ function startResearch(state: SimState): void {
   if (state.researchTimer) return;
   const node = findNextResearchNode(state);
   if (!node) return;
-  if (state.resources.research < node.costR) return; // wait for this one, don't skip ahead
-  state.resources.research -= node.costR;
+  // ECONOMY §5b v4.1: Research + any secondaryCost (Funding/Materials), same merged-cost
+  // check the real game's startResearch (core/actions.ts) makes.
+  const cost: Partial<Record<ResourceId, number>> = { research: node.costR, ...node.secondaryCost };
+  if (!canAfford(state, cost)) return; // wait for this one, don't skip ahead
+  pay(state, cost);
   state.researchTimer = {
     remainingMs: node.durationMs,
     onComplete: () => {
@@ -884,7 +909,9 @@ const RESEARCH_STALL_THRESHOLD_MS = 12 * HOUR;
 // profile/session (it's an observation about the RESOURCE, not a player decision).
 function updateResearchStallTracking(state: SimState): void {
   const node = state.researchTimer ? null : findNextResearchNode(state);
-  if (!node || state.resources.research >= node.costR) {
+  // ECONOMY §5b v4.1: a stall on secondaryCost (Funding/Materials) is just as real a
+  // scarcity signal as one on Research points — same merged cost startResearch() checks.
+  if (!node || canAfford(state, { research: node.costR, ...node.secondaryCost })) {
     state.researchStallTracking = null;
     return;
   }

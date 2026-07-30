@@ -303,6 +303,49 @@ describe('startResearch', () => {
     expect(startResearch(state.resources, state.research, 'aluminum', Date.now())).toBeNull();
   });
 
+  // ECONOMY §5b v4.1 (Sprint 11.5): Probe-1 engine also requires the Test Stand built,
+  // and now carries a secondary Materials cost alongside Research.
+  describe('buildingDep + secondaryCost (ECONOMY §5b v4.1)', () => {
+    function probe1ReadyState() {
+      const state = createInitialState();
+      state.research.completed = ['soundingRockets']; // tech dep met
+      state.resources.research.amount = 1000;
+      state.resources.materials.amount = 1000;
+      return state;
+    }
+
+    it('refuses without the building, even with tech + resources covered', () => {
+      const state = probe1ReadyState();
+      expect(startResearch(state.resources, state.research, 'probe1Engine', Date.now(), false, [])).toBeNull();
+    });
+
+    it('refuses with the building but insufficient secondary-cost Materials', () => {
+      const state = probe1ReadyState();
+      state.buildings.testStand.level = 1;
+      state.resources.materials.amount = 10; // probe1Engine needs 50 Materials
+      expect(
+        startResearch(state.resources, state.research, 'probe1Engine', Date.now(), false, [], state.buildings),
+      ).toBeNull();
+    });
+
+    it('starts once the building is built and both Research + Materials are covered, deducting both', () => {
+      const state = probe1ReadyState();
+      state.buildings.testStand.level = 1;
+      const now = Date.now();
+      const result = startResearch(state.resources, state.research, 'probe1Engine', now, false, [], state.buildings);
+      expect(result).not.toBeNull();
+      expect(result!.resources.research.amount).toBe(1000 - 40);
+      expect(result!.resources.materials.amount).toBe(1000 - 50);
+      expect(result!.research.inProgress?.payload).toEqual({ nodeId: 'probe1Engine' });
+    });
+
+    it('omitting `buildings` entirely (old call-site shape) still refuses a buildingDep node', () => {
+      const state = probe1ReadyState();
+      state.buildings.testStand.level = 1; // built, but not passed in below
+      expect(startResearch(state.resources, state.research, 'probe1Engine', Date.now())).toBeNull();
+    });
+  });
+
   // ECONOMY §4 v3.6: Second research track (R&D Lab internal upgrade).
   describe('second research track', () => {
     it('refuses a second node while the first is in progress, without the upgrade', () => {

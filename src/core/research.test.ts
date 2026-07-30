@@ -24,6 +24,25 @@ describe('isNodeAvailable', () => {
   it('an already-completed node is not "available" (nothing to start)', () => {
     expect(isNodeAvailable(node('aluminum'), ['aluminum'])).toBe(false);
   });
+
+  // ECONOMY §5b v4.1 (Sprint 11.5): Probe-1 engine also requires the Test Stand BUILT,
+  // not just Sounding rockets researched — a real building prerequisite, separate from
+  // the tech dep chain.
+  describe('buildingDep (ECONOMY §5b v4.1)', () => {
+    it('is unavailable once its tech dep is met but the building is not built', () => {
+      expect(isNodeAvailable(node('probe1Engine'), ['soundingRockets'])).toBe(false);
+      expect(isNodeAvailable(node('probe1Engine'), ['soundingRockets'], { testStand: 0 })).toBe(false);
+    });
+
+    it('is available once both the tech dep AND the building are met', () => {
+      expect(isNodeAvailable(node('probe1Engine'), ['soundingRockets'], { testStand: 1 })).toBe(true);
+    });
+
+    it('a node with no buildingDep is unaffected by the buildingLevels argument', () => {
+      expect(isNodeAvailable(node('aluminum'), [], {})).toBe(true);
+      expect(isNodeAvailable(node('aluminum'), [], { testStand: 0 })).toBe(true);
+    });
+  });
 });
 
 describe('isNodeVisible — UI_SPEC §2b progressive disclosure', () => {
@@ -44,6 +63,14 @@ describe('isNodeVisible — UI_SPEC §2b progressive disclosure', () => {
     // Once basicEngineering is done, scientificMethod becomes available and testStand
     // becomes the new one-away tease.
     expect(isNodeVisible(node('testStand'), ['basicEngineering'])).toBe(true);
+  });
+
+  // ECONOMY §5b / UI_SPEC §4 (v4.1): "never a bare padlock" — a node whose tech deps are
+  // all met but whose OWN buildingDep isn't yet still needs to be visible so the player
+  // can see the real reason (build the Test Stand), not have it silently vanish.
+  it('a node whose tech deps are met but buildingDep is not stays visible', () => {
+    expect(isNodeVisible(node('probe1Engine'), ['soundingRockets'])).toBe(true);
+    expect(isNodeVisible(node('probe1Engine'), ['soundingRockets'], { testStand: 0 })).toBe(true);
   });
 });
 

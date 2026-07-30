@@ -303,6 +303,15 @@ export interface StartResearchResult {
  * always filled first; the second slot is never used while the first is empty, so a
  * player without the upgrade sees no behavior change at all.
  */
+/** ECONOMY §5b v4.1 (Sprint 11.5): the level lookup isNodeAvailable's buildingDep check
+ * needs, derived from the real per-building state — a one-liner, not its own module,
+ * shared by this file's startResearch and ui/ResearchPanel.tsx so both gate identically. */
+export function buildingLevelsFor(buildings: GameState['buildings']): Partial<Record<BuildingId, number>> {
+  return Object.fromEntries(
+    (Object.entries(buildings) as [BuildingId, GameState['buildings'][BuildingId]][]).map(([id, b]) => [id, b.level]),
+  );
+}
+
 export function startResearch(
   resources: GameState['resources'],
   research: ResearchState,
@@ -310,10 +319,16 @@ export function startResearch(
   now: number,
   secondTrackUnlocked = false,
   modifiers: Modifier[] = [],
+  buildings?: GameState['buildings'],
 ): StartResearchResult | null {
   const node = RESEARCH_BY_ID.get(nodeId);
-  if (!node || !isNodeAvailable(node, research.completed)) return null;
-  if (resources.research.amount < node.costR) return null;
+  const buildingLevels = buildings ? buildingLevelsFor(buildings) : {};
+  if (!node || !isNodeAvailable(node, research.completed, buildingLevels)) return null;
+  // ECONOMY §5b v4.1: Funding/Materials alongside Research, for the subset of nodes that
+  // declare `secondaryCost` — reuses the same canAffordCost/payCost every other cost in
+  // this file goes through, merged with the Research cost into one object.
+  const cost = { research: node.costR, ...node.secondaryCost };
+  if (!canAffordCost(resources, cost)) return null;
 
   let targetSlot: 'inProgress' | 'secondInProgress';
   if (!research.inProgress) {
@@ -335,10 +350,7 @@ export function startResearch(
   };
 
   return {
-    resources: {
-      ...resources,
-      research: { ...resources.research, amount: resources.research.amount - node.costR },
-    },
+    resources: payCost(resources, cost),
     research: { ...research, [targetSlot]: process },
   };
 }

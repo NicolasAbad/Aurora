@@ -1,10 +1,13 @@
 import { useState } from 'react';
+import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../state/persistStore';
 import { RESEARCH_TREE, type ResearchNode } from '../data/researchTree';
 import { narrativeText } from '../data/narrative';
+import { buildingLevelsFor, canAffordCost } from '../core/actions';
 import { isNodeAvailable, isNodeVisible } from '../core/research';
 import { progressFraction, remainingMs } from '../core/time';
 import { formatDuration } from '../core/format';
+import { BUILDINGS } from '../data/buildings';
 import { useNow } from './useNow';
 import { AnimatedCheck } from './AnimatedCheck';
 import { CostLabel } from './CostLabel';
@@ -53,11 +56,12 @@ function useNodeState(node: ResearchNode): NodeState {
   const completed = useGameStore((s) => s.research.completed);
   const inProgressProcess = useGameStore((s) => s.research.inProgress);
   const secondInProgressProcess = useGameStore((s) => s.research.secondInProgress);
+  const buildingLevels = useGameStore(useShallow((s) => buildingLevelsFor(s.buildings)));
   const isDone = completed.includes(node.id);
   // ECONOMY §4 v3.6: a node can be running in either slot once Second research track is owned.
   const isInProgress =
     inProgressProcess?.payload.nodeId === node.id || secondInProgressProcess?.payload.nodeId === node.id;
-  const isAvailable = !isDone && !isInProgress && isNodeAvailable(node, completed);
+  const isAvailable = !isDone && !isInProgress && isNodeAvailable(node, completed, buildingLevels);
   return isDone ? 'done' : isInProgress ? 'in-progress' : isAvailable ? 'available' : 'locked';
 }
 
@@ -70,8 +74,9 @@ function useNodeState(node: ResearchNode): NodeState {
  */
 function TreeNode({ node, selected, onSelect }: { node: ResearchNode; selected: boolean; onSelect: () => void }) {
   const completed = useGameStore((s) => s.research.completed);
+  const buildingLevels = useGameStore(useShallow((s) => buildingLevelsFor(s.buildings)));
   const state = useNodeState(node);
-  if (!isNodeVisible(node, completed)) return null;
+  if (!isNodeVisible(node, completed, buildingLevels)) return null;
 
   return (
     <button
@@ -91,7 +96,8 @@ function NodeDetail({ node, onClose }: { node: ResearchNode; onClose: () => void
   const inProgressProcess = useGameStore((s) => s.research.inProgress);
   const secondInProgressProcess = useGameStore((s) => s.research.secondInProgress);
   const secondTrackUnlocked = useGameStore((s) => s.buildings.rndLab.upgrades.includes('secondResearchTrack'));
-  const researchAmount = useGameStore((s) => s.resources.research.amount);
+  const resources = useGameStore(useShallow((s) => s.resources));
+  const buildingLevels = useGameStore(useShallow((s) => buildingLevelsFor(s.buildings)));
   const startResearchNode = useGameStore((s) => s.startResearchNode);
   const state = useNodeState(node);
 
@@ -99,13 +105,21 @@ function NodeDetail({ node, onClose }: { node: ResearchNode; onClose: () => void
   // ECONOMY §4 v3.6: a slot is free if the primary is empty, or the second track is
   // owned and its own slot is empty — mirrors core/actions.ts's startResearch exactly.
   const hasFreeSlot = !inProgressProcess || (secondTrackUnlocked && !secondInProgressProcess);
-  const canStart = isAvailable && hasFreeSlot && researchAmount >= node.costR;
+  // ECONOMY §5b v4.1: full cost is Research + any secondaryCost — same merge
+  // core/actions.ts's startResearch itself does, so this never drifts from what Start
+  // actually charges.
+  const fullCost = { research: node.costR, ...node.secondaryCost };
+  const canStart = isAvailable && hasFreeSlot && canAffordCost(resources, fullCost);
   const activeProcess =
     inProgressProcess?.payload.nodeId === node.id
       ? inProgressProcess
       : secondInProgressProcess?.payload.nodeId === node.id
         ? secondInProgressProcess
         : null;
+  // A node whose tech deps are all met but whose buildingDep isn't yet — the locked
+  // reason is the missing building, not a dep chain (never a bare padlock, UI_SPEC §4).
+  const missingBuilding =
+    node.buildingDep && (buildingLevels[node.buildingDep] ?? 0) < 1 ? BUILDINGS[node.buildingDep].name : null;
 
   return (
     <div className="research-detail">
@@ -116,11 +130,15 @@ function NodeDetail({ node, onClose }: { node: ResearchNode; onClose: () => void
         </button>
       </div>
 
-      {state === 'locked' && <div className="research-node__condition">Requires: {depNames(node)}</div>}
+      {state === 'locked' && (
+        <div className="research-node__condition">
+          Requires: {[depNames(node), missingBuilding && `${missingBuilding} built`].filter(Boolean).join(', ')}
+        </div>
+      )}
 
       {state !== 'locked' && (
         <div className="research-node__cost">
-          <CostLabel cost={{ research: node.costR }} />, {formatDuration(node.durationMs)}
+          <CostLabel cost={fullCost} />, {formatDuration(node.durationMs)}
         </div>
       )}
 

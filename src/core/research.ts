@@ -1,6 +1,6 @@
 import { modifierForNode, RESEARCH_BY_ID, type ResearchNode } from '../data/researchTree';
 import { registerModifier } from './modifiers';
-import type { Modifier, Process } from './types';
+import type { BuildingId, Modifier, Process } from './types';
 
 export interface ResearchState {
   completed: string[];
@@ -12,24 +12,46 @@ export interface ResearchState {
   secondInProgress?: Process | null;
 }
 
+/** ECONOMY §5b v4.1 (Sprint 11.5): a node's building prerequisite, if any, is built
+ * (level >= 1) — separate from `deps`' tech chain (see data/researchTree.ts's own
+ * header note on `buildingDep`). `buildingLevels` defaults to `{}` so every pre-v4.1
+ * call site that omits it keeps exactly the old behavior (no node has ever declared
+ * `buildingDep` before this, so the check is always trivially satisfied). */
+function buildingDepMet(node: ResearchNode, buildingLevels: Partial<Record<BuildingId, number>>): boolean {
+  return !node.buildingDep || (buildingLevels[node.buildingDep] ?? 0) >= 1;
+}
+
 /** Deps met and not already completed — the node could be started right now. */
-export function isNodeAvailable(node: ResearchNode, completed: string[]): boolean {
-  return !completed.includes(node.id) && node.deps.every((d) => completed.includes(d));
+export function isNodeAvailable(
+  node: ResearchNode,
+  completed: string[],
+  buildingLevels: Partial<Record<BuildingId, number>> = {},
+): boolean {
+  return (
+    !completed.includes(node.id) &&
+    node.deps.every((d) => completed.includes(d)) &&
+    buildingDepMet(node, buildingLevels)
+  );
 }
 
 /**
  * UI_SPEC §2b: "a node renders only if it's available (deps met) or exactly one
  * prerequisite away." Done/available nodes are visible outright; a locked node is also
  * visible if every one of its deps is itself completed-or-available — i.e. the reveal
- * front extends exactly one ring past the completed frontier, never further.
+ * front extends exactly one ring past the completed frontier, never further. A node
+ * whose tech deps are met but whose OWN buildingDep isn't yet still counts as visible
+ * (the player needs to see "build the Test Stand" as the reason, not have it vanish).
  */
-export function isNodeVisible(node: ResearchNode, completed: string[]): boolean {
-  if (completed.includes(node.id) || isNodeAvailable(node, completed)) return true;
-  return node.deps.every((d) => {
-    if (completed.includes(d)) return true;
-    const depNode = RESEARCH_BY_ID.get(d);
-    return depNode ? isNodeAvailable(depNode, completed) : false;
-  });
+export function isNodeVisible(
+  node: ResearchNode,
+  completed: string[],
+  buildingLevels: Partial<Record<BuildingId, number>> = {},
+): boolean {
+  if (completed.includes(node.id) || isNodeAvailable(node, completed, buildingLevels)) return true;
+  if (!node.deps.every((d) => completed.includes(d) || isNodeAvailable(RESEARCH_BY_ID.get(d)!, completed, buildingLevels))) {
+    return false;
+  }
+  return true;
 }
 
 export interface ResearchResolution {

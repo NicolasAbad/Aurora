@@ -699,7 +699,15 @@ export const useGameStore = create<Store>()((set, get) => ({
   startResearchNode: (nodeId) => {
     const state = get();
     const secondTrackUnlocked = state.buildings.rndLab.upgrades.includes('secondResearchTrack');
-    const result = startResearch(state.resources, state.research, nodeId, Date.now(), secondTrackUnlocked);
+    const result = startResearch(
+      state.resources,
+      state.research,
+      nodeId,
+      Date.now(),
+      secondTrackUnlocked,
+      state.modifiers,
+      state.buildings,
+    );
     if (result) {
       set({ ...result, telemetry: trackFirstOccurrence(state.telemetry, 'first_research_started', { nodeId }) });
     }

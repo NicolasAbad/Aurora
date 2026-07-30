@@ -1,6 +1,6 @@
 // ECONOMY_MODEL.md §5 (v2.9). Node ids match sim/run.ts's pre-existing RESEARCH array
 // (built ahead of this sprint) exactly, so both stay in sync — see sim/run.ts's import.
-import type { Modifier } from '../core/types';
+import type { BuildingId, Modifier, ResourceId } from '../core/types';
 
 const MIN = 60_000;
 const HOUR = 60 * MIN;
@@ -12,6 +12,17 @@ export interface ResearchNode {
   costR: number;
   durationMs: number;
   deps: string[];
+  // ECONOMY §5b v4.1 (Sprint 11.5): a building this node ALSO requires built (level >=
+  // 1), on top of `deps`' tech chain — e.g. Probe-1 engine research thematically implies
+  // the Engine Test Stand exists to research it for. Absent = no building requirement
+  // (every pre-v4.1 node), same additive-optional pattern as everywhere else.
+  buildingDep?: BuildingId;
+  // ECONOMY §5b v4.1: Funding/Materials alongside the Research cost, for nodes where
+  // "this costs real money too" makes sense (certification-adjacent, building-unlocking)
+  // — reserved for a subset, most nodes stay Research-only. Merged with `{ research:
+  // costR }` at the two real call sites (core/actions.ts's startResearch, sim/run.ts) so
+  // existing canAffordCost/payCost machinery handles it, no new cost-resolution path.
+  secondaryCost?: Partial<Record<ResourceId, number>>;
   // Declarative modifier effect (CLAUDE.md rule 4) — omit id/source, callers stamp
   // those when registering. Most nodes have none: unlocking a building/role/tier is
   // checked directly by id elsewhere (e.g. core/hardware.ts's currentHardwareTier,
@@ -68,6 +79,12 @@ export const RESEARCH_TREE: ResearchNode[] = [
     costR: 40,
     durationMs: 10 * MIN,
     deps: ['soundingRockets'],
+    // ECONOMY §5b v4.1 (Sprint 11.5): the clear first case for a building prerequisite —
+    // certifying an engine-testing PROCEDURE for a facility you don't have was
+    // thematically odd and mechanically frictionless. Test Stand built, not just
+    // researched (its own unlock tech is a different Program-branch node entirely).
+    buildingDep: 'testStand',
+    secondaryCost: { materials: 50 }, // certification-adjacent: real test hardware
   },
   {
     id: 'orbital1Engine',
@@ -76,6 +93,8 @@ export const RESEARCH_TREE: ResearchNode[] = [
     costR: 500,
     durationMs: 4 * HOUR,
     deps: ['probe1Engine'],
+    // No separate buildingDep: transitively requires Test Stand already, via probe1Engine.
+    secondaryCost: { materials: 200 }, // certification-adjacent, higher tier than Probe-1
   },
   // --- Operations ---
   {
@@ -116,6 +135,7 @@ export const RESEARCH_TREE: ResearchNode[] = [
     // ECONOMY §5 v3.5: -50% propellant loading duration for satellite-class missions —
     // checked directly by id in core/auroraMission.ts's startNextAuroraStage, same
     // "feature toggle, not a numeric modifier" pattern as vabQueues above.
+    secondaryCost: { materials: 150 }, // ECONOMY §5b v4.1: real plumbing/equipment, not just know-how
   },
   // --- Program ---
   {
@@ -151,6 +171,7 @@ export const RESEARCH_TREE: ResearchNode[] = [
     costR: 150,
     durationMs: 40 * MIN,
     deps: ['scientificMethod'],
+    secondaryCost: { funding: 300 }, // ECONOMY §5b v4.1: building-unlocking node (Testing complex)
   },
   {
     id: 'flightOperations',
@@ -167,12 +188,21 @@ export const RESEARCH_TREE: ResearchNode[] = [
     costR: 400,
     durationMs: 2 * HOUR,
     deps: ['flightOperations'],
+    secondaryCost: { funding: 500 }, // ECONOMY §5b v4.1: building-unlocking node (Launch complex)
   },
   {
     id: 'orbitalFlight',
     name: 'Orbital flight',
     branch: 'program',
-    costR: 700,
+    // ECONOMY §5b/§5c v4.1 (Sprint 11.5 income-rebalance): raised 700 -> 1,000 — the
+    // program's capstone research gate, the single node the "3 Scientists out-produce
+    // the entire remaining tree" finding most concretely names (the longest node, 6h).
+    // Deliberately the ONLY costR raise in this pass: fresh sim data (tasks 3/4/6) found
+    // the OPPOSITE problem at the START of the tree (basicEngineering stalls 12+h in
+    // every seed) — raising early/mid costs or lowering R&D Lab's rate would have
+    // directly worsened an already-confirmed regression. This targets the late-tree
+    // abundance finding without touching the early bottleneck.
+    costR: 1000,
     durationMs: 6 * HOUR,
     deps: ['flightProgram'],
   },
