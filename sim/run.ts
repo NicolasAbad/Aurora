@@ -102,7 +102,7 @@ import { BUILDINGS } from '../src/data/buildings';
 import { CERTIFICATION_TESTS_BY_ID } from '../src/data/certifications';
 import { CONTRACT_TIERS, TIER0_PAYLOAD_EXTRA_HARDWARE, TIER0_PAYLOAD_EXTRA_PROPELLANT } from '../src/data/contracts';
 import { RESEARCH_TREE, type ResearchNode } from '../src/data/researchTree';
-import { PROMOTIONS, ROLES } from '../src/data/roles';
+import { HIRING_COST_EXPONENT, PROMOTIONS, ROLES } from '../src/data/roles';
 import { SOUNDING_ROCKETS, WEATHER_WINDOW_MAX_MS, WEATHER_WINDOW_MIN_MS } from '../src/data/soundingRockets';
 import type { BuildingId, ResourceId, RoleId, UnlockCondition } from '../src/core/types';
 
@@ -193,6 +193,19 @@ const BUILD_PRIORITY: BuildingId[] = [
   'trackingStation',
   'launchPadB',
 ];
+
+// ECONOMY §3d v4.1 (Sprint 11.5 task 8): the 'aggressive' profile's whole point — rush
+// ONE high-yield building (Finance, the owner's own example) instead of the balanced
+// order above. Crew Quarters is NOT here: resolveConstruction's staff-bottleneck
+// override (unconditional, below) still buys it whenever hired-and-capped staff can't
+// fill Finance's own growing slots, so Finance can keep leveling — that's the realistic
+// "hard-focus but not literally refuse every other building" shape a real optimizing
+// player has, not a purity test.
+const AGGRESSIVE_BUILD_PRIORITY: BuildingId[] = ['finance'];
+
+function buildPriorityFor(profile: Profile): BuildingId[] {
+  return profile === 'aggressive' ? AGGRESSIVE_BUILD_PRIORITY : BUILD_PRIORITY;
+}
 
 // Sprint 7: was this file's own hardcoded copy; now imports src/data/certifications.ts
 // and src/core/certification.ts's exported reward constants (same pattern as Sprint 4's
@@ -297,8 +310,16 @@ const RECORDS = {
 // ---------------------------------------------------------------------------
 // Session-based profiles' schedules (sim-only methodology, see header note)
 // ---------------------------------------------------------------------------
-type Profile = 'optimal' | 'human' | 'casual';
-const SESSION_START_HOURS = [7, 14, 21]; // human: 3 sessions/day, ~8h apart
+// ECONOMY §3d v4.1 (Sprint 11.5 task 8): 'aggressive' re-opens the hiring-cost-curve
+// question with a real profile shape, not a guess — the owner's own manual play (dumping
+// investment into Finance early) directly contradicted Sprint 11's "curve is fine"
+// conclusion, and the working theory is that a bot spreading investment evenly (every
+// existing profile) structurally can't reproduce that experience. Session-scheduled like
+// "human" (a real optimizing player still only plays in sessions, they just spend each
+// session's decisions differently) — see buildPriorityFor/resolveConstruction below for
+// the actual behavior difference.
+type Profile = 'optimal' | 'human' | 'casual' | 'aggressive';
+const SESSION_START_HOURS = [7, 14, 21]; // human/aggressive: 3 sessions/day, ~8h apart
 const SESSION_DURATION_MS = 20 * MIN;
 const CASUAL_SESSION_START_HOURS = [19]; // casual: one evening check-in/day
 const CASUAL_SESSION_DURATION_MS = 30 * MIN;
@@ -306,10 +327,10 @@ const OFFLINE_RATE = 0.6; // ECONOMY §11
 const OFFLINE_CAP_MS_BASE = 10 * HOUR;
 const OFFLINE_CAP_MS_EXTENDED = 16 * HOUR; // with Remote Ops tech
 
-function isInSession(nowMs: number, profile: 'human' | 'casual'): boolean {
+function isInSession(nowMs: number, profile: 'human' | 'casual' | 'aggressive'): boolean {
   const timeOfDayMs = nowMs % DAY_MS;
-  const starts = profile === 'human' ? SESSION_START_HOURS : CASUAL_SESSION_START_HOURS;
-  const durationMs = profile === 'human' ? SESSION_DURATION_MS : CASUAL_SESSION_DURATION_MS;
+  const starts = profile === 'casual' ? CASUAL_SESSION_START_HOURS : SESSION_START_HOURS;
+  const durationMs = profile === 'casual' ? CASUAL_SESSION_DURATION_MS : SESSION_DURATION_MS;
   return starts.some((h) => {
     const start = h * HOUR;
     return timeOfDayMs >= start && timeOfDayMs < start + durationMs;
@@ -638,7 +659,7 @@ function resolveHiring(state: SimState): void {
       if (totalHired(state) >= staffCap(state)) continue;
       if (state.staffHired[role] >= requiredSlots(state, role)) continue;
 
-      const cost = def.baseCost! * 1.15 ** state.staffHired[role];
+      const cost = def.baseCost! * HIRING_COST_EXPONENT ** state.staffHired[role];
       if (state.resources.funding < cost) continue;
 
       const currentSalary = Object.entries(state.staffHired).reduce(
@@ -716,7 +737,7 @@ function resolvePromotions(state: SimState): void {
   // had, now gated on the reserve instead of just ">0".
   const engineerMult = state.techCompleted.has('basicEngineering') ? PROMOTION_ACCELERATOR_MULT : 1;
   const engineerPromoCost = Math.ceil(TECH_TO_ENGINEER.costFunding * engineerMult);
-  const techHireCost = ROLES.technician.baseCost! * 1.15 ** state.staffHired.technician;
+  const techHireCost = ROLES.technician.baseCost! * HIRING_COST_EXPONENT ** state.staffHired.technician;
   if (totalHired(state) >= staffCap(state)) return;
   if (!canAfford(state, { funding: techHireCost + engineerPromoCost })) return;
   pay(state, { funding: techHireCost + engineerPromoCost });
@@ -733,7 +754,7 @@ function resolvePromotions(state: SimState): void {
   };
 }
 
-function resolveConstruction(state: SimState): void {
+function resolveConstruction(state: SimState, profile: Profile): void {
   // One purchase per check-in — a real session buys one thing and moves on, rather
   // than instantly reinvesting every accumulated Funding.
   for (let guard = 0; guard < 1; guard++) {
@@ -769,7 +790,7 @@ function resolveConstruction(state: SimState): void {
       }
     }
 
-    for (const id of BUILD_PRIORITY) {
+    for (const id of buildPriorityFor(profile)) {
       if (bought) break;
       const def = BUILDINGS[id];
       if (!isUnlocked(state, def.unlockCondition)) continue;
@@ -857,11 +878,11 @@ function resolveFundingRounds(state: SimState): void {
   }
 }
 
-function runDecisions(state: SimState): void {
+function runDecisions(state: SimState, profile: Profile): void {
   resolveManualPitch(state);
   resolveFundingRounds(state);
   resolveHiring(state);
-  resolveConstruction(state);
+  resolveConstruction(state, profile);
   resolvePromotions(state);
 }
 
@@ -1373,7 +1394,7 @@ function tick(state: SimState, profile: Profile): void {
   // 5. Bot decisions — "optimal" keeps its 15-min check-in cadence around the clock;
   // "human" only acts while inside a session.
   const decisionGate = profile === 'optimal' ? state.nowMs % DECISION_INTERVAL_MS === 0 : active;
-  if (decisionGate) runDecisions(state);
+  if (decisionGate) runDecisions(state, profile);
 
   // STARTING a new process (research node, certification test, sonda assembly,
   // accepting a contract) is a player action too — a mini-checklist launch or "accept
@@ -1562,6 +1583,25 @@ function printSummary({ profile, rows, state, outPath, seed, days }: SimulationR
     `  Hired: ${totalHired(state)} total — technician ${state.staffHired.technician}, engineer ${state.staffHired.engineer}, scientist ${state.staffHired.scientist}, controller ${state.staffHired.controller}`,
   );
   console.log(`  Lifetime Funding spent on hiring/promotion: ${Math.round(state.lifetimeFundingSpentOnHires).toLocaleString()}`);
+
+  // ECONOMY §3d v4.1 (Sprint 11.5 task 8): the owner's own complaint, checked directly —
+  // "a 200-cost hire and a 100-cost promotion felt trivial" once Finance income hit
+  // ~40 Funding/s (5s and 2.5s of income respectively). Reports the SAME ratio for
+  // whatever this run's actual next-hire/next-promotion costs and Finance rate are.
+  if (profile === 'aggressive') {
+    const financeRate = passiveFundingRate(state);
+    const nextHireCost = ROLES.technician.baseCost! * HIRING_COST_EXPONENT ** state.staffHired.technician;
+    const promoMult = state.techCompleted.has('basicEngineering') ? PROMOTION_ACCELERATOR_MULT : 1;
+    const nextPromoCost = Math.ceil(TECH_TO_ENGINEER.costFunding * promoMult);
+    console.log(`\nHiring-cost curve check (ECONOMY §3d, owner's real-play finding):`);
+    console.log(`  Finance level ${state.buildingLevel.finance}, passive rate: ${financeRate.toFixed(1)} Funding/s`);
+    console.log(
+      `  Next Technician hire: ${Math.round(nextHireCost)} Funding = ${financeRate > 0 ? (nextHireCost / financeRate).toFixed(1) : 'n/a'}s of Finance income`,
+    );
+    console.log(
+      `  Next Tech->Engineer promotion: ${nextPromoCost} Funding = ${financeRate > 0 ? (nextPromoCost / financeRate).toFixed(1) : 'n/a'}s of Finance income`,
+    );
+  }
 
   // Checkpoint rows: 5 evenly spaced days across the run (arc-milestone checkpoints
   // would need those milestones to land inside DAYS; falling back to evenly-spaced
@@ -1786,10 +1826,12 @@ function main(): void {
   const optimal = runSimulation('optimal');
   const human = runSimulation('human');
   const casual = runSimulation('casual');
+  const aggressive = runSimulation('aggressive');
 
   printSummary(optimal);
   printSummary(human);
   printSummary(casual);
+  printSummary(aggressive);
 
   console.log('=== Profile comparison ===');
   const fmt = (r: SimulationResult) =>

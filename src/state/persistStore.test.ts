@@ -187,7 +187,7 @@ describe('game store actions (Sprint 1 acceptance loop)', () => {
 
     for (let i = 0; i < 20; i++) pitch(); // top back up: +200
     hire('technician'); // 50 F
-    hire('technician'); // 50 * 1.15
+    hire('technician'); // 50 * 1.20 (ECONOMY §3d v4.1)
     assign('technician', 'finance', 1);
     assign('technician', 'finance', 1);
 

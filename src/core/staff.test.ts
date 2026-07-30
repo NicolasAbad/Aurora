@@ -22,8 +22,8 @@ import {
 describe('hiringCost', () => {
   it('matches ECONOMY §3 formula', () => {
     expect(hiringCost('technician', 0)).toBe(50);
-    expect(hiringCost('technician', 1)).toBeCloseTo(50 * 1.15);
-    expect(hiringCost('controller', 2)).toBeCloseTo(250 * 1.15 ** 2);
+    expect(hiringCost('technician', 1)).toBeCloseTo(50 * 1.2); // ECONOMY §3d v4.1: exponent raised 1.15 -> 1.20
+    expect(hiringCost('controller', 2)).toBeCloseTo(250 * 1.2 ** 2);
   });
 
   // ECONOMY §9 (Sprint 10): Recruiting's -15% hiring cost, registered on 'hiring.cost'.

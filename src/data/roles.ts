@@ -1,6 +1,19 @@
 // ECONOMY_MODEL.md §3 — staff roles. Hiring cost (hireable roles only) = baseCost ×
-// 1.15^hiredOfThatRole.
+// HIRING_COST_EXPONENT^hiredOfThatRole.
 import type { RoleId } from '../core/types';
+
+// ECONOMY §3d v4.1 (Sprint 11.5 task 8, RE-OPENED): raised 1.15 -> 1.20. Sprint 11's
+// "curve never binds" conclusion was correct for its own bot profiles (staff cap and the
+// salary budget bind first, every time) — but real play (aggressively leveling one
+// building, e.g. Finance, early) directly contradicted the FELT experience. The new
+// "aggressive" sim profile (see sim/run.ts) confirmed it with real numbers: even a modest
+// Finance level 5 (10 Funding/s) made the next hire cost 6.6s of income and the next
+// promotion 10.0s — trivial in the moment, regardless of whether the curve is
+// mathematically "binding" in the sim-bot sense. 1.20 roughly 1.5x's the cost by the
+// 10th-20th hire of a role (1.20^15 ≈ 15.4x base vs 1.15^15 ≈ 8.1x) — the shape the
+// original BACKLOG complaint named ("too shallow for a program that will never have
+// thousands of staff"), without changing the first hire's cost at all (1.20^0 = 1.15^0).
+export const HIRING_COST_EXPONENT = 1.2;
 
 export interface RoleDef {
   id: RoleId;

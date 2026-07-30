@@ -163,12 +163,12 @@ describe('hireStaff', () => {
     expect(hireStaff(state.resources, state.staff, [], 0, 'technician')).toBeNull();
   });
 
-  it('scales cost by 1.15^hired', () => {
+  it('scales cost by HIRING_COST_EXPONENT^hired (ECONOMY §3d v4.1: 1.20)', () => {
     const state = createInitialState();
     state.resources.funding.amount = 1000;
     state.staff.pools.technician.hired = 1;
     const result = hireStaff(state.resources, state.staff, [], 5, 'technician');
-    expect(result!.resources.funding.amount).toBeCloseTo(1000 - 50 * 1.15);
+    expect(result!.resources.funding.amount).toBeCloseTo(1000 - 50 * 1.2);
   });
 });
 

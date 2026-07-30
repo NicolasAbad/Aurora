@@ -41,7 +41,7 @@ Funding 0 · Materials 0 · Research 0 · Hardware 0 (Aluminum tier) · Propella
 
 Funding Round payouts are one-time payments: they **ignore the Funding cap** (GDD §1c).
 
-## 3. Staff — hiring cost `base × 1.15^hiredOfThatRole` (exponent per role, Technician/Controller only), salary per second per unit
+## 3. Staff — hiring cost `base × 1.20^hiredOfThatRole` (exponent per role, Technician/Controller only), salary per second per unit
 | Role | Base cost | Salary/s | Unlock |
 |---|---|---|---|
 | Technician | 50 | 0.15 | Start |
@@ -64,6 +64,8 @@ The ticker/production-rate display currently shows GROSS production (e.g. "+20/s
 
 ## 3d. Contradiction to resolve: Sprint 11's "hiring cost is a non-issue" vs. real play
 Sprint 11's dedicated balance pass concluded the hiring-cost curve was fine, unchanged. The owner's own subsequent manual play directly contradicts that: aggressively leveling Finance early (reaching ~40 Funding/s) made a 200-cost hire and a 100-cost promotion feel trivial — 5 and 2.5 seconds of income respectively. **This is likely a sim-bot-vs-real-player divergence, not a wrong prior conclusion** — a bot policy that spreads investment evenly may never reproduce the "dump everything into one high-yield building early" pattern a real optimizing player finds naturally. Sprint 11.5 must specifically test an aggressive-single-building-investment policy in the sim (not just the existing optimal/human/casual profiles) before deciding whether to raise the hiring-cost curve — real human-reported experience outranks a prior simulated conclusion when they conflict, but confirm with data before changing values.
+
+**Resolved (Sprint 11.5 task 8).** Added a real `'aggressive'` profile to `sim/run.ts` (session-scheduled like "human," but its build priority is Finance-only — Crew Quarters still buys itself in via the existing staff-bottleneck override, nothing else does). It confirmed the owner's finding with sim data, not just anecdote: even a modest Finance level 5 (10 Funding/s, far short of the owner's own ~40/s) made the next Technician hire cost 6.6s of income and the next promotion 10.0s — trivial, regardless of whether the curve is the bot's binding constraint in the Sprint-11 sense. **Raised the hiring-cost exponent 1.15 → 1.20** (§3's formula) — the shape the ORIGINAL BACKLOG complaint named ("too shallow for a program that will never have thousands of staff": 1.20^15 ≈ 15.4× base vs 1.15^15 ≈ 8.1×), leaves the first hire of a role untouched (any base^0 = 1), and directly targets the "many hires of the same role" case the aggressive profile's own single-building focus exercises hardest. Did NOT raise the base cost (fine for a first hire) or touch Promotion cost/duration (task 3's territory, and PROMOTIONS' cost is flat/non-curved by design — a real, separate observation worth its own look later, not fixed here as part of this specific reopened question).
 
 ## 4. Buildings — cost `base × factor^level`; production `base × level × staffRatio`
 **staffRatio for multi-role buildings = the MINIMUM filled ratio across its roles (bottleneck rule):** Fabrication with its Engineer slot filled but no Technician produces 0 — a missing discipline halts the line, consistent with §4b's binary philosophy. **Slots exist only at building level ≥ 1** — an unbuilt (level 0) building has no slots and must not appear as an assignment target; hiring into the pool without an assignment is always allowed (Quarters cap is the only limit).

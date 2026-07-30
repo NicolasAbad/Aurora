@@ -1,15 +1,15 @@
 import { BUILDINGS } from '../data/buildings';
-import { ROLES, STARTING_STAFF_CAP, type PromotionDef } from '../data/roles';
+import { HIRING_COST_EXPONENT, ROLES, STARTING_STAFF_CAP, type PromotionDef } from '../data/roles';
 import { applyModifiers } from './modifiers';
 import type { BuildingId, GameState, InternalUpgradeDef, Modifier, RoleId, StaffState } from './types';
 
-/** Cost to hire the next unit of `role`, per ECONOMY §3 (`base × 1.15^hiredOfRole`).
- * `modifiers`/`now` (default `[]`/`0`, ECONOMY §9 Sprint 10): Recruiting's -15% hiring
- * cost registers on 'hiring.cost' — every pre-Sprint-10 call site that omits them keeps
- * the exact old value (applyModifiers with no matching modifiers is a no-op). Only ever
- * called for a hireable role (ROLES[role].baseCost is defined) — see isRoleUnlocked. */
+/** Cost to hire the next unit of `role`, per ECONOMY §3 (`base × HIRING_COST_EXPONENT^
+ * hiredOfRole`). `modifiers`/`now` (default `[]`/`0`, ECONOMY §9 Sprint 10): Recruiting's
+ * -15% hiring cost registers on 'hiring.cost' — every pre-Sprint-10 call site that omits
+ * them keeps the exact old value (applyModifiers with no matching modifiers is a no-op).
+ * Only ever called for a hireable role (ROLES[role].baseCost is defined) — see isRoleUnlocked. */
 export function hiringCost(role: RoleId, hiredOfRole: number, modifiers: Modifier[] = [], now = 0): number {
-  return applyModifiers(ROLES[role].baseCost! * 1.15 ** hiredOfRole, modifiers, 'hiring.cost', now);
+  return applyModifiers(ROLES[role].baseCost! * HIRING_COST_EXPONENT ** hiredOfRole, modifiers, 'hiring.cost', now);
 }
 
 /** Total staff cap: starting cap + Crew Quarters' staffCapBonus × level (ECONOMY §1). */
