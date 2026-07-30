@@ -15,7 +15,7 @@
 |---|---|---|
 | Finance | Grants desk | +1 Technician slot |
 | R&D Lab | Technical archive | +1 Scientist slot |
-| R&D Lab | Second research track | **Two research nodes run in parallel** (mechanic change — the depth item of this set). **Repriced (owner direction, Sprint 11.5): minimum 10,000 Funding + a real Materials cost, meant to take genuine time to reach — this is the set's marquee item and should feel earned, not an early buy.** |
+| R&D Lab | Second research track | **Two research nodes run in parallel** (mechanic change — the depth item of this set). **Repriced (Sprint 11.5, CLOSED): 1,000F → 10,000 Funding + 2,500 Materials (ECONOMY §4 v4.1) — meets the owner's ≥10,000 Funding + real Materials-cost direction; ~4:1 Funding:Materials, matching Launch Rail's ratio at a similar price tier.** |
 | Supply Depot | Bulk contracts | +1 Technician slot |
 | Refinery | Recovery loop | −10% Materials consumed per Propellant |
 | Fabrication | QA station | −15% Materials consumed per Hardware |

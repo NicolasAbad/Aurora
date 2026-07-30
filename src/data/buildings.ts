@@ -44,7 +44,13 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     unlockCondition: { kind: 'start' },
     internalUpgrades: [
       { id: 'technicalArchive', name: 'Technical archive', cost: { funding: 500 }, narrativeId: 'U-11' },
-      { id: 'secondResearchTrack', name: 'Second research track', cost: { funding: 1000 }, narrativeId: 'U-12' },
+      // ECONOMY §4 v4.1 (Sprint 11.5, owner direction): repriced from 1,000F — the set's
+      // marquee depth item (two research nodes running in parallel) reading as an early,
+      // cheap buy undersold it. 10,000 Funding + 2,500 Materials (~4:1, matching Launch
+      // Rail's Funding:Materials ratio at a similar price tier) — a real Materials line,
+      // not just a bigger Funding number, and a threshold meant to take genuine time to
+      // reach rather than land alongside the Lab's other, cheaper upgrades.
+      { id: 'secondResearchTrack', name: 'Second research track', cost: { funding: 10_000, materials: 2_500 }, narrativeId: 'U-12' },
     ],
   },
   crewQuarters: {
