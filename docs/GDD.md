@@ -1,6 +1,8 @@
 # GDD — Aurora Program
 *Final design document for Claude Code development — v2.1 (English base language)*
 
+**v2.11 changelog:** Engineer/Scientist hiring made promotion-ONLY (§2) — Technician and Controller remain directly hireable, but the promotion ladder is now the sole path to Engineer/Scientist, permanently closing the "skip the bootstrap" tension the project patched twice before. `basicEngineering`/`scientificMethod` tech nodes repurposed as promotion accelerators (ECONOMY §5) rather than removed.
+
 **v2.10 changelog:** checklist-vs-Confidence relationship clarified (§7b) — all 8 items mandatory to full state (Option A); "proportional"/"launched early" wording describes the live preview during the checklist, never a reachable end state. A genuinely partial/skippable checklist is deferred to BACKLOG, contingent on Sprint 9's deadline pressure.
 
 **v2.6 changelog:** progressive-disclosure rules made explicit (UI_SPEC §2b): default is hidden-until-relevant — building tiles, research nodes, ticker rows, verbs and panels appear as the player earns them; the only deliberate teasers are the locked complex tabs, the Training Center, and unnamed record placeholders.
@@ -66,9 +68,9 @@ Passive/continuous production **halts at cap** (amber warning). **One-time payme
 ## 2. Staff — hybrid system
 
 **Role pools** (numbers, not individuals): Technicians, Engineers, Scientists, Controllers.
-- Hired directly or **promoted** between roles via training (timed process; Quarters "Classroom" upgrade in v1)
+- **Technician and Controller are directly hireable.** **Engineer and Scientist are PROMOTION-ONLY** (v2.11 change) — Technician is the sole entry point, and the Classroom is the only path up the ladder (Technician → Engineer → Scientist). This permanently resolves a tension the project spent several sprints defending piecemeal (Basic engineering's cost, E-04's precondition) by removing the bypass entirely instead of continuing to patch around it. Controller stays directly hireable — it was never part of the promotion ladder and gates on `flightOperations` tech as before.
 - Buildings define slots per role; production scales with filled ratio
-- Salary per tick scales by role; hiring cost `base × 1.15^hiredOfThatRole` (exponent is **per role**, not global)
+- Salary per tick scales by role; hiring cost (Technician/Controller only) `base × 1.15^hiredOfThatRole` (exponent is **per role**, not global)
 
 **Individual astronauts** ⟨KSP astronaut XP/specialization⟩ (era 2 — data model defined NOW):
 `{ id, name, originRole, skill (grows per mission flown), status, missionsFlown }` — Training Center visible-but-locked in v1; save schema ships with `astronauts: []`.
