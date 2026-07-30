@@ -1317,7 +1317,11 @@ function tick(state: SimState, profile: Profile): void {
       // ECONOMY §5 v3.6: Aluminum alloys' -10% Materials-per-Hardware IS modeled — it's a
       // research node the bot completes on its normal RESEARCH_PRIORITY schedule, not an
       // optional purchase (unlike QA station, deliberately NOT modeled — see header note).
-      const materialsPerHardware = 2 * (state.techCompleted.has('aluminum') ? 0.9 : 1);
+      // ECONOMY §3b v4.1 (Sprint 11.5): reads BUILDINGS.fabrication's own consume rate
+      // (now 3, was this file's own hardcoded `2`) instead of a second copy that would
+      // have silently kept simulating the pre-Sprint-11.5 economy otherwise.
+      const materialsPerHardware =
+        BUILDINGS.fabrication.production!.consumes!.materials! * (state.techCompleted.has('aluminum') ? 0.9 : 1);
       const materialsNeeded = hardwareAmount * materialsPerHardware;
       if (state.resources.materials >= materialsNeeded) {
         state.resources.materials -= materialsNeeded;
@@ -1330,8 +1334,10 @@ function tick(state: SimState, profile: Profile): void {
         productionPerSecond(BUILDINGS.refinery.production!.basePerSec, refLevel, 1) *
         dtSec *
         rateMultiplier;
-      if (state.resources.materials >= propellantAmount) {
-        state.resources.materials -= propellantAmount;
+      const materialsPerPropellant = BUILDINGS.refinery.production!.consumes!.materials!;
+      const materialsNeededForPropellant = propellantAmount * materialsPerPropellant;
+      if (state.resources.materials >= materialsNeededForPropellant) {
+        state.resources.materials -= materialsNeededForPropellant;
         grant(state, 'propellant', propellantAmount, false);
       }
     }

@@ -160,15 +160,15 @@ describe('resolveEconomyTick — Complex B consumers (ECONOMY §4b)', () => {
     const state = fabricationState(10);
     const result = resolveEconomyTick(state.resources, state.buildings, state.staff, [], 1000);
 
-    // Fabrication: 0.3 H/s * level 1 * ratio 1 * 1s = 0.3 H; consumes 2 M per H = 0.6 M.
+    // Fabrication: 0.3 H/s * level 1 * ratio 1 * 1s = 0.3 H; consumes 3 M per H (v4.1) = 0.9 M.
     expect(result.resources.hardware.amount).toBeCloseTo(0.3);
     expect(result.resources.hardware.byTier.aluminum).toBeCloseTo(0.3);
-    expect(result.resources.materials.amount).toBeCloseTo(10 - 0.6);
+    expect(result.resources.materials.amount).toBeCloseTo(10 - 0.9);
     expect(result.buildings.fabrication.starvedIndicator).toBe(false);
   });
 
   it('binary-pauses (produces nothing, never negative) when Materials cannot cover the full tick', () => {
-    const state = fabricationState(0.5); // needs 0.6 M this tick, only has 0.5
+    const state = fabricationState(0.5); // needs 0.9 M this tick (v4.1), only has 0.5
     const result = resolveEconomyTick(state.resources, state.buildings, state.staff, [], 1000);
 
     expect(result.resources.hardware.amount).toBe(0);
@@ -227,12 +227,13 @@ describe('resolveEconomyTick — Complex B consumers (ECONOMY §4b)', () => {
     // Supply Depot output tuned to exactly match Fabrication's per-tick demand, leaving
     // nothing for Refinery — fixed §4b claim order (Fabrication before Refinery) means
     // this resolves the SAME way every tick, not an alternating/proportional split.
-    // Supply Depot lv2, full ratio (2 Tech): 1.5 * 2 * 1 = 3.0 M/s. Fabrication lv5, full
-    // ratio (1 Eng + 1 Tech): consumes 0.3 * 5 * 2 = 3.0 M/s — an exact match, with every
-    // level an integer (ECONOMY §4 v2.8: slots only exist at level >= 1, so a fractional
-    // level can no longer be used as a shortcut to an arbitrary rate).
+    // Supply Depot lv3, full ratio (2 Tech): 1.5 * 3 * 1 = 4.5 M/s. Fabrication lv5, full
+    // ratio (1 Eng + 1 Tech): consumes 0.3 * 5 * 3 = 4.5 M/s (v4.1: 3 M/H, was lv2/2 M/H
+    // pre-Sprint-11.5) — an exact match, with every level an integer (ECONOMY §4 v2.8:
+    // slots only exist at level >= 1, so a fractional level can no longer be used as a
+    // shortcut to an arbitrary rate).
     let state = createInitialState();
-    state.buildings.supplyDepot.level = 2;
+    state.buildings.supplyDepot.level = 3;
     state.staff.pools.technician.hired = 2;
     state.staff.pools.technician.assigned.supplyDepot = 2;
     state.buildings.fabrication.level = 5;
@@ -282,8 +283,8 @@ describe('resolveEconomyTick — Materials-consumption reductions (v3.6)', () =>
     const state = fabricationState(10);
     state.buildings.fabrication.upgrades = ['qaStation'];
     const result = resolveEconomyTick(state.resources, state.buildings, state.staff, [], 1000);
-    // Base: 0.3 H produced, consumes 2 M/H = 0.6 M. QA station: 0.6 * 0.85 = 0.51 M.
-    expect(result.resources.materials.amount).toBeCloseTo(10 - 0.51);
+    // Base (v4.1): 0.3 H produced, consumes 3 M/H = 0.9 M. QA station: 0.9 * 0.85 = 0.765 M.
+    expect(result.resources.materials.amount).toBeCloseTo(10 - 0.765);
   });
 
   it('Aluminum alloys alone (via the modifier registry) cuts it by 10%', () => {
@@ -292,7 +293,7 @@ describe('resolveEconomyTick — Materials-consumption reductions (v3.6)', () =>
       { id: 'research:aluminum', source: 'aluminum', target: 'fabrication.materialsPerHardware', op: 'mult' as const, value: 0.9 },
     ];
     const result = resolveEconomyTick(state.resources, state.buildings, state.staff, [], 1000, 1, modifiers, Date.now());
-    expect(result.resources.materials.amount).toBeCloseTo(10 - 0.54); // 0.6 * 0.9
+    expect(result.resources.materials.amount).toBeCloseTo(10 - 0.81); // 0.9 * 0.9 (v4.1)
   });
 
   it('QA station and Aluminum alloys stack multiplicatively', () => {
@@ -302,7 +303,7 @@ describe('resolveEconomyTick — Materials-consumption reductions (v3.6)', () =>
       { id: 'research:aluminum', source: 'aluminum', target: 'fabrication.materialsPerHardware', op: 'mult' as const, value: 0.9 },
     ];
     const result = resolveEconomyTick(state.resources, state.buildings, state.staff, [], 1000, 1, modifiers, Date.now());
-    expect(result.resources.materials.amount).toBeCloseTo(10 - 0.6 * 0.85 * 0.9); // 10 - 0.459
+    expect(result.resources.materials.amount).toBeCloseTo(10 - 0.9 * 0.85 * 0.9); // 10 - 0.6885 (v4.1)
   });
 
   it('Recovery loop cuts Refinery Materials-per-Propellant by 10%, independent of Fabrication', () => {

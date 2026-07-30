@@ -101,7 +101,14 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     baseCost: { funding: 350, materials: 100 },
     costFactor: 1.15,
     description: 'Converts Materials into Hardware, at the program’s current tier.',
-    production: { resource: 'hardware', basePerSec: 0.3, consumes: { materials: 2 } },
+    // ECONOMY §3b v4.1 (Sprint 11.5): raised 2 -> 3 Materials/Hardware — the resource-
+    // friction lever. At equal building levels, Fabrication+Refinery's combined draw
+    // (0.9L + 0.5L = 1.4L) now sits close to Supply Depot's own output (1.5L) instead of
+    // comfortably under it (was 1.1L vs 1.5L) — staffing both up without also investing
+    // in Supply Depot now creates a real, felt Materials squeeze, even after Aluminum
+    // alloys/QA station's stacked reductions (which still land above the OLD unreduced
+    // rate: 3 * 0.9 * 0.85 ≈ 2.3 vs the old 2).
+    production: { resource: 'hardware', basePerSec: 0.3, consumes: { materials: 3 } },
     slots: { engineer: 1, technician: 1 },
     unlockCondition: { kind: 'lifetimeFunding', amount: 300 },
     internalUpgrades: [

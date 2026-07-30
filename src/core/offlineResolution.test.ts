@@ -222,9 +222,9 @@ describe('resolveOffline — process queue resolution', () => {
 describe('resolveOffline — starvation resolves identically offline (ECONOMY §4b)', () => {
   it('Fabrication stays fed and Refinery stays starved across an offline gap', () => {
     const state = createInitialState();
-    // Same exact-match setup as economy.test.ts's oscillation case (Supply Depot lv2 =
-    // Fabrication lv5's consumption at full ratio), all-integer levels.
-    state.buildings.supplyDepot.level = 2;
+    // Same exact-match setup as economy.test.ts's oscillation case (Supply Depot lv3 =
+    // Fabrication lv5's consumption at full ratio, v4.1's 3 M/H rate), all-integer levels.
+    state.buildings.supplyDepot.level = 3;
     state.staff.pools.technician.hired = 2;
     state.staff.pools.technician.assigned.supplyDepot = 2;
     state.buildings.fabrication.level = 5;
