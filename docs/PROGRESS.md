@@ -2755,142 +2755,25 @@ Flight Data share jumped to 81-85% against the 20-35% target once Aurora II's re
 reward went live — framed for Sprint 11's balance pass, **resolved there** (see Sprint
 11's own entry: metric redefined, not a bug). 515 tests passing at close (up from 502).
 
-## Sprint 10.5 — Visual Identity 2.0 — COMPLETE (2026-07-29)
+## Sprint 10.5 — Visual Identity 2.0 — COMPLETE (2026-07-29, compressed 2026-07-30)
 
-Five presentation-only features (UI_SPEC v3.4), zero economy impact, no scoped unlock,
-no sim re-run needed (no `/core` or `/data` value changed — only new pure-presentational
-components and CSS). Placed after Sprint 10 per the doc's own reasoning: the Constellation
-View needed Aurora II and satellite contracts to exist to show real variety.
-
-### Task 4: Building Pictograms (UI_SPEC §2 building-tile rule) — built first, foundational
-
-One consistent blueprint-style line icon per building (`ui/BuildingIcon.tsx`), all 18
-buildings, same stroke-only/no-illustration language `RocketBlueprint` already
-established (`stroke: var(--accent)`, no fill). Built first since both the tile header
-(`BuildingTile.tsx`) and the Site Map (task 3) consume it — glyph choices (gear for
-Fabrication, dish for Tracking Station, flask for R&D Lab, etc.) were this session's call
-within the style per the doc's own explicit "exact glyph choices are Claude Code's call"
-line; the gear icon's 8 teeth are computed via a rotate-transform loop rather than
-hand-authored paths.
-
-### Task 1: Confidence Dial (UI_SPEC screen 4)
-
-`ui/ConfidenceDial.tsx`: an SVG half-circle gauge (arc math via a small polar-to-Cartesian
-helper), needle sweeping 0-100, each `ConfidenceBreakdown` term (base/certification/
-flightReview/controllers/serviceTower/weather/experience) stacked as its own colored arc
-segment in formula order, clipped to a 100 total exactly like `computeConfidenceBreakdown`
-itself caps `total`. Slotted into the existing `ConfidenceBreakdownView` in
-`LaunchSequencePanel.tsx` in place of the old text-button — tap-to-expand numeric
-breakdown behavior is unchanged, the dial is just the new primary read. The doc calls for
-"colored" segments without specifying which colors; picked six small, distinguishable
-accent hues (teal/blue/green/purple alongside the existing orange/amber) scoped to the
-dial's own CSS rather than new global `--accent`-family variables, since the app's
-"one accent color" direction (UI_SPEC §1) governs the rest of the UI, not this
-one gauge.
-
-### Task 3: Program Site Map (UI_SPEC §2h amended)
-
-`ui/SiteMap.tsx`: a thumbnail (tiny dashed/solid plots, no labels) always rendered next to
-Current Directive, tap-to-expand to a full-screen dialog (larger plots + building-name
-labels), grouped into the 4 real complexes in `BUILDINGS`' own declared order. A built
-plot fades in via a CSS keyframe using the same `BuildingIcon`; unbuilt plots stay dashed
-(`var(--border)`), matching `RocketBlueprint`'s established dashed-until-built /
-solid-once-built convention. One deliberate deviation from the literal doc text: the
-thumbnail is NOT gated on `currentDirective` returning non-null — `core/directive.ts`'s
-`currentDirective` goes null once every D-01..D-12 condition has been exhausted (common
-well before end-game, e.g. any time no contract happens to be active post-firstOrbit),
-and hiding the Site Map exactly when it's most "grown" would contradict the sprint's own
-"grows as buildings are built" acceptance line. `CurrentDirective.tsx` now always renders
-its wrapper row; the directive text itself stays conditional, the Site Map thumbnail does
-not.
-
-### Task 2: Constellation View (UI_SPEC §2i, NEW)
-
-`ui/ConstellationView.tsx`: Earth-centered SVG (a simple line-art globe — outline, one
-latitude ellipse, one meridian line, same blueprint aesthetic), one dot per successful
-satellite mission via a new `core/auroraMission.ts` helper, `satelliteLaunches` (Aurora I,
-Aurora II, fulfilled contracts — success + those 3 `missionType`s only, sounding rockets
-excluded since they're sub-orbital test flights, not satellites; unit-tested in
-`auroraMission.test.ts`). Dots placed on a deterministic golden-angle spiral (radius grows
-per dot) so an arbitrary count never overlaps and never needs a fixed grid size. Tapping a
-dot shows mission type + timestamp, and for contract launches, the client name and tier
-(looked up from `contracts.offers` via the launch's own `contractId`). Reachable from two
-places per the doc: a small ticker-area icon+count (`Ticker.tsx`, rendered only once
-`satelliteLaunches(...).length > 0`, mirroring the existing optional-`onOpenSettings`-prop
-pattern) and a "View Constellation" button inside the Tracking Station tile once it's
-actually built (safe to gate that way — every pad-based launch requires
-`checklist.trackingActive`, so no dot can exist before that tile does anyway).
-
-### Task 5: Three cheap wins
-
-- **Staff role silhouette icons** (`ui/RoleIcon.tsx`): abstract filled person silhouette
-  (circle head + body arc, no face), one accent color per role (reusing the same 4 hues
-  the Confidence Dial introduced — teal for Controller lines up thematically with the
-  dial's own "controllers" segment). Deliberately solid-filled rather than the stroke-only
-  blueprint language buildings use — a different visual register for people vs. structures.
-- **Weather-window radar sweep** (`ui/WeatherRadarSweep.tsx`): a small circular scope with
-  a continuously-rotating sweep line (CSS animation, gated off under the existing
-  `data-reduced-motion` root attribute same as every other animation in the app), replacing
-  the generic progress ring for the `weatherWindow` checklist item specifically — both in
-  `LaunchSequencePanel.tsx` (Aurora/contract pads) and `SoundingMissionPanel.tsx` (sounding
-  rockets), which had its own separate `ChecklistRing`/`ChecklistRow` pair; every other
-  checklist item in both panels keeps its original ring.
-- **Mission Log category icon badges** (`core/missionLogCategory.ts` +
-  `ui/MissionLogIcon.tsx`): rocket/flask/people/building/document/star, one per feed entry.
-  `missionLogBase`'s feed stores already-RENDERED English text, not narrative IDs, so this
-  is a keyword heuristic over that text, not an ID lookup — exact and reliable for the 5
-  generic completion templates (T-18/19/20/23/26, fixed prefixes), best-effort for one-off
-  N-* flavor prose. Documented as a heuristic in the module's own header comment;
-  `missionLogCategory.test.ts` covers the 5 templates exactly plus 5 representative N-*
-  spot-checks (not exhaustive — there's no way to exhaustively test free-form prose
-  matching without coupling the test to every current narrative string).
-
-### Verification
-
-- 527 tests passing (up from 515 at Sprint 10's close: +2 for `satelliteLaunches`, +10 for
-  `categorizeLogLine`). Typecheck (`tsc -b`), lint, and production build all clean.
-- `npm run sim` not re-run — nothing in `/core` or `/data`'s numeric surface changed this
-  sprint (confirmed via `git diff HEAD`: zero touched lines outside `/ui`, one new
-  `/core` file that's pure text-categorization, and one new pure helper in
-  `auroraMission.ts` that filters existing records, computes no new economy value).
-- Playwright, through a real browser (scratchpad-only Chromium, never a project
-  dependency): 3 game-state snapshots (early — a few Campus buildings built, no Launch
-  complex yet; mid — Launch complex built, pad partway through its checklist with a live
-  weather-window process, a few Mission Log entries; post-Aurora-II — Aurora I + Aurora II
-  + a fulfilled contract all successful). State was set directly via the live store's own
-  `useGameStore.setState(...)` (dynamically imported in-page from the Vite dev server,
-  `import('/src/state/persistStore.ts')`) rather than hand-built localStorage save JSON —
-  simpler and less error-prone than replicating `GameState`'s full nested shape by hand,
-  and it's the same partial-override technique the existing test suite already uses
-  (`ComplexTabs.test.tsx` etc.). 20 checks across the 3 snapshots, all passing, zero
-  console/page errors. Confirmed pixel-level via targeted screenshots (not just the
-  automated locator counts): Building Pictograms render distinctly and consistently
-  between the tile header and the expanded Site Map; the Confidence Dial's stacked
-  segments and needle render correctly at a 61%-style partial fill; Mission Log badges
-  render correctly next to a multi-word edge-case line ("Promotion complete: one of your
-  Technicians is now a(n) Engineer."); the Constellation View's 3 dots and tap-to-detail
-  (including the multi-word "Helios Corp (Tier 1)" contract label) all render correctly.
-
-### Scope notes
-
-- **Real bug found, NOT fixed (flagged to `docs/BACKLOG.md`):** `.complex-tabs` (index.css)
-  is a plain non-wrapping flex row with no overflow handling; once 6 tabs are unlocked
-  simultaneously (reachable by mid-game) at a ~420px mobile viewport, the row's natural
-  width (~620px) exceeds the viewport and the whole page gains horizontal scroll —
-  Playwright's own auto-scroll-into-view on a tab click then shifts the entire page,
-  which is what actually surfaced this during this sprint's own verification pass.
-  Confirmed unrelated to Sprint 10.5 via `git diff HEAD`: `ComplexTabs.tsx` and every
-  `.complex-tabs`/`.complex-tabs__tab` CSS rule are byte-identical to the pre-sprint
-  commit. Not fixed here — out of scope for a presentation-only visual-identity sprint,
-  and deserves its own small pass (scroll container vs. wrap vs. an overflow menu like
-  `ActiveProcessStrip`'s own `+N` pattern) rather than a drive-by tweak. The Playwright
-  verification pass itself was run at an 800px viewport instead of a narrower mobile one
-  specifically to route around this pre-existing, unrelated bug rather than let it block
-  verifying this sprint's actual features.
-- Site Map's built-plot fade-in animation replays every time the full-screen dialog is
-  opened (a fresh `SiteMapGrid` mount each time, not an incremental one) rather than only
-  once when a building is newly completed — cosmetic only, not worth the added state
-  needed to track "already seen built" per building for a presentation-only replay effect.
+Five presentation-only features (UI_SPEC v3.4), zero economy impact, no sim re-run needed.
+Building Pictograms (`ui/BuildingIcon.tsx`, all 18 buildings, blueprint stroke-only style)
+built first as the foundation for both the tile header and the new Site Map. Confidence
+Dial (`ui/ConfidenceDial.tsx`, SVG half-circle gauge with stacked colored arc segments)
+replaced the old text-button breakdown in `LaunchSequencePanel.tsx`. Program Site Map
+(`ui/SiteMap.tsx`, thumbnail + tap-to-expand dialog) deliberately NOT gated on
+`currentDirective` returning non-null (that goes null well before end-game, which would
+have hidden the map exactly when it's most "grown"). Constellation View
+(`ui/ConstellationView.tsx`, one dot per successful satellite mission on a golden-angle
+spiral) reachable from the ticker and the Tracking Station tile. Three cheap wins: staff
+role silhouette icons, a weather-window radar-sweep visual, Mission Log category icon
+badges (`core/missionLogCategory.ts`, a keyword heuristic over already-rendered text, not
+an ID lookup). 527 tests passing (up from 515). Playwright-verified across 3 game-state
+snapshots (early/mid/post-Aurora-II), zero console errors. Real bug found but NOT fixed
+here (flagged to BACKLOG, out of scope for a presentation-only sprint): `.complex-tabs`
+overflows horizontally once 6 tabs unlock at a ~420px viewport — fixed later in Sprint 11
+Phase H.
 
 ## Sprint 11 — Polish — COMPLETE (2026-07-30)
 
@@ -3054,3 +2937,185 @@ own stated voice throughout.
   2 commits rather than 4-5) — the pieces were tightly coupled enough (shared
   CountdownSequence component, shared CSS additions) that finer splitting would have
   produced commits that didn't build/test cleanly on their own.
+
+## Sprint 11.5 — Economy friction, progression depth & anti-slop audit — COMPLETE (2026-07-30)
+
+Owner's full post-Sprint-11 manual playtest, 14 findings, two tracks (17 numbered items).
+Five docs replaced (GDD v2.11, ECONOMY_MODEL v4.1, UI_SPEC v3.6, SPRINTS.md, BACKLOG.md) —
+diffed against HEAD before applying (rule 5b): purely additive, nothing shipped-and-tested
+dropped. 13 commits, one per task (1+2 combined as both were quick real bugs; 12-13
+combined as one audit pass). 539 → 562 tests. Baseline re-confirmed clean before starting
+(typecheck/lint/tests/sim all matching Sprint 11's own close numbers).
+
+### Track A — economy friction (SCOPED UNLOCK, every item sim-verified)
+
+1. **Real bug, fixed:** displayed Funding rate showed gross production, not what the
+   player actually received. `core/selectors.ts`'s `getResourceRatePerSecond` now nets
+   Funding against `totalSalaryPerSecond` (plus `salary.rate`/`salary.flat` modifiers,
+   matching `resolveEconomyTick` exactly).
+2. **Real bug, fixed:** `.staff-panel__row-actions`/`.staff-panel__release-confirm` never
+   wrapped, so the release-confirm state (T-15's longer text + Confirm/Cancel) overflowed
+   past the panel — landing under an adjacent sibling at some viewports ("covered by an
+   adjacent element") or fully off-screen at others (Cancel unreachable, "uncancellable").
+   Root-caused via a scratchpad Playwright rig that measured the actual overflow
+   (row-actions rendering ~150-330px wider than its parent) before guessing at a fix;
+   `flex-wrap` + `max-width: 100%` resolved both symptoms.
+3. **Engineer/Scientist made promotion-only** (GDD §2 v2.11, ECONOMY §3 v4.1): `RoleDef`
+   gains `hireable`; `baseCost` optional. `basicEngineering`/`scientificMethod` repurposed
+   from hiring-unlock techs into promotion accelerators (-25% cost+duration each, ordinary
+   modifiers). `sim/run.ts` migrated its own hand-duplicated `ROLES` table to import the
+   real one — this drift was harmless before, but would have silently kept simulating the
+   old dual hire-or-promote economy otherwise (Engineer/Scientist having no `baseCost` now
+   would have produced NaN under the old copy). Caught and fixed a real fall-through bug
+   of my own mid-implementation (an early version turned an `&&`-combined afford-check
+   into a nested `if` that returned instead of falling through, stalling Engineer growth
+   at 0 for 30 simulated days) by comparing sim output against the pre-change baseline
+   before trusting it, not assuming the first version was correct.
+4. **Starting Funding cap 500 → 1,000.** 10-seed sweep: pacing floor/ceiling both hold
+   (Aurora I lands right at day 5 every seed). Surfaced sonda Flight Data share falling to
+   16.4% (below the 20-35% target) and `basicEngineering` stalling 12+h in every seed —
+   flagged for item 7, not patched here.
+5. **Second research track repriced** 1,000F → 10,000 Funding + 2,500 Materials, meeting
+   the owner's "≥10,000F + real Materials cost" direction; ~4:1 ratio matching Launch
+   Rail's at a similar tier. Sim doesn't model internal-upgrade purchases (pre-existing
+   scope limit) — no sim delta expected or seen.
+6. **Resource friction lever:** Fabrication 2 → 3 Materials/Hardware. At equal levels,
+   Fabrication+Refinery's combined draw was `1.1L` against Supply Depot's `1.5L`
+   (comfortably positive even fully staffed — why Materials was never genuinely scarce);
+   now `1.4L` vs `1.5L`, a real squeeze that persists even through Aluminum alloys/QA
+   station's stacked reductions. Chose Fabrication over Refinery/Supply Depot specifically
+   (the bigger, more central consumer; didn't want to punish Materials-independent
+   pre-Fabrication play by lowering supply). `sim/run.ts` had its own hardcoded `2` (and
+   an implicit 1:1 Refinery hardcode) — both replaced with the real `BUILDINGS.*.consumes`
+   values.
+7. **Research tree gating + mixed costs + income rebalance:** `probe1Engine` gains
+   `buildingDep: 'testStand'` (the named first case — researching an engine-test
+   procedure for a facility you don't have was thematically odd) plus secondary costs on
+   5 of 14 nodes (Materials for certification-adjacent nodes, Funding for the two
+   complex-unlocking nodes) — `ResearchNode` gains `buildingDep?`/`secondaryCost?`,
+   `core/research.ts`'s `isNodeAvailable`/`isNodeVisible` take a `buildingLevels` param.
+   Income rebalance: raised ONLY `orbitalFlight` (700→1,000R, the capstone node the "3
+   Scientists out-produce the tree" finding most concretely names) — deliberately left
+   R&D Lab's rate and every early/mid node's cost untouched, since this item's OWN fresh
+   sim data had just found active early scarcity, not abundance, and either move would
+   have worsened a confirmed regression. **Real bug found and fixed via this item's own
+   sim-verification, not a value change:** `sim/run.ts`'s `resolvePromotions` only ever
+   promoted toward R&D Lab's Scientist requirement — once met, it silently stopped
+   touching engineer count forever, so Fabrication/Refinery's own slots (unreachable via
+   direct-hire since item 3) went permanently unfilled. The "optimal" profile never
+   produced Hardware, never built Test Stand, never reached Aurora I in 30 days as a
+   result — invisible until this item's own buildingDep gate made the downstream
+   consequence visible. Took two attempts: the first fix still early-returned on the
+   Scientist-target check alone, silently skipping the engineer reserve whenever Scientist
+   was already satisfied — caught by re-checking "optimal" after the first fix still
+   failed. After the real fix, all three profiles reach Aurora II (day 2/6/13) and sonda
+   Flight Data recovered to 20.2% median.
+8. **Hiring-cost curve re-opened** with a real `'aggressive'` sim profile (session-
+   scheduled like human, but Finance-only build priority) instead of trusting Sprint 11's
+   prior bot-only conclusion. Confirmed the owner's finding with real numbers: even
+   Finance level 5 (10 Funding/s, far short of the owner's own ~40/s) made the next
+   Technician hire cost 6.6s of income and the next promotion 10.0s — trivial. Raised the
+   exponent 1.15 → 1.20 (`HIRING_COST_EXPONENT`, now a named constant instead of
+   duplicated inline in 4 places), targeting the shape the ORIGINAL BACKLOG complaint
+   named (too shallow for a program that will never have thousands of staff) without
+   touching the first hire's cost.
+9. **Multi-resource upgrade costs:** `BuildingDef` gains `costThresholds?`, scaled from
+   the THRESHOLD's own level (not level 0 — scaling from 0 would inflate a level-50
+   threshold's addCost hundreds of times over). Applied to Finance (Funding-only to lv20,
+   +40M past 20, +15H past 50 — the doc's own named example) and Fabrication (+25H past
+   lv15). The 'aggressive' profile (exempted from the normal level-5 soft cap) run to 90
+   days surfaced a genuine, separate finding instead of reaching level 20: Finance
+   plateaus at level 15 because its own upgrade cost exceeds the Funding cap, which stays
+   pinned at 1,000 forever since this profile never builds Warehouse — a faithful
+   reproduction of what a real Finance-only player would hit, not a sim bug; left as-is.
+10. **Mid-game pacing check (report only):** Test Stand purchase follows tech completion
+    within about a day for the human profile (sim notes: both events land in the same
+    simulated day) — no data-confirmed gap. Campus/Production internal upgrades
+    (grantsDesk, qaStation, etc.) can't be verified via sim (a pre-existing scope
+    limitation — the bot never purchases any internal upgrade except extendedRail); their
+    costs are affordable well within the mid-game Funding range observed, but actual
+    player uptake is unverifiable without extending the sim or a manual playtest.
+11. **VAB automation timing (report only):** `vabQueues` (research path) arrives day 6 for
+    the human profile, same day as both VAB construction and Aurora I's launch — not too
+    slow. `parallelIntegration` (XP-tree path, same effect, redundant with vabQueues) is
+    unverifiable — `sim/run.ts` doesn't model Flight XP tree purchases at all. No
+    adjustment made for either — no sim data justifies one.
+
+### Track B — anti-slop audit (UI_SPEC §1d)
+
+14. **R&D Lab reveal fixed:** moved off the shared staff-cap-reached condition (step 4)
+    onto its own, later condition — Classroom purchased (OR already built, regression-
+    proofed for old saves) — since it was appearing before a Scientist (which needs the
+    Classroom) could ever staff it. Playwright-verified 3 cases.
+15. **Site Map resized:** thumbnail plots 9px → 18px (mobile) / 24px (desktop, first
+    `@media` query in this codebase). Measured before/after against the ticker row
+    (49px, the doc's own size reference): thumbnail went from 57×42px to 102×78px on
+    mobile, 132×102px on desktop — correctly wider on the larger viewport, which it
+    wasn't before.
+16. **Manual verbs recede below ~1% of passive income:** new `isManualVerbLowValue`
+    helper (yield < passive rate × 60 × 0.01 — 1% of a minute's income, the natural
+    reading of a per-time "income" figure compared against a one-time click yield).
+    `ManualActionButton` gains a `receded` prop (smaller, muted, never disabled/hidden,
+    expands back automatically). Wired to all 3 named verbs; Pitch compares against the
+    same net Funding rate the ticker shows (item 1's fix).
+12-13. **Full screen-by-screen audit against §1d's checklist**, not just "looks fine":
+    grepped every `border: 1px solid var(--border)` (18 occurrences), classified each,
+    dropped it on 5 selectors used across every screen (`.building-tile`, `.staff-panel`,
+    `.research-detail`, `.research-node` — reused by 3 other panels despite the name —
+    `.checklist-row`), relying on the existing panel-vs-page background contrast (~9.8%
+    vs ~2.7% lightness, past the doc's 3-5% minimum) instead. Left borders where they're
+    genuinely semantic (checklist done-state, launch success/failure color-coding,
+    milestone-screen's accent border) or a different, justified convention (modals, form
+    inputs, small chips). No gradient text, no Hero Metric layout, no bento-grid-by-
+    default found. Spacing: every padding/gap/margin value in the stylesheet is already a
+    multiple of 4px, zero exceptions. Off-accent colors: role icons and the Confidence
+    Dial's segment colors are legitimate categorical data encoding, not the interactive
+    accent (which stayed consistently orange) — but found and fixed one genuine leak:
+    Settings' checkboxes rendered with the browser's native blue (unstyled default),
+    fixed with `accent-color: var(--accent)`. APCA contrast not precisely computed (no
+    calculator available this session); a WCAG-ratio approximation for the tightest
+    likely pair (`--text-dim` on `--panel`) comes out to ~5.6:1, not obviously concerning,
+    but flagged as unverified-to-Lc-number rather than claimed as a pass.
+
+### Verification
+
+- 562 tests passing (up from 539), +23 across the sprint (buildingDep/secondaryCost,
+  promotionCost/promotionDurationMs, cost-threshold math, isManualVerbLowValue). Lint,
+  typecheck, and production build clean after every task, not just at sprint close.
+- Sim: every task touching `/core` or `/data` values got its own sim run before moving on
+  (not batched to the end), plus a final 10-seed sweep and a final full 3-profile run for
+  the closing record. Documented sanity rules (human profile, the one ECONOMY's targets
+  are scoped to) all hold: Aurora I day 6 (5-12 floor/ceiling), sonda Flight Data 20.2%
+  median (20-35% target).
+- **One deliberate, reported deviation, not silently accepted:** human/casual salary
+  ratio is now 62-69.5% against the 30-55% target (was misleadingly reading in-band
+  before item 7's bot fix, which had been artificially suppressing engineer/controller
+  hiring). This is a real, current sanity-rule violation — a cumulative effect of items
+  3/4/6/7 together only becoming visible once the bot was staffing correctly. NOT fixed
+  in this sprint: it doesn't belong to any single numbered item, and guessing at a fix
+  (lower salary rates? raise passive income? more Funding Rounds?) without a specific
+  mandate would violate the project's own "don't guess numbers" discipline. Flagged
+  clearly in ECONOMY_MODEL §3d for a dedicated look.
+- Playwright, through a real browser (scratchpad-only Chromium): every task verified
+  individually as it landed (screenshots + geometric/state assertions, not just "looks
+  fine"), plus a final consolidated acceptance pass across a realistic mid-game save
+  checking 5 fixes together (R&D Lab reveal, net salary rate matching the ticker exactly,
+  Release-button Cancel reachability, Site Map size, manual-verb prominence) with zero
+  console errors.
+
+### Scope notes
+
+- The resolve-then-re-verify pattern (task 7's sim bug, task 2's overflow bug) held up
+  again this sprint: measure the actual state before trusting a fix, not just believing
+  the code change was correct because it compiled and looked reasonable.
+- `.research-node`'s name is a historical artifact — it's not used anywhere in
+  `ResearchPanel.tsx` itself (that uses `.research-tree__node`, a different, compact
+  node-button style); it's a generic card class reused by ContractsPanel,
+  LaunchSequencePanel, and SoundingMissionPanel. Left the name as-is (a rename is a much
+  bigger diff than this sprint's actual scope), but noted here so a future session isn't
+  confused by it.
+- `.constellation-screen__detail`'s border was left alone despite being a "default
+  border" match — it's the one case that genuinely needed a background LIGHTER than its
+  own modal parent's `--panel` to read as distinct, and as a single low-traffic nested
+  detail box (not a repeated list-of-cards), didn't seem worth introducing a whole new
+  `--panel-raised` CSS variable for.
