@@ -719,6 +719,21 @@ describe('importSave', () => {
   });
 });
 
+describe('dismissMilestoneScreen (Sprint 10 task 3)', () => {
+  beforeEach(() => {
+    useGameStore.setState(createInitialState());
+  });
+
+  it('latches economyFlags.milestoneScreenDismissed permanently', () => {
+    expect(useGameStore.getState().economyFlags.milestoneScreenDismissed).toBeUndefined();
+    useGameStore.getState().dismissMilestoneScreen();
+    expect(useGameStore.getState().economyFlags.milestoneScreenDismissed).toBe(true);
+    // Idempotent: calling it again is a no-op, not an error.
+    useGameStore.getState().dismissMilestoneScreen();
+    expect(useGameStore.getState().economyFlags.milestoneScreenDismissed).toBe(true);
+  });
+});
+
 // in-memory state right after the key was cleared, before the reloaded page ever reads
 // it. Placed last in this file: hardResetSave permanently flips a module-level guard
 // with no reset hook (mirroring what only a real page reload undoes in production), so

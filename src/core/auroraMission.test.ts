@@ -5,6 +5,7 @@ import {
   applyCompletedAuroraWeather,
   buildingForPad,
   emptyPadMissionState,
+  hasAuroraIISuccess,
   launchAuroraMission,
   maybeAutoQueueAuroraStage,
   nextAuroraStageId,
@@ -35,6 +36,22 @@ function fundedState() {
   state.resources.propellant.cap = 2000;
   return state;
 }
+
+// UI_SPEC §3 screen 8 (Sprint 10 task 3): the v1 milestone screen's trigger condition.
+describe('hasAuroraIISuccess', () => {
+  it('is false with no launches, or an auroraI success only', () => {
+    expect(hasAuroraIISuccess([])).toBe(false);
+    const auroraI: LaunchRecord = { id: 'l0', padId: 'padA', missionType: 'auroraI', success: true, timestamp: 0 };
+    expect(hasAuroraIISuccess([auroraI])).toBe(false);
+  });
+
+  it('is false for a failed auroraII attempt, true once one succeeds', () => {
+    const failed: LaunchRecord = { id: 'l1', padId: 'padA', missionType: 'auroraII', success: false, timestamp: 0 };
+    expect(hasAuroraIISuccess([failed])).toBe(false);
+    const success: LaunchRecord = { id: 'l2', padId: 'padA', missionType: 'auroraII', success: true, timestamp: 1 };
+    expect(hasAuroraIISuccess([failed, success])).toBe(true);
+  });
+});
 
 describe('nextAuroraStageId', () => {
   it('starts with structure and ends at null once all 8 are done', () => {

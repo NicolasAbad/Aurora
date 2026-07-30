@@ -515,6 +515,9 @@ export interface GameActions {
   /** No-ops until the pad's checklist has committed a roll (rule 12). Resolves the
    * already-decided outcome and resets the pad either way. */
   launchAurora: (padId: PadId) => void;
+  /** UI_SPEC §3 screen 8: dismisses the one-time v1 milestone screen. Idempotent —
+   * latches `economyFlags.milestoneScreenDismissed` permanently, so it never shows again. */
+  dismissMilestoneScreen: () => void;
   /** Called once per animation frame by the game loop (see core/tick.ts + main.tsx).
    * `warp` (dev builds only, default 1) is the real caller passing a possibly-warped
    * multiplier — see `applyTick`'s implementation for why processes need it separately
@@ -880,6 +883,11 @@ export const useGameStore = create<Store>()((set, get) => ({
         telemetry: trackFirstOccurrence(state.telemetry, 'first_aurora_launch', { padId }),
       });
     }
+  },
+
+  dismissMilestoneScreen: () => {
+    const state = get();
+    set({ economyFlags: { ...state.economyFlags, milestoneScreenDismissed: true } });
   },
 
   applyTick: (deltaMs, warp = 1) => {

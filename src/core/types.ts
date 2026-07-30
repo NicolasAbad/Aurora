@@ -252,6 +252,11 @@ export interface MissionState {
 
 export interface EconomyFlags {
   payrollUnpaid: boolean; // GDD §1b insolvency state, drives UI banner
+  // Sprint 10 task 3 (UI_SPEC §3 screen 8): the v1 milestone screen fires once, on
+  // Aurora II's first success, and never again — this is that latch. Additive optional
+  // (rule 5, no migration): absent/false means "not yet dismissed," which is also correct
+  // for every pre-existing save (nobody could have dismissed a screen that didn't exist).
+  milestoneScreenDismissed?: boolean;
 }
 
 // ECONOMY §6: only Probe-1 has certification content in v1 (Sprint 5); Orbital-1 is

@@ -1,6 +1,8 @@
 # ECONOMY_MODEL.md — Aurora Program — Complete baseline numbers
 *Every value in the game. Claude Code does NOT invent numbers: if a value isn't here, ask and add it here first. Tick = 1 second (logical economy rate; the render loop is delta-based per CLAUDE.md rule 6). Baseline for the Sprint-0 headless simulator (`sim/run.ts`); adjust only via the simulator, updating this file.*
 
+**v4.0 changes (Sprint 10 wrap-up):** satellite-era Flight Data share flagged at 81-85% vs the 20-35% target once Aurora II's repeatable, non-decaying reward is live — target predates Aurora II; framed for Sprint 11's balance pass as "redefine the metric vs. fix the economy," not assumed broken. See SPRINTS Sprint 11 for the full framing.
+
 **v3.9 changes (Sprint 10 design questions):** §7 restructured — Aurora II confirmed to reuse Aurora I's mechanics wholesale, no separate values; `orbitalFlight` tech gates the SECOND orbital attempt onward, NOT Aurora I's own launch (the doc's old wording was simply wrong — shipped, tested Sprint 7 behavior is authoritative); "Parallel integration" XP node clarified as auto-chaining stages with no dead time between them, not literal concurrent timers (VAB stages keep real prerequisite order).
 
 **v3.8 changes (owner design proposal — emotional payoff for staff growth):** new building-expansion milestone rule (§4c) — every 10 levels, a slotted building gains +1 slot per role it already employs, universal and automatic, coexisting with the already-shipped specific slot upgrades. **SCOPED UNLOCK — full sim sweep required.**

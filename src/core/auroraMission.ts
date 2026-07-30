@@ -82,6 +82,13 @@ export function hasAuroraISuccess(launches: LaunchRecord[]): boolean {
   return launches.some((l) => l.missionType === 'auroraI' && l.success);
 }
 
+/** UI_SPEC §3 screen 8 (v1 milestone screen): whether Aurora II has ever succeeded —
+ * the screen's one-time trigger condition (paired with EconomyFlags.milestoneScreenDismissed
+ * so it only ever fires once). */
+export function hasAuroraIISuccess(launches: LaunchRecord[]): boolean {
+  return launches.some((l) => l.missionType === 'auroraII' && l.success);
+}
+
 function rocketStatusAfterStarting(stageId: AuroraStageId): PadMissionState['rocketStatus'] {
   if ((VAB_STAGE_IDS as string[]).includes(stageId)) return 'integrating';
   if (stageId === 'padTransfer') return 'transferring';

@@ -169,6 +169,10 @@ export const NARRATIVE_TEXT: Record<string, string> = {
   // only ever happen once, wrong the moment a second orbital attempt (Aurora II) is real.
   'T-27': 'Aurora II is flying.',
   'T-28': 'Rewards: +250 Flight XP, +60 Reputation, +2,000 Flight Data.',
+  // §9 (Sprint 10 task 3, NEW) — ui/MilestoneScreen.tsx's crewed-mission teaser line
+  // (UI_SPEC §3 screen 8).
+  'T-29':
+    'The next chapter — crewed missions, the Moon, a station in orbit — is still ahead. For now: the program you built got something into space, on purpose, more than once.',
 };
 
 /** Resolves an ID to its text, filling any `{name}` placeholders (T-10's open-slot

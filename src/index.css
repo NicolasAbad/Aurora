@@ -763,6 +763,88 @@ body {
   cursor: pointer;
 }
 
+/* UI_SPEC §3 screen 8 (Sprint 10 task 3): the v1 milestone screen — same backdrop+panel
+ * shape as .away-modal, sized for richer content (run summary + narrative + teaser) and a
+ * higher z-index so it stacks above (never alongside — see MilestoneScreen.tsx's own
+ * awayModalShowing guard) the away-modal it can follow directly on an offline catch-up. */
+.milestone-screen-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 110;
+}
+
+.milestone-screen {
+  background: var(--panel);
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  padding: 28px;
+  max-width: 520px;
+  max-height: 85vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.milestone-screen__badge {
+  align-self: flex-start;
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.milestone-screen__narrative,
+.milestone-screen__teaser {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.milestone-screen__stats {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.milestone-screen__section-title {
+  font-size: 0.8em;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.milestone-screen__records {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.9em;
+}
+
+.milestone-screen button {
+  align-self: flex-start;
+  background: var(--accent);
+  color: #1a1200;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 16px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 /* UI_SPEC §2 / §3.4: collapsible bottom panel, last entry always visible as one
  * italic line. */
 .mission-log {

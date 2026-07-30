@@ -12,6 +12,7 @@ import { ResearchPanel } from './ui/ResearchPanel';
 import { FlightXpPanel } from './ui/FlightXpPanel';
 import { PayrollBanner } from './ui/PayrollBanner';
 import { AwayModal } from './ui/AwayModal';
+import { MilestoneScreen } from './ui/MilestoneScreen';
 import { ActiveProcessStrip } from './ui/ActiveProcessStrip';
 import { StaffAvailabilityChip } from './ui/StaffAvailabilityChip';
 import { CertificationPanel } from './ui/CertificationPanel';
@@ -388,6 +389,7 @@ export function App() {
   return (
     <div className="app">
       <AwayModal />
+      <MilestoneScreen />
       <TierChangeToast />
       <MilestoneCallout />
       <EventCard />
