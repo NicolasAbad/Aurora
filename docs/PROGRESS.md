@@ -2733,3 +2733,120 @@ new slots empty would see a staffing-ratio dip, which neither bot ever does.
   LOGIC itself is unit-tested directly (`ftue.test.ts`, 2 new cases) and the rendering
   mechanism is unchanged/already-proven (same `GlobalFtueTooltip` that correctly rendered
   T-01 in the same pass).
+
+## Sprint 10 — XP trees & orbital mission — COMPLETE (2026-07-29)
+
+All 3 SPRINTS.md tasks done, verified through the integrated path. Task 2 was blocked
+mid-sprint on three genuine design gaps (Aurora II's own mechanics, what `orbitalFlight`
+actually gates, "Parallel integration"'s literal meaning) — exported as an explicit
+question set rather than guessed at (commit `2fd9827`); the owner answered all three in
+one pass, ECONOMY_MODEL bumped to v3.9 (§7 restructured to cover Aurora I and II
+together), and task 2 + the rest of task 1 (Parallel integration itself) resumed from
+there. Task 3 was similarly blocked on a real UI_SPEC gap (no spec existed anywhere for
+"the v1 milestone screen") until the owner added UI_SPEC §3 screen 8 mid-sprint.
+
+### Task 1: Flight Experience trees (ECONOMY §9)
+
+All 10 XP-tree nodes across 4 branches (Propulsion, Operations, Organization, Prestige).
+8 register declarative Modifiers through the existing registry (rule 4); Partial
+reusability is dedicated logic (20% propellant credited back at spend, no modifier target
+fits "refund some of what was just paid"). Tracking Station's own "+25% Flight XP per
+level" (documented since the building shipped) was never wired to any grant site until
+now — same "described but unwired" gap class as prior sprints' Test Stand leveling fix.
+New top-level "Flight XP" tab reuses Research's Design B lane layout verbatim (judgment
+call, not a new design decision — documented in UI_SPEC v3.5, since compressed away, see
+its own changelog note). `sim/run.ts` updated to match (`grantFlightXp` helper).
+
+### Task 2: Aurora II, orbitalFlight gate, Parallel integration (ECONOMY §7/§9 v3.9)
+
+Aurora II reuses Aurora I's mechanics wholesale — same 5 VAB stages, costs, durations,
+checklist, reward values, no new numbers. `missionType` tags the first-ever successful
+orbital launch `'auroraI'`, every one after `'auroraII'` (was hardcoded to `'auroraI'`
+always — a real bug, just invisible until Aurora II could exist). `orbitalFlight` tech
+gates the SECOND orbital attempt onward, never Aurora I's own launch — the doc's old
+wording was simply wrong; the shipped Sprint 7 behavior (gated on Flight program tech +
+VAB only) was already correct and stays untouched. Parallel integration turned out to be
+mechanically identical to the research tree's own `vabQueues` node (auto-chain VAB
+stages, no dead time) — `maybeAutoQueueAuroraStage` now ORs both gates, a second
+currency route to the same effect rather than a second mechanic.
+
+`sim/run.ts` had the exact same wrong orbitalFlight-gates-Aurora-I bug the doc did —
+fixed alongside it; zero effect on days-to-Aurora-I for any profile (the wrong gate never
+actually bound in practice for this seed/config) but a real correctness fix regardless.
+Sim now simulates Aurora II as repeatable post-Aurora-I content and reports "Days to
+Aurora II" alongside the existing table.
+
+**Two real bugs found beyond the three design questions, both fixed:**
+- Pre-existing `tsc -b` failure in `FlightXpPanel.tsx` (confirmed via `git stash` to
+  already be broken on HEAD before this session touched anything) — a TypeScript
+  aliased-condition-narrowing false positive (`!canBuy || state === 'pending-design'`,
+  where `canBuy`'s own definition ties it to `state === 'available'`), fixed by
+  reordering the condition.
+- Playwright verification caught `LaunchSequencePanel`'s `ResultCard` hardcoding "Aurora
+  I is flying" / "First orbit" for every successful launch — harmless while Aurora I
+  could only ever happen once, wrong the instant Aurora II became real. New T-27/T-28
+  (NARRATIVE_EVENTS.md §9) branch the result screen on `missionType`.
+
+**Economy finding, flagged not retuned (economy lock):** satellite-era Flight Data share
+jumps to 81-85% against the 20-35% target once Aurora II's repeatable, non-decaying
+reward is live — direct, expected consequence of "no new numbers, reused wholesale," not
+a sim or code bug. The 20-35% target predates Aurora II existing at all. Framed for
+Sprint 11's balance pass (ECONOMY_MODEL v4.0, SPRINTS.md's own Sprint 11 entry, both
+owner-authored): is this a metric that needs redefining (scope it to the pre-Aurora-II
+arc) or a real economy problem (give repeat Aurora II launches diminishing returns)?
+Answer with data at that pass, not assumption now.
+
+### Task 3: v1 milestone screen (UI_SPEC §3 screen 8, new)
+
+Fires once, on Aurora II's first success (same moment N-16 fires) — full-screen,
+dismissible, never shown again. Explicitly NOT a game-over: contracts, XP nodes, and
+repeat launches all stay fully playable after dismissal, per GDD §0's no-reset-prestige
+pillar; copy and framing avoid anything reading as closing credits. Content is entirely
+real, doc-sourced text (N-16's narrative beat + T-29's crewed-mission teaser, both from
+NARRATIVE_EVENTS.md) plus a factual run summary (successful launches by type, Program
+Records earned, play time, total Funding raised) — no invented flavor copy anywhere on
+the screen. "Play time" reuses the existing `first_pitch` telemetry event as a "game
+started at" timestamp rather than adding a new schema field just for one stat; absent on
+a save with no telemetry history (pre-dates telemetry), the line is simply omitted rather
+than showing a wrong number. New `economyFlags.milestoneScreenDismissed?: boolean`
+latches the one-time trigger — additive optional (rule 5, no migration needed; absent
+means "not yet dismissed," correct for every pre-existing save since nobody could have
+dismissed a screen that didn't exist yet).
+
+**Playwright verification found a real testing-methodology trap, not a product bug,**
+worth recording for future sessions: `context.addInitScript()` re-fires on every
+navigation within that context — a reload of the same page, or even a second page's own
+first load — which was silently re-seeding the original injected save right back over
+whatever had since been live-autosaved, and looked exactly like a real persistence bug
+(the dismissed flag reverting after "reload"). Confirmed via direct instrumentation of
+the boot path that `loadGame`/`computeBootOffline`/`saveGame` were correct throughout;
+switching to page-scoped `addInitScript` (and checking via a fresh page rather than a
+reload for the "survives closing the tab" case, since page-scoped init scripts *also*
+re-fire on that same page's own reload) fixed the test, not the product.
+
+### Verification
+
+- 515 tests passing (up from 502 at Sprint 9.5's close). Typecheck (`tsc -b`), lint, and
+  production build all clean.
+- `npm run sim` (seed 42, 30 days) re-run after the orbitalFlight fix: Aurora I pacing
+  identical across all three profiles to the last reported baseline (optimal day 3, human
+  day 6, casual day 13) — the removed incorrect gate never actually bound. Pacing floor:
+  PASS (human day 6).
+- Playwright, through a real browser (scratchpad-only Chromium install per CLAUDE.md rule
+  11, never a project dependency): task 2's Parallel-integration purchase flow and the
+  orbitalFlight gate message in both states (9 checks); task 3's milestone screen full
+  render (narrative text, run summary, records list, teaser, dismiss, and persistence
+  across a fresh page) (11 checks). Zero console errors across both passes. Two real bugs
+  found this way (ResultCard's hardcoded Aurora I text; the addInitScript testing trap
+  above) — both diagnosed to a root cause before concluding anything, not patched blind.
+
+### Scope notes
+
+- Task 1's XP node purchases aren't modeled in `sim/run.ts` at all (the bot never spends
+  Flight XP) — consistent with the sim's own documented pattern of not modeling every
+  optional upgrade; Parallel integration's OR-gate with `vabQueues` is therefore moot for
+  the sim specifically, not a gap.
+- NARRATIVE_EVENTS.md's own copy currently lags the repo for T-26/27/28 and all of §12
+  (the owner's working copy predates those Sprint 10 additions) — confirmed intentional
+  by the owner, syncs at their next regeneration, no action taken here per their explicit
+  instruction.
