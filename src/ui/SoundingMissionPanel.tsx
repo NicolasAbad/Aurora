@@ -11,6 +11,7 @@ import { narrativeText } from '../data/narrative';
 import { formatDuration, formatPercent } from '../core/format';
 import { CostLabel } from './CostLabel';
 import { useNow } from './useNow';
+import { WeatherRadarSweep } from './WeatherRadarSweep';
 import type { LaunchRecord, Process, SoundingChecklistItemId } from '../core/types';
 
 function findProcess(processes: Process[], kind: 'integration' | 'weather_window'): Process | undefined {
@@ -31,14 +32,18 @@ interface ChecklistRowProps {
   done: boolean;
   process?: Process;
   children?: React.ReactNode;
+  // UI_SPEC screen 4 (Sprint 10.5, cheap win): the weather-window item gets the radar
+  // sweep instead of the generic progress ring every other checklist item still uses —
+  // same swap LaunchSequencePanel's own ChecklistRow makes.
+  radar?: boolean;
 }
 
-function ChecklistRow({ label, done, process, children }: ChecklistRowProps) {
+function ChecklistRow({ label, done, process, children, radar }: ChecklistRowProps) {
   return (
     <div className={`checklist-row ${done ? 'checklist-row--done' : ''}`}>
       <span className="checklist-row__mark">{done ? '✓' : '○'}</span>
       <span className="checklist-row__label">{label}</span>
-      {!done && process && <ChecklistRing process={process} />}
+      {!done && process && (radar ? <WeatherRadarSweep process={process} /> : <ChecklistRing process={process} />)}
       {!done && !process && children}
     </div>
   );
@@ -197,7 +202,13 @@ function InFlightMission() {
           }
           if (item === 'weatherWindow') {
             return (
-              <ChecklistRow key={item} label={CHECKLIST_LABELS[item]} done={mission.checklist.weatherWindow} process={weatherProcess}>
+              <ChecklistRow
+                key={item}
+                label={CHECKLIST_LABELS[item]}
+                done={mission.checklist.weatherWindow}
+                process={weatherProcess}
+                radar
+              >
                 {!weatherProcess && (
                   <button type="button" className="upgrade-button" onClick={startWeatherCheck}>
                     Check weather

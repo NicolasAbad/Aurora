@@ -21,6 +21,7 @@ import {
 } from '../core/staff';
 import { upgradeDeltaPreview } from '../core/upgradePreview';
 import type { BuildingId, ResourceId, RoleId } from '../core/types';
+import { BuildingIcon } from './BuildingIcon';
 import { CostLabel } from './CostLabel';
 
 interface BuildingTileProps {
@@ -64,7 +65,10 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
   return (
     <div className="building-tile">
       <div className="building-tile__header">
-        <span className="building-tile__name">{def.name}</span>
+        <span className="building-tile__title">
+          <BuildingIcon buildingId={buildingId} />
+          <span className="building-tile__name">{def.name}</span>
+        </span>
         {!isLocked && <span className="building-tile__level">Level {level}</span>}
       </div>
 

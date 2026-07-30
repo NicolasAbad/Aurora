@@ -51,6 +51,43 @@ body {
   padding: 4px;
 }
 
+/* UI_SPEC §2i (Sprint 10.5, NEW): Constellation View's ticker-area icon+count, only
+ * rendered once at least one satellite dot exists. Sits left of the settings gear. */
+.ticker__constellation-button {
+  position: absolute;
+  top: 8px;
+  right: 44px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 0.85em;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.ticker__constellation-button:hover {
+  color: var(--text);
+}
+
+.ticker__constellation-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.ticker__constellation-icon circle {
+  fill: var(--accent);
+}
+
+.ticker__constellation-icon path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.2;
+}
+
 .ticker__settings-button:hover {
   color: var(--text);
 }
@@ -96,12 +133,20 @@ body {
  * near the ticker, no dismiss button. */
 .current-directive {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  justify-content: space-between;
   gap: 8px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
   padding: 8px 16px;
   font-size: 0.9em;
+}
+
+.current-directive__body {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
 }
 
 .current-directive__label {
@@ -318,6 +363,12 @@ body {
 .building-tile__header {
   display: flex;
   justify-content: space-between;
+  gap: 8px;
+}
+
+.building-tile__title {
+  display: flex;
+  align-items: center;
   gap: 8px;
 }
 
@@ -582,6 +633,35 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* SPRINTS.md Sprint 10.5 (cheap win): role silhouette icon beside the label. */
+.staff-panel__role-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.role-icon {
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.role-icon--technician {
+  fill: var(--accent);
+}
+
+.role-icon--engineer {
+  fill: #5b8def;
+}
+
+.role-icon--scientist {
+  fill: #6fcf6f;
+}
+
+.role-icon--controller {
+  fill: #4fd1c5;
 }
 
 .staff-panel__row button {
@@ -898,6 +978,34 @@ body {
   margin: 0;
   font-size: 0.9em;
   color: var(--text-dim);
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.mission-log__last-entry-text {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* SPRINTS.md Sprint 10.5 (cheap win): Mission Log category icon badges. */
+.mission-log-icon {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  margin-top: 0.15em;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.mission-log-icon--star {
+  fill: var(--accent);
+  stroke: none;
 }
 
 .dev-tools-row {
@@ -1300,6 +1408,54 @@ body {
   gap: 8px;
 }
 
+/* UI_SPEC screen 4 (Sprint 10.5, cheap win): weather-window radar sweep, replacing the
+ * bare countdown ring for that one checklist item. */
+.weather-radar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.weather-radar__scope {
+  width: 34px;
+  height: 34px;
+}
+
+.weather-radar__ring {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.weather-radar__crosshair {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.weather-radar__sweep {
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  transform-origin: 20px 20px;
+  animation: weather-radar-spin 2.4s linear infinite;
+}
+
+@keyframes weather-radar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.weather-radar__time {
+  font-size: 0.65em;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+
+:root[data-reduced-motion='true'] .weather-radar__sweep {
+  animation: none;
+}
+
 .checklist-row {
   display: flex;
   align-items: center;
@@ -1452,17 +1608,253 @@ body {
   stroke-width: 1;
 }
 
-.confidence-breakdown__toggle {
+/* UI_SPEC §2 building-tile rule (Sprint 10.5, NEW): one consistent line icon per
+ * building — same geometric-blueprint stroke language as .rocket-blueprint__part,
+ * reused everywhere a building appears (tile header, Site Map pictogram). */
+.building-icon {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+/* UI_SPEC screen 4 (Sprint 10.5, NEW): Confidence Dial — a blueprint-style radial gauge
+ * replacing the plain percentage readout; tapping it still opens the numeric breakdown
+ * below (.confidence-breakdown__terms, unchanged). */
+/* UI_SPEC §2h amended (Sprint 10.5, NEW): Program Site Map — thumbnail lives inline with
+ * Current Directive; tap expands to the full-screen dialog below. Plot sizing differs
+ * between the two contexts via the differing wrapper class, same grid markup either way
+ * (SiteMap.tsx's SiteMapGrid). */
+.site-map__thumbnail {
+  flex: none;
   background: none;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  color: var(--text);
-  font: inherit;
-  font-weight: 600;
-  padding: 8px 12px;
+  border: none;
+  padding: 0;
   cursor: pointer;
-  text-align: left;
+}
+
+.site-map__grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.site-map__row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.site-map__row-label {
+  width: 70px;
+  flex: none;
+  font-size: 0.75em;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.site-map__row-plots {
+  display: flex;
+  gap: 3px;
+}
+
+.site-map__plot {
+  border: 1px dashed var(--border);
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.site-map__plot--built {
+  border-style: solid;
+  border-color: var(--accent);
+  animation: site-map-fade-in 0.6s ease;
+}
+
+.site-map__plot-label {
+  display: none;
+}
+
+@keyframes site-map-fade-in {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Thumbnail context: tiny plots, no labels. */
+.site-map__thumbnail .site-map__plot {
+  width: 9px;
+  height: 9px;
+}
+
+.site-map__thumbnail .site-map__plot .building-icon {
   width: 100%;
+  height: 100%;
+}
+
+.site-map-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 250;
+}
+
+.site-map-screen {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 20px 24px;
+  width: 100%;
+  max-width: 560px;
+  max-height: 85vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.site-map-screen__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.site-map-screen__header h2 {
+  margin: 0;
+}
+
+.site-map-screen__header button {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.3em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.site-map-screen__header button:hover {
+  color: var(--text);
+}
+
+/* Full-screen context: larger plots, building-name labels below each. */
+.site-map-screen .site-map__row {
+  align-items: flex-start;
+}
+
+.site-map-screen .site-map__plot {
+  width: 44px;
+  height: 44px;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.site-map-screen .site-map__plot .building-icon {
+  width: 26px;
+  height: 26px;
+}
+
+.site-map-screen .site-map__plot-label {
+  display: block;
+  position: static;
+  font-size: 0.6em;
+  color: var(--text-dim);
+  text-align: center;
+  line-height: 1.1;
+  max-width: 60px;
+  white-space: normal;
+}
+
+:root[data-reduced-motion='true'] .site-map__plot--built {
+  animation: none;
+}
+
+.confidence-dial-button {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0 auto;
+  display: block;
+  width: 100%;
+  max-width: 220px;
+  cursor: pointer;
+}
+
+.confidence-dial {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.confidence-dial__track {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 8;
+  stroke-linecap: round;
+}
+
+.confidence-dial__segment {
+  fill: none;
+  stroke-width: 8;
+  stroke-linecap: butt;
+}
+
+.confidence-dial__segment--base {
+  stroke: var(--text-dim);
+}
+
+.confidence-dial__segment--certification {
+  stroke: var(--accent);
+}
+
+.confidence-dial__segment--flight-review {
+  stroke: var(--amber);
+}
+
+.confidence-dial__segment--controllers {
+  stroke: #4fd1c5;
+}
+
+.confidence-dial__segment--service-tower {
+  stroke: #5b8def;
+}
+
+.confidence-dial__segment--weather {
+  stroke: #6fcf6f;
+}
+
+.confidence-dial__segment--experience {
+  stroke: #b980e8;
+}
+
+.confidence-dial__needle {
+  stroke: var(--text);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.confidence-dial__hub {
+  fill: var(--text);
+}
+
+.confidence-dial__value {
+  fill: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .confidence-breakdown__terms {
@@ -1501,6 +1893,115 @@ body {
 .launch-result__detail {
   color: var(--text-dim);
   font-size: 0.9em;
+}
+
+/* UI_SPEC §2i (Sprint 10.5, NEW): Constellation View — same backdrop+panel shape as
+ * .settings-screen/.milestone-screen. */
+.constellation-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 260;
+}
+
+.constellation-screen {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 20px 24px;
+  width: 100%;
+  max-width: 480px;
+  max-height: 85vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.constellation-screen__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.constellation-screen__header h2 {
+  margin: 0;
+}
+
+.constellation-screen__header button {
+  background: none;
+  border: none;
+  color: var(--text-dim);
+  font-size: 1.3em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.constellation-screen__header button:hover {
+  color: var(--text);
+}
+
+.constellation-screen__empty {
+  color: var(--text-dim);
+  font-size: 0.9em;
+}
+
+.constellation-view {
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  margin: 0 auto;
+  display: block;
+}
+
+.constellation-view__earth {
+  fill: none;
+  stroke: var(--text-dim);
+  stroke-width: 1.5;
+}
+
+.constellation-view__earth-line {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.constellation-view__dot {
+  fill: var(--accent);
+  cursor: pointer;
+}
+
+.constellation-view__dot:focus {
+  outline: 1px solid var(--text);
+}
+
+.constellation-view__dot--selected {
+  fill: var(--amber);
+}
+
+.constellation-screen__count {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.85em;
+}
+
+.constellation-screen__detail {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 8px 12px;
+  text-align: center;
+}
+
+.constellation-screen__detail-title {
+  font-weight: 600;
+}
+
+.constellation-screen__detail-time {
+  color: var(--text-dim);
+  font-size: 0.85em;
 }
 
 /* UI_SPEC §6: Settings screen. */

@@ -14,6 +14,7 @@ import {
   totalStaffCap,
 } from '../core/staff';
 import { formatCostEntry, formatRate } from '../core/format';
+import { RoleIcon } from './RoleIcon';
 import type { RoleId } from '../core/types';
 
 /** UI_SPEC §4b: Release action per pool member — inline confirm (single tap + inline
@@ -108,7 +109,8 @@ export function StaffHiring() {
         return (
           <div key={role} className="staff-panel__row-group">
             <div className="staff-panel__row">
-              <span>
+              <span className="staff-panel__role-label">
+                <RoleIcon role={role} />
                 {ROLE_LABEL[role]} ({roleHired})
               </span>
               <span className="staff-panel__row-actions">

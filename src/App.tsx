@@ -18,6 +18,7 @@ import { StaffAvailabilityChip } from './ui/StaffAvailabilityChip';
 import { CertificationPanel } from './ui/CertificationPanel';
 import { SoundingMissionPanel } from './ui/SoundingMissionPanel';
 import { ContractsPanel } from './ui/ContractsPanel';
+import { ConstellationView } from './ui/ConstellationView';
 import { LaunchSequencePanel } from './ui/LaunchSequencePanel';
 import { MissionLog } from './ui/MissionLog';
 import { TimeWarpControl } from './ui/TimeWarpControl';
@@ -210,11 +211,13 @@ function LaunchPanel({
   onDismissTip,
   checklistTipDismissed,
   onDismissChecklistTip,
+  onOpenConstellation,
 }: ComplexPanelProps & {
   tipDismissed: boolean;
   onDismissTip: () => void;
   checklistTipDismissed: boolean;
   onDismissChecklistTip: () => void;
+  onOpenConstellation: () => void;
 }) {
   const vabLevel = useGameStore((s) => s.buildings.vab.level);
   // UI_SPEC §2b default: hidden until its own unlockCondition is met (not the teaser
@@ -229,6 +232,7 @@ function LaunchPanel({
   // the building reaches level 1) — reading the pad's presence, not the building's own
   // level, keeps this in lockstep with the one place that actually creates the pad slot.
   const padBExists = useGameStore((s) => s.mission.pads.padB !== undefined);
+  const trackingStationLevel = useGameStore((s) => s.buildings.trackingStation.level);
 
   return (
     <>
@@ -243,7 +247,19 @@ function LaunchPanel({
             for the orbital-mission XP multiplier) — not the "everything at once" problem
             Campus/Production had, but the same staged-reveal spirit applies: it appears
             once the VAB is built, the natural next-step moment. */}
-        {vabLevel >= 1 && <BuildingTile buildingId="trackingStation" />}
+        {vabLevel >= 1 && (
+          <BuildingTile buildingId="trackingStation">
+            {/* UI_SPEC §2i (Sprint 10.5): Constellation View's own access point — only
+                once the building itself is actually built (every pad-based launch
+                requires 'trackingActive' checked, so no satellite dot can exist before
+                this tile is built anyway). */}
+            {trackingStationLevel >= 1 && (
+              <button type="button" className="upgrade-button" onClick={onOpenConstellation}>
+                View Constellation
+              </button>
+            )}
+          </BuildingTile>
+        )}
         {launchPadBUnlocked && <BuildingTile buildingId="launchPadB" />}
       </div>
       {/* T-06 (NARRATIVE §2): "Launch checklist" is a screen-mount moment, not a
@@ -376,6 +392,7 @@ export function App() {
   const [dismissedTips, setDismissedTips] = useState<Set<string>>(new Set());
   const dismissTip = (id: string) => setDismissedTips((prev) => new Set(prev).add(id));
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [constellationOpen, setConstellationOpen] = useState(false);
 
   // UI_SPEC §7: "reduced-motion setting disables rolling numbers and pulses." Applied
   // as a root-level data attribute so index.css can override every animation in one
@@ -394,13 +411,14 @@ export function App() {
       <MilestoneCallout />
       <EventCard />
       {settingsOpen && <SettingsScreen onClose={() => setSettingsOpen(false)} />}
+      {constellationOpen && <ConstellationView onClose={() => setConstellationOpen(false)} />}
       {__DEV_TOOLS__ && (
         <div className="dev-tools-row">
           <TimeWarpControl />
           <DevResetButton />
         </div>
       )}
-      <Ticker onOpenSettings={() => setSettingsOpen(true)} />
+      <Ticker onOpenSettings={() => setSettingsOpen(true)} onOpenConstellation={() => setConstellationOpen(true)} />
       <CurrentDirective />
       <ActiveProcessStrip onSelectComplex={setActiveComplex} />
       <PayrollBanner />
@@ -425,6 +443,7 @@ export function App() {
             onDismissTip={() => dismissTip('T-17')}
             checklistTipDismissed={dismissedTips.has('T-06')}
             onDismissChecklistTip={() => dismissTip('T-06')}
+            onOpenConstellation={() => setConstellationOpen(true)}
           />
         )}
       </main>

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../state/persistStore';
+import { satelliteLaunches } from '../core/auroraMission';
 import { formatAmount, formatRate } from '../core/format';
 import { getResourceRatePerSecond } from '../core/selectors';
 import { BUILDINGS } from '../data/buildings';
@@ -41,13 +42,17 @@ interface TickerProps {
   // UI_SPEC §6: "Accessed from a gear icon in the ticker." Optional so existing tests
   // that render <Ticker /> without it (no Settings screen involved) keep working.
   onOpenSettings?: () => void;
+  // UI_SPEC §2i (Sprint 10.5): "a small persistent ticker-area icon+count once ≥1 dot
+  // exists." Same optional-prop pattern as onOpenSettings, for the same reason.
+  onOpenConstellation?: () => void;
 }
 
-export function Ticker({ onOpenSettings }: TickerProps = {}) {
+export function Ticker({ onOpenSettings, onOpenConstellation }: TickerProps = {}) {
   const resources = useGameStore(useShallow((s) => s.resources));
   const production = useGameStore(
     useShallow((s) => ({ buildings: s.buildings, staff: s.staff })),
   );
+  const satelliteCount = useGameStore((s) => satelliteLaunches(s.mission.launches).length);
   const [capHintFor, setCapHintFor] = useState<ResourceId | null>(null);
 
   const visiblePrimary = PRIMARY.filter(({ id }) => isRevealed(id, resources));
@@ -55,6 +60,23 @@ export function Ticker({ onOpenSettings }: TickerProps = {}) {
 
   return (
     <header className="ticker">
+      {onOpenConstellation && satelliteCount > 0 && (
+        <button
+          type="button"
+          className="ticker__constellation-button"
+          aria-label={`Constellation View: ${satelliteCount} successful mission${satelliteCount === 1 ? '' : 's'}`}
+          title="Constellation View"
+          onClick={onOpenConstellation}
+        >
+          <svg viewBox="0 0 24 24" className="ticker__constellation-icon" aria-hidden="true">
+            <circle cx="12" cy="17" r="1.4" />
+            <circle cx="6" cy="8" r="1.4" />
+            <circle cx="18" cy="6" r="1.4" />
+            <path d="M12 17 L6 8 M12 17 L18 6" />
+          </svg>
+          <span>{satelliteCount}</span>
+        </button>
+      )}
       {onOpenSettings && (
         <button
           type="button"

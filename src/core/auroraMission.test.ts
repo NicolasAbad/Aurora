@@ -11,6 +11,7 @@ import {
   nextAuroraStageId,
   resolveAuroraChecklist,
   resolveAuroraTick,
+  satelliteLaunches,
   startAuroraWeatherCheck,
   startNextAuroraStage,
 } from './auroraMission';
@@ -50,6 +51,27 @@ describe('hasAuroraIISuccess', () => {
     expect(hasAuroraIISuccess([failed])).toBe(false);
     const success: LaunchRecord = { id: 'l2', padId: 'padA', missionType: 'auroraII', success: true, timestamp: 1 };
     expect(hasAuroraIISuccess([failed, success])).toBe(true);
+  });
+});
+
+// UI_SPEC §2i (Sprint 10.5): the Constellation View's dot set — successful satellite
+// missions only, excluding sounding rockets and failures.
+describe('satelliteLaunches', () => {
+  it('includes successful auroraI/auroraII/contract launches, excludes failures and sounding rockets', () => {
+    const launches: LaunchRecord[] = [
+      { id: 'l0', padId: 'padA', missionType: 'auroraI', success: true, timestamp: 0 },
+      { id: 'l1', padId: 'padA', missionType: 'auroraII', success: true, timestamp: 1 },
+      { id: 'l2', padId: 'padB', missionType: 'contract', success: true, timestamp: 2, contractId: 'c1' },
+      { id: 'l3', padId: 'padA', missionType: 'auroraII', success: false, timestamp: 3 },
+      { id: 'l4', padId: null, missionType: 's1', success: true, timestamp: 4 },
+      { id: 'l5', padId: null, missionType: 's2', success: true, timestamp: 5 },
+      { id: 'l6', padId: null, missionType: 'staticFireTest', success: true, timestamp: 6 },
+    ];
+    expect(satelliteLaunches(launches).map((l) => l.id)).toEqual(['l0', 'l1', 'l2']);
+  });
+
+  it('is empty with no launches', () => {
+    expect(satelliteLaunches([])).toEqual([]);
   });
 });
 

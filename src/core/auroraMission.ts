@@ -89,6 +89,17 @@ export function hasAuroraIISuccess(launches: LaunchRecord[]): boolean {
   return launches.some((l) => l.missionType === 'auroraII' && l.success);
 }
 
+/** UI_SPEC §2i (Sprint 10.5, Constellation View, NEW): "one permanent dot per successful
+ * satellite" — Aurora I, Aurora II, and fulfilled contracts (every mission type that puts
+ * something in orbit). Sounding rockets (s1/s2/staticFireTest) are sub-orbital test
+ * flights, not satellites, and are excluded — same distinction GDD §6b draws between the
+ * pre-orbital loop and the real launch program. */
+export function satelliteLaunches(launches: LaunchRecord[]): LaunchRecord[] {
+  return launches.filter(
+    (l) => l.success && (l.missionType === 'auroraI' || l.missionType === 'auroraII' || l.missionType === 'contract'),
+  );
+}
+
 function rocketStatusAfterStarting(stageId: AuroraStageId): PadMissionState['rocketStatus'] {
   if ((VAB_STAGE_IDS as string[]).includes(stageId)) return 'integrating';
   if (stageId === 'padTransfer') return 'transferring';

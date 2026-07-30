@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../state/persistStore';
 import { missionLogBase } from '../data/narrative';
+import { categorizeLogLine } from '../core/missionLogCategory';
 import { RECORD_DEFS } from '../core/records';
+import { MissionLogIcon } from './MissionLogIcon';
 import type { RecordId } from '../core/types';
 
 // ECONOMY §8b's own table order (first ignition -> first flight -> Kármán -> orbit ->
@@ -71,7 +73,10 @@ export function MissionLog() {
         onClick={toggle}
         aria-expanded={expanded}
       >
-        <em>{feed[feed.length - 1]}</em>
+        <span className="mission-log__last-entry-text">
+          <MissionLogIcon category={categorizeLogLine(feed[feed.length - 1])} />
+          <em>{feed[feed.length - 1]}</em>
+        </span>
         {!expanded && unreadCount > 0 && <span className="mission-log__badge">{unreadCount}</span>}
       </button>
       {expanded && (
@@ -96,6 +101,7 @@ export function MissionLog() {
             <div className="mission-log__feed">
               {[...feed].reverse().map((text, i) => (
                 <p key={`${feed.length - i}-${text}`} className="mission-log__entry">
+                  <MissionLogIcon category={categorizeLogLine(text)} />
                   {text}
                 </p>
               ))}
