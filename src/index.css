@@ -357,8 +357,12 @@ body {
   flex: 1;
 }
 
+/* UI_SPEC §1d v3.6 (Sprint 11.5 anti-slop audit): dropped the default 1px gray border —
+ * the #1 slop tell (a bordered card as the default separator). background vs. the page's
+ * own --bg already carries a real lightness shift (~9.8% vs ~2.7%, well past the doc's
+ * 3-5% minimum), plus .campus-grid's own gap — whitespace-first separation, no border
+ * needed as a crutch. */
 .building-tile {
-  border: 1px solid var(--border);
   background: var(--panel);
   border-radius: 4px;
   padding: 16px;
@@ -631,8 +635,9 @@ body {
   cursor: not-allowed;
 }
 
+/* UI_SPEC §1d v3.6: same border-drop as .building-tile — background vs. page --bg
+ * already separates it, no default gray border needed. */
 .staff-panel {
-  border: 1px solid var(--border);
   background: var(--panel);
   border-radius: 4px;
   padding: 16px;
@@ -1312,10 +1317,10 @@ body {
   }
 }
 
+/* UI_SPEC §1d v3.6: same border-drop as .building-tile. */
 .research-detail {
   flex: 1;
   min-width: 220px;
-  border: 1px solid var(--border);
   background: var(--panel);
   border-radius: 4px;
   padding: 14px;
@@ -1365,8 +1370,10 @@ body {
   padding-bottom: 6px;
 }
 
+/* UI_SPEC §1d v3.6: same border-drop as .building-tile — also reused (despite the name)
+ * as a generic card by ContractsPanel/LaunchSequencePanel/SoundingMissionPanel, all
+ * sitting directly on the page background with no wrapping panel of their own. */
 .research-node {
-  border: 1px solid var(--border);
   background: var(--panel);
   border-radius: 4px;
   padding: 12px;
@@ -1511,11 +1518,16 @@ body {
   animation: none;
 }
 
+/* UI_SPEC §1d v3.6: dropped the default gray border in favor of a background tint (same
+ * reasoning as .building-tile). The done-state border stays — that one's genuine
+ * semantic state (UI_SPEC §1d's own named exception), not decoration; a transparent
+ * border on the base state reserves the same box size so it doesn't shift on completion. */
 .checklist-row {
   display: flex;
   align-items: center;
   gap: 10px;
-  border: 1px solid var(--border);
+  background: var(--panel);
+  border: 1px solid transparent;
   border-radius: 4px;
   padding: 8px 12px;
 }
@@ -2254,6 +2266,13 @@ body {
   align-items: center;
   gap: 8px;
   cursor: pointer;
+}
+
+/* UI_SPEC §1d v3.6 (Sprint 11.5 anti-slop audit): unstyled checkboxes render with the
+ * browser's native blue by default — a real, visible off-accent leak found by screenshot
+ * (signal orange is the one accent everywhere else on this screen). */
+.settings-toggle input[type='checkbox'] {
+  accent-color: var(--accent);
 }
 
 .settings-file-label {
