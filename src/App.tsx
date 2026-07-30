@@ -47,20 +47,27 @@ interface ComplexPanelProps {
  * a direct consequence of the player's last action." Steps 2-3 (Finance at 150 lifetime
  * Funding; Staff panel at Finance built) are naturally monotonic — lifetime Funding and
  * building levels never decrease in this game — so they're read live. Step 4 (Crew
- * Quarters + R&D Lab + Training Center, at the staff pool's first 2/2 — Sprint 9.5 moved
- * Training Center here from "visible at game start") is NOT monotonic once staff
- * dismissal (§4b) exists, so it's backed by the persisted `staffCapReachedOnce` latch,
- * OR'd with "already built" so a save from before this field existed never regresses. */
+ * Quarters + Training Center, at the staff pool's first 2/2 — Sprint 9.5 moved Training
+ * Center here from "visible at game start") is NOT monotonic once staff dismissal (§4b)
+ * exists, so it's backed by the persisted `staffCapReachedOnce` latch, OR'd with "already
+ * built" so a save from before this field existed never regresses. Step 5 (v3.6, Sprint
+ * 11.5 real fix): R&D Lab used to reveal alongside step 4, but it's useless until a
+ * Scientist exists, and Scientist requires the Classroom (ECONOMY §3 v4.1: promotion is
+ * the ONLY path now) — same "trap" pattern the idle-staff rules already guard against
+ * elsewhere. Moved to its own, later condition: Classroom purchased (OR R&D Lab already
+ * built, same regression-proofing as step 4's own latch). */
 function CampusPanel({ onSelectComplex }: ComplexPanelProps) {
   const lifetimeFunding = useGameStore((s) => s.resources.funding.lifetimeEarned);
   const financeLevel = useGameStore((s) => s.buildings.finance.level);
   const crewQuartersLevel = useGameStore((s) => s.buildings.crewQuarters.level);
+  const classroomBuilt = useGameStore((s) => s.buildings.crewQuarters.upgrades.includes('classroom'));
   const rndLabLevel = useGameStore((s) => s.buildings.rndLab.level);
   const staffCapReachedOnce = useGameStore((s) => s.staffCapReachedOnce);
 
   const financeRevealed = lifetimeFunding >= CAMPUS_FINANCE_REVEAL_FUNDING;
   const staffPanelRevealed = financeLevel >= 1;
-  const quartersAndLabRevealed = staffCapReachedOnce || crewQuartersLevel >= 1 || rndLabLevel >= 1;
+  const quartersRevealed = staffCapReachedOnce || crewQuartersLevel >= 1 || rndLabLevel >= 1;
+  const rndLabRevealed = classroomBuilt || rndLabLevel >= 1;
 
   return (
     <>
@@ -70,9 +77,9 @@ function CampusPanel({ onSelectComplex }: ComplexPanelProps) {
           <PitchButton />
         </BuildingTile>
         {financeRevealed && <BuildingTile buildingId="finance" />}
-        {quartersAndLabRevealed && <BuildingTile buildingId="rndLab" />}
-        {quartersAndLabRevealed && <BuildingTile buildingId="crewQuarters" />}
-        {quartersAndLabRevealed && <BuildingTile buildingId="trainingCenter" />}
+        {rndLabRevealed && <BuildingTile buildingId="rndLab" />}
+        {quartersRevealed && <BuildingTile buildingId="crewQuarters" />}
+        {quartersRevealed && <BuildingTile buildingId="trainingCenter" />}
         {staffPanelRevealed && <StaffHiring />}
         {staffPanelRevealed && <PromotionPanel />}
       </div>
