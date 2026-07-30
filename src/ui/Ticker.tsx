@@ -61,6 +61,9 @@ export function Ticker({ onOpenSettings, onOpenConstellation }: TickerProps = {}
   const production = useGameStore(
     useShallow((s) => ({ buildings: s.buildings, staff: s.staff })),
   );
+  // Funding's displayed rate must net out salary burn (ECONOMY §3c) — Team culture
+  // (salary.rate) and E-04 (salary.flat) are the only modifiers that ever target it.
+  const modifiers = useGameStore((s) => s.modifiers);
   const satelliteCount = useGameStore((s) => satelliteLaunches(s.mission.launches).length);
   const [capHintFor, setCapHintFor] = useState<ResourceId | null>(null);
 
@@ -100,7 +103,7 @@ export function Ticker({ onOpenSettings, onOpenConstellation }: TickerProps = {}
       <div className="ticker__row ticker__row--primary">
         {visiblePrimary.map(({ id, label }) => {
           const res = resources[id];
-          const rate = getResourceRatePerSecond(production, id);
+          const rate = getResourceRatePerSecond(production, id, modifiers, Date.now());
           const overCap = res.cap !== null && res.amount > res.cap;
           const nearCap = res.cap !== null && !overCap && res.amount / res.cap >= 0.9;
           const stateClass = overCap

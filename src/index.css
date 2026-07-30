@@ -643,14 +643,29 @@ body {
 
 .staff-panel__row {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
+  row-gap: 6px;
 }
 
+/* Sprint 11.5 real bug: at hired counts high enough to lengthen the Hire button's cost
+ * text, and especially once the release-confirm span (T-15's longer inline text + two
+ * buttons) replaces the plain Release button, this row's actions didn't fit the panel's
+ * own width — neither wrapped nor shrank, just overflowed straight past the panel edge,
+ * landing under whatever sat next to it (reported as "covered by an adjacent element")
+ * or fully off-screen on narrow viewports (reported as "uncancellable" — the Cancel
+ * button was rendered somewhere unreachable). `max-width: 100%` + `flex-wrap: wrap`
+ * keeps it inside the panel, wrapping onto its own line like the idle-flag/promotion
+ * hint below already do, instead of silently overflowing.
+ */
 .staff-panel__row-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   align-items: center;
   gap: 8px;
+  max-width: 100%;
 }
 
 /* SPRINTS.md Sprint 10.5 (cheap win): role silhouette icon beside the label. */
@@ -721,8 +736,11 @@ body {
 
 .staff-panel__release-confirm {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: 6px;
+  max-width: 100%;
   font-size: 0.8em;
   color: var(--amber);
 }
