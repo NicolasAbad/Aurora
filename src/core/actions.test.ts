@@ -108,7 +108,7 @@ describe('buyBuildingUpgrade', () => {
     state.resources.funding.amount = 10_000;
     state.resources.materials.amount = 10_000;
     const result = buyBuildingUpgrade(state.resources, state.buildings, 'warehouse');
-    expect(result!.resources.funding.cap).toBe(1000); // 500 base + 500 bonus
+    expect(result!.resources.funding.cap).toBe(1500); // 1000 base + 500 bonus
     expect(result!.resources.materials.cap).toBe(500); // 200 base + 300 bonus
   });
 
@@ -118,7 +118,7 @@ describe('buyBuildingUpgrade', () => {
     state.resources.materials.amount = 10_000;
     state.buildings.warehouse.upgrades = ['inventorySystem'];
     const result = buyBuildingUpgrade(state.resources, state.buildings, 'warehouse');
-    expect(result!.resources.funding.cap).toBe(1125); // 500 base + 500*1.25 bonus
+    expect(result!.resources.funding.cap).toBe(1625); // 1000 base + 500*1.25 bonus
     expect(result!.resources.materials.cap).toBe(575); // 200 base + 300*1.25 bonus
   });
 });

@@ -25,7 +25,7 @@ export function createInitialState(): GameState {
     lastSeenAt: Date.now(),
     staffCapReachedOnce: false,
     resources: {
-      funding: { amount: 0, cap: 500, lifetimeEarned: 0 },
+      funding: { amount: 0, cap: 1000, lifetimeEarned: 0 }, // ECONOMY §1 v4.1 (Sprint 11.5): raised 500 -> 1,000
       research: { amount: 0, cap: null, lifetimeEarned: 0 },
       materials: { amount: 0, cap: 200, lifetimeEarned: 0 },
       propellant: { amount: 0, cap: 0, lifetimeEarned: 0 }, // requires Propellant Depot

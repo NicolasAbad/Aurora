@@ -458,7 +458,8 @@ function createState(): SimState {
     },
     lifetimeFunding: 0,
     cap: {
-      funding: 500,
+      // ECONOMY §1 v4.1 (Sprint 11.5): raised 500 -> 1,000.
+      funding: 1000,
       materials: 200,
       hardware: 50,
       propellant: 0,

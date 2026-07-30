@@ -18,7 +18,7 @@ describe('App', () => {
   it('shows Funding 0 and the pitch button on first load', () => {
     render(<App />);
     expect(screen.getByText('Funding')).toBeDefined();
-    expect(screen.getByText(/^0 \/ 500$/)).toBeDefined();
+    expect(screen.getByText(/^0 \/ 1,000$/)).toBeDefined();
     expect(screen.getByRole('button', { name: /pitch investors/i })).toBeDefined();
   });
 
@@ -30,7 +30,7 @@ describe('App', () => {
     // (confirmed via the store directly), the DOM just takes a moment to catch up.
     expect(useGameStore.getState().resources.funding.amount).toBe(10);
     await waitFor(() => {
-      expect(screen.getByText(/^10 \/ 500$/)).toBeDefined();
+      expect(screen.getByText(/^10 \/ 1,000$/)).toBeDefined();
     });
   });
 });
