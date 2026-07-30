@@ -72,8 +72,23 @@ export const SAVE_KEY = 'aurora-program-save';
 const AUTOSAVE_INTERVAL_MS = 10_000;
 const AWAY_SUMMARY_THRESHOLD_MS = 5 * 60_000; // UI_SPEC §3: modal only when >5 min elapsed
 
+// Sprint 11 save-migration audit: a real gap found — `fromVersion` below defaults to 0
+// for any save with a missing/non-numeric `schemaVersion`, but `MIGRATIONS` has no `0`
+// key (no v0 shape has ever shipped; schemaVersion has been 1 since Sprint 0's first
+// commit), so `migrate()` throws and was previously caught SILENTLY, indistinguishable
+// from "no save existed" — a real save present on disk could be discarded with zero
+// indication anything went wrong. This flag lets the one production call site
+// (computeBootOffline, below) tell the two cases apart and surface a one-time warning
+// (never a silent wipe) instead. Reset at the start of every call so a later successful
+// load always clears a stale flag from an earlier one.
+let lastLoadWasCorrupted = false;
+export function wasLastLoadCorrupted(): boolean {
+  return lastLoadWasCorrupted;
+}
+
 /** Reads localStorage and returns a valid GameState, migrating or falling back as needed. */
 export function loadGame(): GameState {
+  lastLoadWasCorrupted = false;
   const raw = localStorage.getItem(SAVE_KEY);
   if (!raw) return createInitialState();
 
@@ -88,8 +103,10 @@ export function loadGame(): GameState {
     // dead entries forward indefinitely.
     return { ...state, modifiers: pruneExpiredModifiers(state.modifiers, Date.now()) };
   } catch {
-    // Corrupt save: never crash the app on load (Sprint 8 adds a user-facing import
-    // validation path for the Settings screen; this is the silent boot-time fallback).
+    // Corrupt/unreadable save: never crash the app on load (Sprint 8 adds a user-facing
+    // import validation path for the Settings screen; this is the silent-at-the-JSON-
+    // level boot-time fallback) — but no longer silent to the PLAYER, see the flag above.
+    lastLoadWasCorrupted = true;
     return createInitialState();
   }
 }
@@ -314,8 +331,13 @@ interface AwaySummaryStore {
 // OUTSIDE GameState/the main store deliberately: it's transient UI state for one modal,
 // not save data — if it lived on the Store object alongside GameState fields,
 // `saveGame(useGameStore.getState())` would serialize it into the save file.
-function computeBootOffline(): { initialState: GameState; awaySummary: AwaySummary | null } {
+function computeBootOffline(): {
+  initialState: GameState;
+  awaySummary: AwaySummary | null;
+  saveWasCorrupted: boolean;
+} {
   const loaded = loadGame();
+  const saveWasCorrupted = wasLastLoadCorrupted();
   const now = Date.now();
   // ECONOMY §5 / SPRINTS Sprint 4 acceptance: Remote Ops raises the offline cap via a
   // registered modifier ('offline.capMs', +6h) — queried against modifiers as they stood
@@ -440,7 +462,7 @@ function computeBootOffline(): { initialState: GameState; awaySummary: AwaySumma
         }
       : null;
 
-  return { initialState, awaySummary };
+  return { initialState, awaySummary, saveWasCorrupted };
 }
 
 const boot = computeBootOffline();
@@ -448,6 +470,19 @@ const boot = computeBootOffline();
 export const useAwaySummary = create<AwaySummaryStore>()((set) => ({
   summary: boot.awaySummary,
   dismiss: () => set({ summary: null }),
+}));
+
+// Sprint 11 save-migration audit: same "resolved once at boot, outside GameState" shape
+// as useAwaySummary above — a corrupted/unreadable save is rare (no genuine v0 shape has
+// ever shipped) but must never be a silent wipe, see loadGame()'s own header note.
+interface SaveWarningStore {
+  corrupted: boolean;
+  dismiss: () => void;
+}
+
+export const useSaveWarning = create<SaveWarningStore>()((set) => ({
+  corrupted: boot.saveWasCorrupted,
+  dismiss: () => set({ corrupted: false }),
 }));
 
 export interface GameActions {

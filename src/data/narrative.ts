@@ -173,6 +173,11 @@ export const NARRATIVE_TEXT: Record<string, string> = {
   // (UI_SPEC §3 screen 8).
   'T-29':
     'The next chapter — crewed missions, the Moon, a station in orbit — is still ahead. For now: the program you built got something into space, on purpose, more than once.',
+  // §9 (v4.0, Sprint 11, save-migration audit) — ui/SaveWarningBanner.tsx's one-time
+  // warning when boot found an unreadable save on disk (never silent — see
+  // state/persistStore.ts's loadGame()/wasLastLoadCorrupted() header notes).
+  'T-30':
+    "Your last save couldn't be read, so we're starting fresh. Sorry about that — exporting a save from Settings now and then is the best safety net.",
   // §13 (v4.0, Sprint 11) — contextual job titles, keyed by `${buildingId}.${role}` (no
   // separate ID column, same "id IS the key" reasoning as §8's research node descriptions
   // immediately above). launchPadB reuses launchPad's own title (ECONOMY §4: same

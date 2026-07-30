@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createInitialState } from '../data/initialState';
 import { launchAuroraMission, resolveAuroraChecklist } from '../core/auroraMission';
-import { hardResetSave, importSave, loadGame, saveGame, SAVE_KEY, useGameStore } from './persistStore';
+import { hardResetSave, importSave, loadGame, saveGame, SAVE_KEY, useGameStore, wasLastLoadCorrupted } from './persistStore';
 import { CURRENT_SCHEMA_VERSION } from './migrations';
 import { narrativeText } from '../data/narrative';
 import type { Process } from '../core/types';
@@ -85,7 +85,10 @@ describe('loadGame', () => {
     expect(loadGame().schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
   });
 
-  it('throws a clear error for an unmigratable future schema version', () => {
+  // v1 milestone screen used "throws a clear error" for its name but asserted
+  // not.toThrow() — a pre-existing misleading name, corrected while auditing this same
+  // file (Sprint 11 save-migration audit); behavior/assertion unchanged.
+  it('does not throw for an unmigratable future schema version — left as-is and returned', () => {
     const state = createInitialState();
     (state as unknown as { schemaVersion: number }).schemaVersion = CURRENT_SCHEMA_VERSION + 1;
     // A save from a newer version than this build knows about isn't "corrupt" — it's
@@ -94,6 +97,51 @@ describe('loadGame', () => {
     // migrate() only walks forward; a version ahead of CURRENT is left as-is here and
     // simply returned, matching "never crash the app on load".
     expect(() => loadGame()).not.toThrow();
+  });
+
+  // Sprint 11 save-migration audit: a real silent-data-loss bug found here — a save
+  // present on disk that fails to load (corrupt JSON, or valid JSON with a missing/
+  // invalid schemaVersion, which computes fromVersion=0 and has no migration registered)
+  // was previously indistinguishable from "no save ever existed." wasLastLoadCorrupted()
+  // is the fix: it flags the corrupted case so the boot path can warn instead of stay
+  // silent (ui/SaveWarningBanner.tsx, NARRATIVE T-30).
+  describe('wasLastLoadCorrupted', () => {
+    it('is false when nothing was saved (this is NOT corruption, just a fresh game)', () => {
+      loadGame();
+      expect(wasLastLoadCorrupted()).toBe(false);
+    });
+
+    it('is false after a normal successful load', () => {
+      saveGame(createInitialState());
+      loadGame();
+      expect(wasLastLoadCorrupted()).toBe(false);
+    });
+
+    it('is true after corrupt JSON, and the game still boots to a fresh state', () => {
+      localStorage.setItem(SAVE_KEY, '{not valid json');
+      const state = loadGame();
+      expect(wasLastLoadCorrupted()).toBe(true);
+      expect(state.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    });
+
+    it('is true for valid JSON with a missing schemaVersion (fromVersion 0 — no v0 shape has ever shipped)', () => {
+      localStorage.setItem(SAVE_KEY, JSON.stringify({ resources: { funding: { amount: 999 } } }));
+      const state = loadGame();
+      expect(wasLastLoadCorrupted()).toBe(true);
+      expect(state.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+      // Fresh state, not a half-migrated Frankenstate — funding is back to the real default.
+      expect(state.resources.funding.amount).toBe(0);
+    });
+
+    it('resets to false on the NEXT call after a corrupted one (does not leak across loads)', () => {
+      localStorage.setItem(SAVE_KEY, '{not valid json');
+      loadGame();
+      expect(wasLastLoadCorrupted()).toBe(true);
+
+      saveGame(createInitialState());
+      loadGame();
+      expect(wasLastLoadCorrupted()).toBe(false);
+    });
   });
 });
 

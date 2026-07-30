@@ -3,9 +3,12 @@
 
 **v4.0 changes (Sprint 11 — Polish):** new §13, contextual job titles — a short flavor
 title per (building, role) staff slot, shown as secondary text next to the mechanical
-role name (UI_SPEC §2 building-tile rule, presentation only). §12 is Flight Experience
-node descriptions (already live in code since Sprint 10 — see data/narrative.ts — still
-pending sync into this doc from the owner's side per Sprint 10's own note).
+role name (UI_SPEC §2 building-tile rule, presentation only). T-30 added — the
+save-migration audit found a real silent-data-loss bug (an unreadable save on disk was
+indistinguishable from "no save yet"); this is the one-time warning shown instead. §12 is
+Flight Experience node descriptions (already live in code since Sprint 10 — see
+data/narrative.ts — still pending sync into this doc from the owner's side per Sprint
+10's own note).
 
 **v3.9 changes (genre research + owner-selected new features):** T-24 (Confidence explainer, first time shown below 100%) and T-25 (first-orbital-attempt distinguishing beat before Aurora I's VAB work) added. New §11: Current Directive text table (UI_SPEC §2h) — a persistent, dynamic "what now" indicator addressing a recurring root-cause confusion pattern across multiple playtests.
 
@@ -137,6 +140,7 @@ Rules: **v2-only upgrades (Sound Suppression, Cryogenic Stand, Heavy Crane) are 
 | T-26 *(reserved)* | — | — |
 | T-27/T-28 | Aurora I vs Aurora II success result screens — added directly in-repo (Sprint 10, commit bc2b679) to fix a real bug where every orbital success showed Aurora I's text | *(text as shipped in NARRATIVE_EVENTS.md — not duplicated here; this doc's copy should be synced from the repo the next time it's regenerated)* |
 | T-29 | v1 milestone screen (UI_SPEC §3 screen 8), crewed-mission teaser line | "The next chapter — crewed missions, the Moon, a station in orbit — is still ahead. For now: the program you built got something into space, on purpose, more than once." |
+| T-30 | Sprint 11, save-migration audit: boot found a save on disk that couldn't be read (corrupt JSON or an unrecognized schema version) — a real save, not just "no save yet," so this must never be silent | "Your last save couldn't be read, so we're starting fresh. Sorry about that — exporting a save from Settings now and then is the best safety net." |
 
 ## 11. Current Directive text (persistent "what now" indicator, UI_SPEC §2h)
 Ordered roughly by when each becomes the active directive; the engine shows whichever is most relevant to current state. Claude Code may add intermediate directives as needed, following the same terse, action-first phrasing (a directive states the NEXT action, not a status report).

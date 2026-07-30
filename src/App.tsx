@@ -12,6 +12,7 @@ import { ResearchPanel } from './ui/ResearchPanel';
 import { FlightXpPanel } from './ui/FlightXpPanel';
 import { PayrollBanner } from './ui/PayrollBanner';
 import { AwayModal } from './ui/AwayModal';
+import { SaveWarningBanner } from './ui/SaveWarningBanner';
 import { MilestoneScreen } from './ui/MilestoneScreen';
 import { ActiveProcessStrip } from './ui/ActiveProcessStrip';
 import { StaffAvailabilityChip } from './ui/StaffAvailabilityChip';
@@ -423,6 +424,7 @@ export function App() {
         </div>
       )}
       <Ticker onOpenSettings={() => setSettingsOpen(true)} onOpenConstellation={() => setConstellationOpen(true)} />
+      <SaveWarningBanner />
       <CurrentDirective />
       <ActiveProcessStrip onSelectComplex={setActiveComplex} />
       <PayrollBanner />

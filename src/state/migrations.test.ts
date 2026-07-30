@@ -93,4 +93,34 @@ describe('migrate — v3 to v4 (Sprint 6: sounding-mission state)', () => {
     expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
     expect(migrated.mission.sounding).toBeNull();
   });
+
+  // Sprint 11 save-migration audit: only fromVersion 1 had a "walks multiple hops" test
+  // before this — fromVersion 2 (v2->v3->v4, two hops) was untested. Not a correctness
+  // gap (each step composes), but a real coverage gap: this is the exact path a real
+  // v2 save takes today.
+  it('walking from v2 (two hops: v2->v3->v4) lands on the current version with both migrations applied', () => {
+    const v2Save = { schemaVersion: 2, resources: { funding: { amount: 7 } } };
+    const migrated = migrate(v2Save, 2) as {
+      schemaVersion: number;
+      certifications: unknown;
+      mission: { sounding: unknown; soundingHalfDurationNext: unknown };
+    };
+    expect(migrated.schemaVersion).toBe(CURRENT_SCHEMA_VERSION);
+    expect(migrated.certifications).not.toBeUndefined();
+    expect(migrated.mission.sounding).toBeNull();
+    expect(migrated.mission.soundingHalfDurationNext).toEqual({});
+  });
+});
+
+// Sprint 11 save-migration audit: persistStore.ts's loadGame() computes fromVersion=0
+// for any save with a missing/non-numeric schemaVersion, but no v0 shape has ever
+// shipped (schemaVersion has been 1 since Sprint 0's first commit) — so MIGRATIONS has
+// no `0` key and this must throw, which loadGame()'s own catch block relies on to detect
+// "this save is unreadable" (see its wasLastLoadCorrupted() flag, tested in
+// persistStore.test.ts). Untested before this — a silent behavior change here (e.g. an
+// accidental no-op v0 migration added later) would have broken that detection invisibly.
+describe('migrate — fromVersion 0 (no v0 shape has ever shipped)', () => {
+  it('throws — there is no migration registered from 0', () => {
+    expect(() => migrate({ schemaVersion: undefined }, 0)).toThrow();
+  });
 });
