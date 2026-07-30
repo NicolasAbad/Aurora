@@ -73,7 +73,7 @@ Sprint 11's dedicated balance pass concluded the hiring-cost curve was fine, unc
 | Building | Base cost | Factor | Effect | Slots |
 |---|---|---|---|---|
 | Offices | upgrades: 100 F | 1.12 | Pitch yield per §2 formula (+5 Funding/pitch per level above lv1) | — |
-| Finance | 150 F | 1.14 | +2 Funding/s per level | 2 Tech |
+| Finance | 150 F (+40 M past lv20, +15 H past lv50 — v4.1 §4d) | 1.14 | +2 Funding/s per level | 2 Tech |
 | R&D Lab | 250 F | 1.14 | +0.03 Research/s per level | 2 Sci |
 | Crew Quarters | 120 F | 1.08 | +3 staff cap per level | — |
 | Training Center | — | — | LOCKED v1 (visible) | — |
@@ -82,7 +82,7 @@ Sprint 11's dedicated balance pass concluded the hiring-cost curve was fine, unc
 | Building | Base cost | Factor | Effect | Slots |
 |---|---|---|---|---|
 | Supply Depot | 200 F | 1.13 | +1.5 Materials/s per level | 2 Tech |
-| Fabrication | 350 F + 100 M | 1.15 | +0.3 Hardware/s per level. **Consumes 3 Materials per Hardware produced** (v4.1, Sprint 11.5 §3b resource-friction lever — was 2; UI must show this as its own line, not folded into the output line). Produces at current researched tier automatically. | 1 Eng + 1 Tech |
+| Fabrication | 350 F + 100 M (+25 H past lv15 — v4.1 §4d) | 1.15 | +0.3 Hardware/s per level. **Consumes 3 Materials per Hardware produced** (v4.1, Sprint 11.5 §3b resource-friction lever — was 2; UI must show this as its own line, not folded into the output line). Produces at current researched tier automatically. | 1 Eng + 1 Tech |
 | Refinery | 300 F + 80 M | 1.14 | +0.5 Propellant/s per level. **Consumes 1 Material per Propellant produced** (its own visible line, same rule as Fabrication). | 1 Eng |
 | Warehouse | 250 F + 50 M | 1.07 | +500 F / +300 M / +75 H cap per level | — |
 | Propellant Depot | 400 F + 120 M | 1.07 | +250 Propellant cap per level | — |
@@ -132,6 +132,10 @@ Milestone fires a one-time celebration (NARRATIVE §9, new entry) distinct from 
 
 ## 4d. Multi-resource costs at higher levels (Sprint 11.5 design goal — direction, not final numbers)
 Real finding: building upgrade costs stay single/dual-resource forever, never diversifying at higher levels — this understates a mature facility's real logistics (a level-50 Finance office needs more than just Funding to expand). Design goal: **past certain level thresholds, an upgrade's cost gains additional resource types** — e.g. a building might cost Funding-only through level ~20, add Materials from ~20-50, add Hardware past ~50, with exact thresholds and mixes varying per building (a Refinery's late costs might lean Materials-heavy, a Test Stand's might lean Hardware-heavy). This directly creates the late-game resource competition §3b asks for — a Finance upgrade competing with Fabrication for the same Materials is a real trade-off. Exact thresholds/mixes per building go through the propose-then-ratify process with a full sim sweep.
+
+**Resolved (Sprint 11.5), scoped to 2 buildings, not all 18** (real per-building variance per the doc's own guidance, not a uniform rule): **Finance** — Funding-only through level 20, +40 Materials past 20, +15 Hardware past 50 (the doc's own named example, close to verbatim). **Fabrication** — +25 Hardware past level 15 (no Materials threshold: it's already Materials-heavy from level 1, so Hardware is the meaningful THIRD resource, not a bigger second helping of what it already costs — "a factory eventually needs machinery built from what it produces"). `costAtLevel` (core/economy.ts) scales each threshold's `addCost` from the THRESHOLD's own level, not level 0 — an addCost scaled by the base cost's full compounding from level 0 would be nonsensical at a level-50 threshold (hundreds of times the declared amount); scaling from the threshold means the cost is exactly the declared amount right when first crossed, growing moderately (same costFactor) from there. Fully unit-tested (4 cases: below-threshold no-op, exactly-at-threshold unscaled, scaled-from-threshold, multiple-thresholds-stacking).
+
+sim/run.ts's normal profiles never reach level 20+ (a deliberate soft level-5 re-investment cap keeps them advancing through BUILD_PRIORITY instead of tunneling); the 'aggressive' profile (task 8) is exempted from that cap specifically so these thresholds would be sim-reachable. It confirmed a genuine, separate economic finding instead: run to 90 days, Finance plateaus at level 15 (never reaching the level-20 threshold) because its own upgrade cost (1,071F) exceeds the Funding cap — which stays pinned at the starting 1,000 forever, since this profile never builds Warehouse. Confirmed directly (Funding sits exactly at 1,000 from day 14 through day 89 in the CSV) — not a sim bug, a faithful reproduction of what a real player doing the same thing (Finance-only, no Warehouse) would actually hit. Left as-is rather than "fixed": it's a real, correct constraint the thresholds don't need to route around, and it doesn't affect the DOCUMENTED sanity rules (checked against the human profile, which does build Warehouse in its normal priority order and would cross these thresholds eventually in a long enough run).
 
 ## 5. Research tree v1 (cost in Research, real-time duration)
 Materials: **Aluminum alloys** (25 R, 5 min — *branch entry node: no production effect in v1; the Aluminum Hardware tier is available from the start with NO tech required. Its function is to gate Titanium and to be an early, affordable teaching node. Flavor: certifying aluminum stock for flight hardware*) → Titanium (400 R, 3 h)

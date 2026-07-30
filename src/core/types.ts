@@ -102,6 +102,13 @@ export interface BuildingDef {
   complex: ComplexId;
   baseCost: Partial<Record<ResourceId, number>>;
   costFactor: number | null; // null => one-time (non-leveled) building
+  // ECONOMY §4d v4.1 (Sprint 11.5): past `level`, the upgrade cost ALSO includes
+  // `addCost` (scaled by the same costFactor^level growth as baseCost) — a mature
+  // facility's real logistics understated by a cost that stays single/dual-resource
+  // forever. Sorted ascending by level is not required (core/economy.ts's costAtLevel
+  // sums every threshold whose `level` the CURRENT level has reached); absent = no
+  // thresholds, the exact pre-v4.1 behavior for every building that doesn't declare one.
+  costThresholds?: { level: number; addCost: Partial<Record<ResourceId, number>> }[];
   // UI_SPEC §4: "nothing purchasable... may be offered without plain-language copy
   // stating its effect." Plain mechanical fact transcribed from ECONOMY §4's Effect
   // column (same "plain data field, not narrative-ID-routed" pattern as

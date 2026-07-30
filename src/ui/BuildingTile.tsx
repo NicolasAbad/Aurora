@@ -86,7 +86,7 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
 
   const isOneTime = def.costFactor === null;
   const alreadyBuilt = isOneTime && level > 0;
-  const cost = costAtLevel(def.baseCost, def.costFactor, level);
+  const cost = costAtLevel(def.baseCost, def.costFactor, level, def.costThresholds);
   const costEntries = Object.entries(cost) as [ResourceId, number][];
   const canAfford = costEntries.every(([id, amount]) => resourceAmounts[id] >= amount);
 

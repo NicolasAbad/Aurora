@@ -31,6 +31,14 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     internalUpgrades: [
       { id: 'grantsDesk', name: 'Grants desk', cost: { funding: 350 }, narrativeId: 'U-10' },
     ],
+    // ECONOMY §4d v4.1 (Sprint 11.5): Funding-only through level 20, +Materials past 20,
+    // +Hardware past 50 — the doc's own named example. A mature Finance office needs more
+    // than money to keep expanding; also directly creates the late-game Materials
+    // competition §3b asks for (a Finance upgrade competing with Fabrication for it).
+    costThresholds: [
+      { level: 20, addCost: { materials: 40 } },
+      { level: 50, addCost: { hardware: 15 } },
+    ],
   },
   rndLab: {
     id: 'rndLab',
@@ -114,6 +122,11 @@ export const BUILDINGS: Record<BuildingId, BuildingDef> = {
     internalUpgrades: [
       { id: 'qaStation', name: 'QA station', cost: { funding: 600, materials: 100 }, narrativeId: 'U-15' },
     ],
+    // ECONOMY §4d v4.1 (Sprint 11.5): +Hardware past level 15 — a growing factory
+    // eventually needs machinery built from what it produces, and it's Materials-heavy
+    // already from level 1, so Hardware (not another Materials add) is the meaningful
+    // third resource here, per-building variance the doc's own guidance asks for.
+    costThresholds: [{ level: 15, addCost: { hardware: 25 } }],
   },
   refinery: {
     id: 'refinery',

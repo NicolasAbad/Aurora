@@ -781,6 +781,7 @@ function resolveConstruction(state: SimState, profile: Profile): void {
         BUILDINGS.crewQuarters.baseCost,
         BUILDINGS.crewQuarters.costFactor,
         state.buildingLevel.crewQuarters,
+        BUILDINGS.crewQuarters.costThresholds,
       );
       if (canAfford(state, cost)) {
         pay(state, cost);
@@ -802,9 +803,12 @@ function resolveConstruction(state: SimState, profile: Profile): void {
       // level, always cheaper than the next unbuilt item), and Funding never pools
       // toward big-ticket infrastructure like Test Stand (800F) or VAB (2000F). Capping
       // early re-investment lets priority genuinely advance down BUILD_PRIORITY.
-      if (def.costFactor !== null && level >= 5) continue;
+      // Exempted for 'aggressive' (ECONOMY §3d/§4d v4.1): tunnel-visioning on its one
+      // building IS the point, and task 9's costThresholds (level 20+/50+) need a profile
+      // that actually reaches those levels to be sim-verifiable at all.
+      if (def.costFactor !== null && level >= 5 && profile !== 'aggressive') continue;
 
-      const cost = costAtLevel(def.baseCost, def.costFactor, level);
+      const cost = costAtLevel(def.baseCost, def.costFactor, level, def.costThresholds);
       if (!canAfford(state, cost)) continue;
 
       pay(state, cost);
@@ -1601,6 +1605,15 @@ function printSummary({ profile, rows, state, outPath, seed, days }: SimulationR
     console.log(
       `  Next Tech->Engineer promotion: ${nextPromoCost} Funding = ${financeRate > 0 ? (nextPromoCost / financeRate).toFixed(1) : 'n/a'}s of Finance income`,
     );
+
+    // ECONOMY §4d v4.1 (Sprint 11.5 task 9): confirms the multi-resource cost thresholds
+    // are actually reachable and sane, not just unit-tested in isolation — this profile
+    // is exempted from the normal level-5 soft cap specifically so this is verifiable.
+    const financeLevel = state.buildingLevel.finance;
+    const financeCost = costAtLevel(BUILDINGS.finance.baseCost, BUILDINGS.finance.costFactor, financeLevel, BUILDINGS.finance.costThresholds);
+    console.log(`\nMulti-resource cost threshold check (ECONOMY §4d):`);
+    console.log(`  Finance level ${financeLevel} next-upgrade cost: ${JSON.stringify(financeCost)}`);
+    console.log(`  Crossed level-20 Materials threshold: ${financeLevel >= 20 ? 'yes' : `no (reached level ${financeLevel})`}`);
   }
 
   // Checkpoint rows: 5 evenly spaced days across the run (arc-milestone checkpoints

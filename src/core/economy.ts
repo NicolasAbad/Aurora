@@ -2,23 +2,40 @@ import { BUILDINGS } from '../data/buildings';
 import { buildingStaffRatio, totalSalaryPerSecond } from './staff';
 import { creditHardware, currentHardwareTier } from './hardware';
 import { applyModifiers } from './modifiers';
-import type { BuildingState, GameState, Modifier, ResourceId, ResourceState, StaffState } from './types';
+import type { BuildingDef, BuildingState, GameState, Modifier, ResourceId, ResourceState, StaffState } from './types';
 
 /**
  * Cost to go from `level` to `level + 1`, per ECONOMY_MODEL §4 (`base × factor^level`).
  * `level` is the CURRENT level (0 for an unbuilt building's first purchase).
  * `factor: null` marks a one-time building (Launch Rail, Launch Pad B) — cost is just baseCost.
  * Costs are rounded up so a building is never cheaper than its documented value.
+ * `costThresholds` (default `[]`, ECONOMY §4d v4.1): each threshold whose `level` the
+ * CURRENT level has reached (>=) adds its own resources on top — a Finance upgrade past
+ * level 20 costs Funding AND Materials, not just more Funding. Scaled by factor^(level -
+ * threshold.level), i.e. from the THRESHOLD's own level, not level 0 — the added
+ * resource costs exactly `addCost` right when the threshold is first crossed and grows
+ * moderately from there, rather than being retroactively inflated by the base cost's
+ * full compounding (which at a level-50 threshold, e.g., would multiply a small addCost
+ * by factor^50 — hundreds of times over, not a sane number). Omitting costThresholds
+ * (every pre-v4.1 call site) keeps exactly the old single/dual-resource-forever behavior.
  */
 export function costAtLevel(
   baseCost: Partial<Record<ResourceId, number>>,
   factor: number | null,
   level: number,
+  costThresholds: BuildingDef['costThresholds'] = [],
 ): Partial<Record<ResourceId, number>> {
   const scale = factor === null ? 1 : factor ** level;
   const scaled: Partial<Record<ResourceId, number>> = {};
   for (const [resource, amount] of Object.entries(baseCost) as [ResourceId, number][]) {
     scaled[resource] = Math.ceil(amount * scale);
+  }
+  for (const threshold of costThresholds ?? []) {
+    if (level < threshold.level) continue;
+    const thresholdScale = factor === null ? 1 : factor ** (level - threshold.level);
+    for (const [resource, amount] of Object.entries(threshold.addCost) as [ResourceId, number][]) {
+      scaled[resource] = Math.ceil((scaled[resource] ?? 0) + amount * thresholdScale);
+    }
   }
   return scaled;
 }

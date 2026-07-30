@@ -34,6 +34,39 @@ describe('costAtLevel', () => {
       materials: 100,
     });
   });
+
+  // ECONOMY §4d v4.1 (Sprint 11.5 task 9): multi-resource costs past a level threshold.
+  describe('costThresholds', () => {
+    const thresholds = [
+      { level: 20, addCost: { materials: 40 } },
+      { level: 50, addCost: { hardware: 15 } },
+    ];
+
+    it('is a no-op below the first threshold — identical to omitting costThresholds', () => {
+      expect(costAtLevel({ funding: 150 }, 1.14, 10, thresholds)).toEqual(
+        costAtLevel({ funding: 150 }, 1.14, 10),
+      );
+    });
+
+    it('adds the threshold resource exactly at its own level, unscaled (factor^0)', () => {
+      const result = costAtLevel({ funding: 150 }, 1.14, 20, thresholds);
+      expect(result.materials).toBe(40);
+      expect(result.hardware).toBeUndefined(); // level-50 threshold not reached yet
+    });
+
+    it('scales the added resource from the THRESHOLD level, not level 0', () => {
+      // 10 levels past the level-20 threshold: 40 * 1.14^10 ≈ 148.28 -> ceil 149.
+      const result = costAtLevel({ funding: 150 }, 1.14, 30, thresholds);
+      expect(result.materials).toBe(Math.ceil(40 * 1.14 ** 10));
+    });
+
+    it('stacks every crossed threshold at once, each scaled from its own level', () => {
+      const result = costAtLevel({ funding: 150 }, 1.14, 50, thresholds);
+      expect(result.materials).toBe(Math.ceil(40 * 1.14 ** 30)); // 30 levels past its own threshold
+      expect(result.hardware).toBe(15); // exactly at its own threshold
+      expect(result.funding).toBe(Math.ceil(150 * 1.14 ** 50));
+    });
+  });
 });
 
 describe('productionPerSecond', () => {

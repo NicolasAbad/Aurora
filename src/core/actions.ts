@@ -140,7 +140,7 @@ export function buyBuildingUpgrade(
   const current = buildings[buildingId];
   if (def.costFactor === null && current.level > 0) return null; // one-time, already built
 
-  const cost = costAtLevel(def.baseCost, def.costFactor, current.level);
+  const cost = costAtLevel(def.baseCost, def.costFactor, current.level, def.costThresholds);
   if (!canAffordCost(resources, cost, def.minHardwareTier)) return null;
 
   let nextResources: Record<ResourceId, ResourceState> = payCost(resources, cost, def.minHardwareTier);
