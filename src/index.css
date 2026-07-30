@@ -1809,15 +1809,27 @@ body {
   }
 }
 
-/* Thumbnail context: tiny plots, no labels. */
+/* Thumbnail context, no labels. UI_SPEC §2h v3.6 (Sprint 11.5 real fix): the shipped
+ * 9px plots were too small to register at all — real player feedback, not a guess.
+ * Minimum footprint: roughly ticker-row height on mobile (measured: .ticker__row is
+ * ~49px; 4 stacked complex rows at 18px + 2px gaps totals ~78px, comfortably past that),
+ * wider still on desktop (see the media query below) — large enough that individual
+ * building pictograms are actually legible without tapping to expand. */
 .site-map__thumbnail .site-map__plot {
-  width: 9px;
-  height: 9px;
+  width: 18px;
+  height: 18px;
 }
 
 .site-map__thumbnail .site-map__plot .building-icon {
   width: 100%;
   height: 100%;
+}
+
+@media (min-width: 768px) {
+  .site-map__thumbnail .site-map__plot {
+    width: 24px;
+    height: 24px;
+  }
 }
 
 .site-map-backdrop {
