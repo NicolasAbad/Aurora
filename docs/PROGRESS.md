@@ -2734,122 +2734,26 @@ new slots empty would see a staffing-ratio dip, which neither bot ever does.
   mechanism is unchanged/already-proven (same `GlobalFtueTooltip` that correctly rendered
   T-01 in the same pass).
 
-## Sprint 10 — XP trees & orbital mission — COMPLETE (2026-07-29)
+## Sprint 10 — XP trees & orbital mission — COMPLETE (2026-07-29, compressed 2026-07-30)
 
-All 3 SPRINTS.md tasks done, verified through the integrated path. Task 2 was blocked
-mid-sprint on three genuine design gaps (Aurora II's own mechanics, what `orbitalFlight`
-actually gates, "Parallel integration"'s literal meaning) — exported as an explicit
-question set rather than guessed at (commit `2fd9827`); the owner answered all three in
-one pass, ECONOMY_MODEL bumped to v3.9 (§7 restructured to cover Aurora I and II
-together), and task 2 + the rest of task 1 (Parallel integration itself) resumed from
-there. Task 3 was similarly blocked on a real UI_SPEC gap (no spec existed anywhere for
-"the v1 milestone screen") until the owner added UI_SPEC §3 screen 8 mid-sprint.
-
-### Task 1: Flight Experience trees (ECONOMY §9)
-
-All 10 XP-tree nodes across 4 branches (Propulsion, Operations, Organization, Prestige).
-8 register declarative Modifiers through the existing registry (rule 4); Partial
-reusability is dedicated logic (20% propellant credited back at spend, no modifier target
-fits "refund some of what was just paid"). Tracking Station's own "+25% Flight XP per
-level" (documented since the building shipped) was never wired to any grant site until
-now — same "described but unwired" gap class as prior sprints' Test Stand leveling fix.
-New top-level "Flight XP" tab reuses Research's Design B lane layout verbatim (judgment
-call, not a new design decision — documented in UI_SPEC v3.5, since compressed away, see
-its own changelog note). `sim/run.ts` updated to match (`grantFlightXp` helper).
-
-### Task 2: Aurora II, orbitalFlight gate, Parallel integration (ECONOMY §7/§9 v3.9)
-
-Aurora II reuses Aurora I's mechanics wholesale — same 5 VAB stages, costs, durations,
-checklist, reward values, no new numbers. `missionType` tags the first-ever successful
-orbital launch `'auroraI'`, every one after `'auroraII'` (was hardcoded to `'auroraI'`
-always — a real bug, just invisible until Aurora II could exist). `orbitalFlight` tech
-gates the SECOND orbital attempt onward, never Aurora I's own launch — the doc's old
-wording was simply wrong; the shipped Sprint 7 behavior (gated on Flight program tech +
-VAB only) was already correct and stays untouched. Parallel integration turned out to be
-mechanically identical to the research tree's own `vabQueues` node (auto-chain VAB
-stages, no dead time) — `maybeAutoQueueAuroraStage` now ORs both gates, a second
-currency route to the same effect rather than a second mechanic.
-
-`sim/run.ts` had the exact same wrong orbitalFlight-gates-Aurora-I bug the doc did —
-fixed alongside it; zero effect on days-to-Aurora-I for any profile (the wrong gate never
-actually bound in practice for this seed/config) but a real correctness fix regardless.
-Sim now simulates Aurora II as repeatable post-Aurora-I content and reports "Days to
-Aurora II" alongside the existing table.
-
-**Two real bugs found beyond the three design questions, both fixed:**
-- Pre-existing `tsc -b` failure in `FlightXpPanel.tsx` (confirmed via `git stash` to
-  already be broken on HEAD before this session touched anything) — a TypeScript
-  aliased-condition-narrowing false positive (`!canBuy || state === 'pending-design'`,
-  where `canBuy`'s own definition ties it to `state === 'available'`), fixed by
-  reordering the condition.
-- Playwright verification caught `LaunchSequencePanel`'s `ResultCard` hardcoding "Aurora
-  I is flying" / "First orbit" for every successful launch — harmless while Aurora I
-  could only ever happen once, wrong the instant Aurora II became real. New T-27/T-28
-  (NARRATIVE_EVENTS.md §9) branch the result screen on `missionType`.
-
-**Economy finding, flagged not retuned (economy lock):** satellite-era Flight Data share
-jumps to 81-85% against the 20-35% target once Aurora II's repeatable, non-decaying
-reward is live — direct, expected consequence of "no new numbers, reused wholesale," not
-a sim or code bug. The 20-35% target predates Aurora II existing at all. Framed for
-Sprint 11's balance pass (ECONOMY_MODEL v4.0, SPRINTS.md's own Sprint 11 entry, both
-owner-authored): is this a metric that needs redefining (scope it to the pre-Aurora-II
-arc) or a real economy problem (give repeat Aurora II launches diminishing returns)?
-Answer with data at that pass, not assumption now.
-
-### Task 3: v1 milestone screen (UI_SPEC §3 screen 8, new)
-
-Fires once, on Aurora II's first success (same moment N-16 fires) — full-screen,
-dismissible, never shown again. Explicitly NOT a game-over: contracts, XP nodes, and
-repeat launches all stay fully playable after dismissal, per GDD §0's no-reset-prestige
-pillar; copy and framing avoid anything reading as closing credits. Content is entirely
-real, doc-sourced text (N-16's narrative beat + T-29's crewed-mission teaser, both from
-NARRATIVE_EVENTS.md) plus a factual run summary (successful launches by type, Program
-Records earned, play time, total Funding raised) — no invented flavor copy anywhere on
-the screen. "Play time" reuses the existing `first_pitch` telemetry event as a "game
-started at" timestamp rather than adding a new schema field just for one stat; absent on
-a save with no telemetry history (pre-dates telemetry), the line is simply omitted rather
-than showing a wrong number. New `economyFlags.milestoneScreenDismissed?: boolean`
-latches the one-time trigger — additive optional (rule 5, no migration needed; absent
-means "not yet dismissed," correct for every pre-existing save since nobody could have
-dismissed a screen that didn't exist yet).
-
-**Playwright verification found a real testing-methodology trap, not a product bug,**
-worth recording for future sessions: `context.addInitScript()` re-fires on every
-navigation within that context — a reload of the same page, or even a second page's own
-first load — which was silently re-seeding the original injected save right back over
-whatever had since been live-autosaved, and looked exactly like a real persistence bug
-(the dismissed flag reverting after "reload"). Confirmed via direct instrumentation of
-the boot path that `loadGame`/`computeBootOffline`/`saveGame` were correct throughout;
-switching to page-scoped `addInitScript` (and checking via a fresh page rather than a
-reload for the "survives closing the tab" case, since page-scoped init scripts *also*
-re-fire on that same page's own reload) fixed the test, not the product.
-
-### Verification
-
-- 515 tests passing (up from 502 at Sprint 9.5's close). Typecheck (`tsc -b`), lint, and
-  production build all clean.
-- `npm run sim` (seed 42, 30 days) re-run after the orbitalFlight fix: Aurora I pacing
-  identical across all three profiles to the last reported baseline (optimal day 3, human
-  day 6, casual day 13) — the removed incorrect gate never actually bound. Pacing floor:
-  PASS (human day 6).
-- Playwright, through a real browser (scratchpad-only Chromium install per CLAUDE.md rule
-  11, never a project dependency): task 2's Parallel-integration purchase flow and the
-  orbitalFlight gate message in both states (9 checks); task 3's milestone screen full
-  render (narrative text, run summary, records list, teaser, dismiss, and persistence
-  across a fresh page) (11 checks). Zero console errors across both passes. Two real bugs
-  found this way (ResultCard's hardcoded Aurora I text; the addInitScript testing trap
-  above) — both diagnosed to a root cause before concluding anything, not patched blind.
-
-### Scope notes
-
-- Task 1's XP node purchases aren't modeled in `sim/run.ts` at all (the bot never spends
-  Flight XP) — consistent with the sim's own documented pattern of not modeling every
-  optional upgrade; Parallel integration's OR-gate with `vabQueues` is therefore moot for
-  the sim specifically, not a gap.
-- NARRATIVE_EVENTS.md's own copy currently lags the repo for T-26/27/28 and all of §12
-  (the owner's working copy predates those Sprint 10 additions) — confirmed intentional
-  by the owner, syncs at their next regeneration, no action taken here per their explicit
-  instruction.
+All 3 SPRINTS.md tasks done: Flight Experience trees (10 XP nodes, 4 branches, Tracking
+Station's undocumented-until-now "+25% Flight XP" finally wired to a grant site); Aurora
+II shipping as a repeatable reuse of Aurora I's mechanics wholesale (`missionType` tags
+first success `'auroraI'`, every one after `'auroraII'`), `orbitalFlight` tech confirmed
+to gate the SECOND orbital attempt onward (not Aurora I's own launch — the doc's old
+wording was simply wrong, shipped Sprint 7 behavior was already correct), "Parallel
+integration" resolved as mechanically identical to the research tree's `vabQueues` node;
+and the v1 milestone screen (UI_SPEC §3 screen 8, fires once on Aurora II's first
+success, explicitly not a game-over). Blocked mid-sprint on 3 genuine design gaps
+(Aurora II's mechanics, what `orbitalFlight` gates, "Parallel integration"'s meaning) —
+exported as an explicit question set rather than guessed at, owner answered all three in
+one pass. Two real bugs found and fixed: a pre-existing `tsc -b` failure (aliased-
+condition-narrowing false positive) and `ResultCard` hardcoding "Aurora I is flying" for
+every orbital success (wrong the instant Aurora II became real; T-27/T-28 branch on
+`missionType` now). Economy finding flagged, not retuned (lock in force): satellite-era
+Flight Data share jumped to 81-85% against the 20-35% target once Aurora II's repeatable
+reward went live — framed for Sprint 11's balance pass, **resolved there** (see Sprint
+11's own entry: metric redefined, not a bug). 515 tests passing at close (up from 502).
 
 ## Sprint 10.5 — Visual Identity 2.0 — COMPLETE (2026-07-29)
 
@@ -2987,3 +2891,166 @@ actually built (safe to gate that way — every pad-based launch requires
   opened (a fresh `SiteMapGrid` mount each time, not an incremental one) rather than only
   once when a building is newly completed — cosmetic only, not worth the added state
   needed to track "already seen built" per building for a presentation-only replay effect.
+
+## Sprint 11 — Polish — COMPLETE (2026-07-30)
+
+Last dev sprint before Sprint 12's public playtest. Nine workstreams per SPRINTS.md,
+tackled in phases A-I, one commit per phase. Two owner decisions taken before starting
+(countdown scope: build the full 10→0 takeover, not a minimal sound-only version; sound
+approach: Web Audio synthesis only, no audio asset files) are now explicit in UI_SPEC v3.5
+(new §1c) and SPRINTS.md's own Sprint 11 line. 539 tests passing at close (up from 515 at
+Sprint 10.5's close).
+
+### Phase A: Countdown + sound (the big feature)
+
+The full-screen 10→0 countdown takeover UI_SPEC screen 5 always specified, deferred since
+Sprint 9's own LaunchSequencePanel comment — built now (`ui/CountdownSequence.tsx`),
+shared between LaunchSequencePanel (Aurora/contract pads) and SoundingMissionPanel
+(sounding rockets), same reuse pattern RocketBlueprint/WeatherRadarSweep established.
+**Structural decision, not just an animation:** the store action (`launchAurora`/
+`launchContract`/`launchSounding`) still resolves IMMEDIATELY on button press, exactly as
+before — N-10/N-11/N-12's existing tested "fires at the countdown press" timing
+(`persistStore.test.ts`) depends on that and stays untouched. The countdown is a pure UI
+reveal-delay layered on top (`counting` state gates the RESULT from showing, not the
+resolution). Caught and fixed a real ordering bug of my own mid-implementation: an earlier
+version deferred the store action until the countdown finished, which would have shifted
+N-10's Mission Log timing by ~11 seconds — caught via the existing test suite before it
+shipped. SoundingMissionPanel needed the `counting` state lifted to its OUTER component,
+since `mission.sounding` going null on resolve unmounts `InFlightMission` (and any state
+local to it) immediately.
+
+Content: reuses N-10 ("Countdown, mission 1") verbatim for Aurora I's literal first-ever
+launch attempt; every other countdown shows static technical-readout microcopy
+("Engines: nominal" etc.) — not narrative-ID content, since no reusable "every launch"
+narrative pool exists in NARRATIVE_EVENTS.md (flagged as a real content-scope finding
+before building, not silently invented). Canvas smoke/exhaust particle burst at liftoff
+(UI_SPEC §1b item 4, "ONE particle moment"). `ui/sound.ts`: Web Audio oscillator tones
+(countdown tick, liftoff, success chime, failure tone), gated on the previously-dead
+`soundEnabled` setting. Also: self-drawing SVG checkmarks (`ui/AnimatedCheck.tsx`,
+replacing the plain ✓ glyph in both checklist components AND the Research/Flight XP tree
+node marks for consistency) and rolling number animation (`ui/useRollingNumber.ts`,
+wired into Ticker's resource rows). All motion respects the existing reduced-motion
+setting — reduced motion skips the countdown's wait entirely, not just its visuals.
+
+### Phase B: Performance (Zustand selectors)
+
+`BuildingTile.tsx` (instantiated ~18x simultaneously per screen) was subscribing to the
+entire resources/staff/modifiers slices regardless of what each tile actually needed —
+narrowed to only the specific resource ids its own cost + internal-upgrade costs
+reference, only the role pool(s) it has slots for (a stable stub for the rest, since
+`assignedToBuilding`/`unassignedCount`/`buildingStaffRatio` never read other roles for a
+given buildingId), and modifiers only for Fabrication (the one building that actually
+consumes them). Audited the other ~12 `useShallow` call sites in `src/ui` — all either
+genuinely need their whole slice (`PromotionPanel`/`StaffAvailabilityChip` iterate all 4
+roles) or have a low instantiation count (1-2 instances, unlike BuildingTile's 18) —
+reported clean rather than forcing an unnecessary change.
+
+### Phase C: Accessibility
+
+`role="status" aria-live="polite"` on the two auto-appearing/auto-dismissing toasts
+(`TierChangeToast`, `MilestoneCallout`); `aria-label` on `BuildingTile`'s stepper `−`/`+`
+buttons (previously bare glyphs with no accessible name). Spot-checked every decorative
+SVG for `aria-hidden="true"` — already consistent everywhere; no fix needed, audited clean.
+
+### Phase D: Contextual job titles
+
+New NARRATIVE_EVENTS.md §13, keyed by `` `${buildingId}.${role}` `` (same "id IS the key"
+pattern §8's research node descriptions use). One flavor title per (building, role) slot
+across the 16 role-having buildings; Launch Pad B reuses Launch Pad's own title. Rendered
+as dimmed secondary text right after the mechanical role label in `BuildingTile.tsx`'s
+staff row (its own row would have wrapped awkwardly — Sprint 9.5 already learned that
+lesson for the fully-staffed note). Presentation only.
+
+### Phase E: Dedicated balance pass (SCOPED UNLOCK)
+
+Both questions SPRINTS.md posed resolved with real sim data, not assumption:
+- **Flight Data share: metric redefined, no economy value changed.** Tried scoping the
+  20-35% target to a "pre-Aurora-II" sub-window first — `sim/run.ts` instrumentation
+  showed that window is EMPTY in every profile (Aurora II always launches the same
+  simulated day as Aurora I, the bot re-queues its VAB immediately). The target predates
+  Aurora II existing at all; satellite-era Flight Data dominance (confirmed 81-85%,
+  unchanged from Sprint 10) is the expected reward for reaching orbit once any
+  satellite-class mission flies. Target now applies only through the sonda era.
+- **Hiring-cost curve: confirmed a non-issue, closed without changing the curve.** New
+  sim instrumentation (final headcount + lifetime hiring/promotion spend per run) showed
+  all 3 profiles converge to the identical 18/20 hired (staff-cap constrained), spending
+  only ~3,700-4,000 total Funding on hiring across a full 30-day run — negligible against
+  the millions those runs earn. The curve never binds; the staff cap and the
+  50%-of-passive-income salary budget hit first, every time. BACKLOG item closed resolved.
+
+ECONOMY_MODEL bumped to v4.1. Full sim sweep re-run, every remaining sanity rule (salary
+band, sonda Flight Data share, pacing floor) still holds.
+
+### Phase F: Save-migration audit
+
+**Real silent-data-loss bug found and fixed:** `loadGame()` computed `fromVersion=0` for
+any save with a missing/non-numeric `schemaVersion`, but no v0 shape has ever shipped
+(schemaVersion has been 1 since Sprint 0's first commit) — `MIGRATIONS` has no `0` key,
+`migrate()` throws, and the catch block silently discarded the save and returned a fresh
+`createInitialState()`. A real save on disk could be wiped with zero indication anything
+went wrong. Fixed via `wasLastLoadCorrupted()`, a side-channel flag (kept `loadGame()`'s
+own signature unchanged, avoiding updates to its dozen existing call sites) surfaced
+through a new `useSaveWarning` store (same "resolved once at boot" shape as the existing
+`useAwaySummary`) to a dismissible `SaveWarningBanner.tsx` (NARRATIVE T-30). Never a
+silent wipe now. Coverage gaps closed in `migrations.test.ts`: a two-hop walk from
+`fromVersion` 2 (only `fromVersion` 1 had a multi-hop test before), and `fromVersion` 0
+throwing as documented (previously untested).
+
+### Phase G: Cleanup pass
+
+All three items confirmed clean, no code changes needed: `[v2]` GDD items (Sound
+Suppression/Cryogenic Stand/Heavy Crane) are already permanently enforced absent by a
+structural test in `buildings.test.ts`, not just a one-time manual check; no Google Fonts
+CDN link exists anywhere (fonts are CSS `font-family` fallback names only, nothing
+actually loaded from Google's servers, so nothing to attribute); the casual sim profile's
+numbers WERE genuinely reviewed before (Sprint 9.5 explicitly analyzed and attributed its
+Day-6 salary-ratio dip), not just instrumented and forgotten.
+
+### Phase H: ComplexTabs overflow fix
+
+UI_SPEC §2 already specified the answer ("mobile: horizontal scrollable tab bar") —
+`overflow-x: auto` on `.complex-tabs`, `flex: none` on each tab so they scroll instead of
+squashing. Verified via Playwright at the exact 420px width that originally surfaced the
+Sprint 10.5 finding: `document.body.scrollWidth` now exactly matches `window.innerWidth`
+(the page itself no longer overflows), while the tab row correctly scrolls within itself.
+
+### Phase I: Narrative text review
+
+Full read-through of NARRATIVE_EVENTS.md. Two structural consistency fixes (text content
+unchanged): sections were out of physical file order (§11 sat before §10 from when §11
+was appended in a later sprint without reordering) — reordered so file order matches
+section numbers throughout; a missing blank line between §7 and §8's headers. No tone or
+typo issues found in the actual player-facing text — reads consistently with the doc's
+own stated voice throughout.
+
+### Verification
+
+- 539 tests passing (up from 515). Typecheck (`tsc -b`), lint, and production build all
+  clean; dev-only tools confirmed absent from the production bundle.
+- `npm run sim` (all 3 profiles) re-run at the start (baseline, confirmed matching Sprint
+  10.5's numbers exactly) and after Phase E's changes (confirmed every sanity rule still
+  holds — salary band, sonda Flight Data share, pacing floor all pass).
+- Playwright, through a real browser, at every phase rather than batched to the end (this
+  sprint was large enough that batching risked a big, hard-to-localize failure): the full
+  countdown sequence end-to-end for all three cases (first-ever Aurora I launch with N-10,
+  a repeat launch with technical readouts, and the sounding-rocket path) with zero console
+  errors; `BuildingTile`'s narrowed selectors confirmed correct for staff assignment and
+  affordability; contextual job titles rendering and wrapping gracefully at narrow widths;
+  the save-warning banner showing on a genuinely corrupted save and dismissing cleanly;
+  the ComplexTabs fix at the exact viewport that originally surfaced the bug; reduced
+  motion skipping the countdown's wait entirely (not just its visuals); sound disabled
+  still reaching the result with zero errors. Zero console errors across every pass.
+
+### Scope notes
+
+- The Flight Data share resolution took two attempts: the first (scoping the target to a
+  "pre-Aurora-II" sub-window) seemed right until the actual data showed that window is
+  structurally empty in every profile — caught before committing to ECONOMY_MODEL.md,
+  not after. Worth remembering: a plausible-sounding metric redefinition still needs its
+  own data check, the same "answer with data, not assumption" bar the original question
+  was held to.
+- Commits didn't follow a strict one-per-numbered-task split within Phase A (sound +
+  countdown core, then the two panel wirings, then checkmarks/rolling numbers landed as
+  2 commits rather than 4-5) — the pieces were tightly coupled enough (shared
+  CountdownSequence component, shared CSS additions) that finer splitting would have
+  produced commits that didn't build/test cleanly on their own.
