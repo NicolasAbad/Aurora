@@ -62,6 +62,20 @@ export function pitchYield(officesLevel: number): number {
 }
 
 /**
+ * UI_SPEC §4c v3.6 (Sprint 11.5): "a manual verb whose single use is currently worth
+ * less than ~1% of the player's passive income in that resource" recedes visually.
+ * `passiveRatePerSec` is a RATE and `yieldAmount` is a one-time amount, so "1% of
+ * income" is read the natural casual-language way — 1% of what passive production earns
+ * over a full minute, i.e. `passiveRatePerSec * 60 * 0.01` (= `passiveRatePerSec * 0.6`).
+ * Zero passive rate never recedes a verb (nothing to compare against — Materials
+ * verbs before Supply Depot exists, e.g., stay fully prominent).
+ */
+export function isManualVerbLowValue(yieldAmount: number, passiveRatePerSec: number): boolean {
+  if (passiveRatePerSec <= 0) return false;
+  return yieldAmount < passiveRatePerSec * 60 * 0.01;
+}
+
+/**
  * Grant `amount` of a resource. Passive/continuous production (`oneTime: false`) halts
  * at cap — GDD §1c — crediting only the room left, never more. One-time payments
  * (`oneTime: true`) ignore the cap entirely, per the same rule. `lifetimeEarned` tracks

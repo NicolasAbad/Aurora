@@ -18,6 +18,11 @@ interface ManualActionButtonProps {
    * identical either way (UI_SPEC §4 applies to every manual-action cooldown, not just
    * Pitch's). */
   buttonClassName?: string;
+  /** UI_SPEC §4c v3.6 (Sprint 11.5): true once this verb's single-use yield is worth
+   * less than ~1% of passive income in that resource (core/economy.ts's
+   * isManualVerbLowValue) — recedes visually (smaller, muted), never disabled, never
+   * hidden. Default false: every pre-v3.6 call site renders exactly as before. */
+  receded?: boolean;
 }
 
 /**
@@ -35,6 +40,7 @@ export function ManualActionButton({
   feedbackText,
   onAction,
   buttonClassName = 'upgrade-button',
+  receded = false,
 }: ManualActionButtonProps) {
   const [cooling, setCooling] = useState(false);
   const [rechargeKey, setRechargeKey] = useState(0);
@@ -68,7 +74,7 @@ export function ManualActionButton({
     <div className="manual-action-wrap">
       <button
         type="button"
-        className={`${buttonClassName}${shaking ? ' manual-action-button--shake' : ''}`}
+        className={`${buttonClassName}${shaking ? ' manual-action-button--shake' : ''}${receded ? ' manual-action-button--receded' : ''}`}
         disabled={disabled}
         onClick={handleClick}
         onAnimationEnd={() => setShaking(false)}

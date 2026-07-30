@@ -30,6 +30,8 @@ import { useSettings } from './state/settings';
 import { formatCost } from './core/format';
 import { isUnlockConditionMet, unlockContextFromState } from './core/unlockConditions';
 import { nextFtueTooltip } from './core/ftue';
+import { isManualVerbLowValue } from './core/economy';
+import { getResourceRatePerSecond } from './core/selectors';
 import { RECORD_DEFS } from './core/records';
 import { narrativeText } from './data/narrative';
 import { BUILDINGS } from './data/buildings';
@@ -91,16 +93,24 @@ function CampusPanel({ onSelectComplex }: ComplexPanelProps) {
 // 7.5, now closed for Production too — the complex tab unlocking must not dump all 5
 // buildings at once. Step 2 (Fabrication + Warehouse) is naturally monotonic on Supply
 // Depot's own level; step 3 (Refinery + Propellant Depot) on the "Sounding rockets" tech.
+const GATHER_MATERIALS_YIELD = 5; // ECONOMY §2
+const RUSH_ORDER_MATERIALS = 100; // ECONOMY §2
+
 function ProductionPanel({ onSelectComplex }: ComplexPanelProps) {
   const supplyDepotLevel = useGameStore((s) => s.buildings.supplyDepot.level);
   const fabricationLevel = useGameStore((s) => s.buildings.fabrication.level);
   const funding = useGameStore((s) => s.resources.funding.amount);
   const soundingRocketsResearched = useGameStore((s) => s.research.completed.includes('soundingRockets'));
+  const production = useGameStore(useShallow((s) => ({ buildings: s.buildings, staff: s.staff })));
   const gatherMaterials = useGameStore((s) => s.gatherMaterials);
   const rushOrder = useGameStore((s) => s.rushOrder);
 
   const fabAndWarehouseRevealed = supplyDepotLevel >= 1;
   const refineryAndPropDepotRevealed = soundingRocketsResearched;
+  // UI_SPEC §4c v3.6: both Materials verbs recede off the SAME passive Materials rate —
+  // Gather's fixed +5 recedes much earlier than Rush Order's +100, matching "Rush Order
+  // matters longer, exactly for a genuine pinch" (ECONOMY §3b).
+  const materialsRate = getResourceRatePerSecond(production, 'materials');
 
   return (
     <>
@@ -113,6 +123,7 @@ function ProductionPanel({ onSelectComplex }: ComplexPanelProps) {
               cooldownMs={1000}
               feedbackText="+5"
               onAction={gatherMaterials}
+              receded={isManualVerbLowValue(GATHER_MATERIALS_YIELD, materialsRate)}
             />
           )}
         </BuildingTile>
@@ -127,6 +138,7 @@ function ProductionPanel({ onSelectComplex }: ComplexPanelProps) {
                   label={`Rush Order (${formatCost({ funding: RUSH_ORDER_COST_FUNDING })})`}
                   cooldownMs={5 * 60_000}
                   disabled={funding < RUSH_ORDER_COST_FUNDING}
+                  receded={isManualVerbLowValue(RUSH_ORDER_MATERIALS, materialsRate)}
                   feedbackText="+100"
                   onAction={rushOrder}
                 />

@@ -3,6 +3,7 @@ import { createInitialState } from '../data/initialState';
 import {
   applyGrant,
   costAtLevel,
+  isManualVerbLowValue,
   pitchYield,
   productionPerSecond,
   resolveEconomyTick,
@@ -95,6 +96,30 @@ describe('pitchYield', () => {
     expect(pitchYield(1)).toBe(10);
     expect(pitchYield(2)).toBe(15);
     expect(pitchYield(3)).toBe(20);
+  });
+});
+
+// UI_SPEC §4c v3.6 (Sprint 11.5): a manual verb recedes once its yield is worth less
+// than ~1% of passive income — read as 1% of what passive production earns per minute
+// (yieldAmount < passiveRatePerSec * 0.6).
+describe('isManualVerbLowValue', () => {
+  it('is false with zero (or no) passive income — nothing to compare against yet', () => {
+    expect(isManualVerbLowValue(10, 0)).toBe(false);
+  });
+
+  it('is false when the yield is still worth >=1% of passive income', () => {
+    // 10 Funding yield vs 10 Funding/s passive: 1% of a minute's income = 6. 10 >= 6.
+    expect(isManualVerbLowValue(10, 10)).toBe(false);
+  });
+
+  it('is true once passive income dwarfs the yield', () => {
+    // Same 10 Funding yield, but passive income now 100/s: 1% of a minute = 60. 10 < 60.
+    expect(isManualVerbLowValue(10, 100)).toBe(true);
+  });
+
+  it('sits exactly at the boundary (not receded) when yield equals the threshold', () => {
+    // 6 Funding yield vs 10/s passive: threshold is exactly 6 -> not LESS than, so false.
+    expect(isManualVerbLowValue(6, 10)).toBe(false);
   });
 });
 

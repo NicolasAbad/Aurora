@@ -403,6 +403,25 @@ body {
   cursor: not-allowed;
 }
 
+/* UI_SPEC §4c v3.6 (Sprint 11.5): a manual verb worth less than ~1% of passive income
+ * recedes — smaller, muted, out of the way — never disabled, never removed. Overrides
+ * both button looks (pitch-button's prominent orange AND the neutral upgrade-button)
+ * down to the same quiet baseline; expands back to its normal look automatically the
+ * moment isManualVerbLowValue flips false again, no manual toggle needed. */
+.manual-action-button--receded {
+  padding: 4px 10px;
+  font-size: 0.8em;
+  font-weight: 400;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-dim);
+}
+
+.manual-action-button--receded:hover {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+
 /* UI_SPEC §4 (v2.8): every manual-action button (Pitch, Gather Materials, Rush Order)
  * shares this cooldown-feel — a visible recharge fill for the cooldown duration, and a
  * shake when a click lands during it, so the button reads as rhythm, not as dead. */
