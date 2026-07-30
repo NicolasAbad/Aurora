@@ -1523,9 +1523,17 @@ function printSummary({ profile, rows, state, outPath, seed, days }: SimulationR
     console.log(`  Day ${row.day}: ${row.salaryRatioPct}%`);
   }
 
-  // ECONOMY §8 v2.3: target reformulated as a per-era range, checked separately for
-  // sonda and satellite (pre-flight is reported too, but has no target — it's lab-only
-  // by construction, before any flight has happened).
+  // ECONOMY §8 (v4.1, Sprint 11 balance-pass resolution): "satellite" era's 20-35% target
+  // RETIRED, reporting-only from here on. Sprint 10 found the aggregate satellite-era
+  // share jumping to 81-85% once Aurora II became repeatable; this sprint tried scoping
+  // the target to a "pre-Aurora-II" sub-window instead (splitting at
+  // state.auroraIILaunchedDay) and found that window is EMPTY in every profile — Aurora
+  // II launches the same simulated day as Aurora I every time (the bot re-queues its VAB
+  // immediately), so there is no real time period left where "satellite, but not yet
+  // repeatable" meaningfully exists to hold a target against. The 20-35% band was set
+  // before Aurora II existed at all; once any satellite-class mission (Aurora I onward)
+  // is flying, Flight Data dominating Research income is the expected reward for reaching
+  // orbit, not a balance problem — the target simply doesn't apply past that point.
   console.log('\nFlight Data share of Research income, per era:');
   for (const era of ['preFlight', 'sonda', 'satellite'] as const) {
     const eraRows = rows.filter((r) => r.era === era);
@@ -1537,7 +1545,12 @@ function printSummary({ profile, rows, state, outPath, seed, days }: SimulationR
     const totalFlight = eraRows.reduce((s, r) => s + r.researchFromFlightData, 0);
     const totalResearch = totalLab + totalFlight;
     const pct = totalResearch > 0 ? ((totalFlight / totalResearch) * 100).toFixed(1) : 'n/a';
-    const targetNote = era === 'preFlight' ? '(no target — lab-only by design)' : '(target 20-35%)';
+    const targetNote =
+      era === 'sonda'
+        ? '(target 20-35%)'
+        : era === 'satellite'
+          ? '(no target — expected to dominate once orbital missions fly)'
+          : '(no target — lab-only by design)';
     console.log(`  ${era} (${eraRows.length} days): ${pct}% ${targetNote}`);
   }
 
