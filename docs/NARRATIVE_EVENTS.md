@@ -103,6 +103,7 @@ Rules: **v2-only upgrades (Sound Suppression, Cryogenic Stand, Heavy Crane) are 
 | T-12a | A building shows full slots, and a slot-adding upgrade for it exists and isn't bought yet | "Fully staffed. Buy '[Upgrade Name]' to add another slot." |
 | T-12b | A building shows full slots, and no slot-adding upgrade exists for it | "Fully staffed. This building's slots are fixed — level up to raise output instead." |
 | T-13 | Hiring panel, per role, always visible (not just on the idle-hire flag) | "Hire [Role] ($[cost]) — [salary]/s" — the recurring cost is part of the hire decision every time, not only when it's a mistake. |
+
 ## 8. Research node descriptions (player-facing — every node states its effect, including zero-effect gates)
 | Branch | Node | Description |
 |---|---|---|
@@ -142,6 +143,11 @@ Rules: **v2-only upgrades (Sound Suppression, Cryogenic Stand, Heavy Crane) are 
 | T-29 | v1 milestone screen (UI_SPEC §3 screen 8), crewed-mission teaser line | "The next chapter — crewed missions, the Moon, a station in orbit — is still ahead. For now: the program you built got something into space, on purpose, more than once." |
 | T-30 | Sprint 11, save-migration audit: boot found a save on disk that couldn't be read (corrupt JSON or an unrecognized schema version) — a real save, not just "no save yet," so this must never be silent | "Your last save couldn't be read, so we're starting fresh. Sorry about that — exporting a save from Settings now and then is the best safety net." |
 
+## 10. Manual verb descriptions (missing from earlier docs — same "no purchasable without effect text" rule)
+| Verb | Description |
+|---|---|
+| Rush Order | "Trade Funding for instant Materials when you need them now instead of waiting on the Depot." |
+
 ## 11. Current Directive text (persistent "what now" indicator, UI_SPEC §2h)
 Ordered roughly by when each becomes the active directive; the engine shows whichever is most relevant to current state. Claude Code may add intermediate directives as needed, following the same terse, action-first phrasing (a directive states the NEXT action, not a status report).
 | ID | Active when | Text |
@@ -158,11 +164,6 @@ Ordered roughly by when each becomes the active directive; the engine shows whic
 | D-10 | S-2/Kármán done, VAB not yet built | "Build the VAB to begin your first satellite." |
 | D-11 | Aurora I integration in progress | "Keep building — Aurora I's stages integrate one at a time." |
 | D-12 | Aurora I complete, no contract accepted | "Check the Contracts panel — client work is now available." |
-
-## 10. Manual verb descriptions (missing from earlier docs — same "no purchasable without effect text" rule)
-| Verb | Description |
-|---|---|
-| Rush Order | "Trade Funding for instant Materials when you need them now instead of waiting on the Depot." |
 
 ## 13. Contextual job titles (Sprint 11, NEW — per-building staff role flavor, UI_SPEC §2 building-tile rule)
 Shown as dimmed secondary text next to the mechanical role name in a building's staff row — presentation only, the mechanical role stays the source of truth for slots/salary/promotion. No separate ID column (same "no ID column, the key IS the id" pattern §8 uses for research nodes): keyed in code by `${buildingId}.${role}`. Launch Pad B reuses Launch Pad's own title (same job, second location — ECONOMY §4's own "same cost/effect/copy as Pad A's" precedent for that building).
