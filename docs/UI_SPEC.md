@@ -1,6 +1,8 @@
 # UI_SPEC.md — Aurora Program — Interface specification v1
 *Web-first (desktop + mobile responsive), Android wrap later reuses the mobile layout.*
 
+**v3.5 changes:** §1c added (Achievable audio techniques — Web Audio API synthesis only, no asset files in v1).
+
 **v3.4 changes (Visual Identity 2.0 — new dedicated sprint, see SPRINTS Sprint 10.5):** Confidence Dial (screen 4), Constellation View (new §2i), Program Site Map (§2h amended — now the visual backing of the Current Directive, not text-only), Building Pictograms (§4, new rule). Plus three no-vote "cheap wins" bundled in: staff role silhouette icons, a weather-window radar-sweep visual, Mission Log category icon badges. All presentation-only — zero economy impact, no scoped unlock needed. (Note: this version number also retroactively covers §2d-§2h and the screen 3/4/5 redesigns added progressively since v3.3 without their own version bumps.)
 
 **Version history (compressed — full detail only for the latest version above):**
@@ -21,6 +23,9 @@ North star: **SPACEPLAN** — a space incremental whose entire aesthetic is proc
 4. **One particle moment:** canvas smoke/exhaust particles ONLY during countdown and liftoff — concentrate the special effect on the one moment that earns it.
 5. **Subtle background texture:** a faint dark graph-paper grid via CSS pattern for control-room depth.
 **Explicitly avoid:** AI-generated raster art (asset inconsistency is the #1 cheapness tell), character illustration, anything 3D, gradient/glow abuse. Coherent restraint beats inconsistent ambition — Universal Paperclips is pure text and iconic.
+
+## 1c. Achievable audio techniques (code IS the sound — same philosophy as §1b, applied to audio)
+**v1 sound is synthesized, not sourced.** All sound effects are generated via the Web Audio API (oscillator nodes — simple tones/chimes/beeps), never real audio files (.mp3/.wav/.ogg). Rationale, mirroring §1b's reasoning exactly: zero asset files means zero licensing questions and nothing for an assistant to fetch from the internet without explicit direction; trivially gated behind the existing (currently dead) Sound toggle in Settings; and "minimal" retro tones fit the control-room aesthetic better than mismatched stock sound effects would. Two required cues for Sprint 11: a tick/beep on each countdown second, and a distinct success chime on a successful launch result. Real produced audio is a possible post-v1 upgrade (BACKLOG), not a v1 gap.
 
 ## 2. Layout skeleton
 - **Top ticker (persistent):** Funding, Materials, Hardware, Propellant — value + rate each; capped resources show value/cap and turn amber at ≥90%. **Above cap (one-time payment overflow, GDD §1c): value renders in the accent color with the cap dimmed and a "production paused" microcopy on tap.** Research, Reputation and Flight XP display in a secondary compact row (they update rarely). Hardware shows total; tier breakdown (Al/Ti) on tap once Titanium is researched.

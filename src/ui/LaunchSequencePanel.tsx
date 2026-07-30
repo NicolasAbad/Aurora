@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../state/persistStore';
 import { canAffordCost } from '../core/actions';
@@ -11,7 +11,9 @@ import { formatDuration, formatPercent } from '../core/format';
 import { progressFraction, remainingMs } from '../core/time';
 import { ConfidenceDial } from './ConfidenceDial';
 import { CostLabel } from './CostLabel';
+import { CountdownSequence } from './CountdownSequence';
 import { RocketBlueprint } from './RocketBlueprint';
+import { playFailureTone, playSuccessChime } from './sound';
 import { useNow } from './useNow';
 import { WeatherRadarSweep } from './WeatherRadarSweep';
 import type { ChecklistItemId, LaunchRecord, PadId, Process } from '../core/types';
@@ -231,6 +233,14 @@ function ConfidenceBreakdownView({ padId }: { padId: PadId }) {
 }
 
 function ResultCard({ launch, tierReward, onDismiss }: { launch: LaunchRecord; tierReward?: string; onDismiss: () => void }) {
+  // UI_SPEC §1c: "a distinct success chime on a successful launch result" — fires once per
+  // distinct launch id, at the moment its result first renders (the countdown's own
+  // liftoff tone already covers the countdown itself; this is the separate reveal beat).
+  useEffect(() => {
+    if (launch.success) playSuccessChime();
+    else playFailureTone();
+  }, [launch.id, launch.success]);
+
   const isContract = launch.missionType === 'contract';
   // ECONOMY §7 (v3.9): Aurora II reuses the same reward values, but must not claim to be
   // "Aurora I" / "First orbit" (that Program Record is Aurora I's alone) — real gap found
@@ -269,10 +279,14 @@ function ResultCard({ launch, tierReward, onDismiss }: { launch: LaunchRecord; t
  * Sprint 9: also hosts satellite-contract missions on the same pad (ECONOMY §10 v3.6 —
  * "use the full launch checklist with Confidence") — the checklist/Confidence/countdown
  * chrome is identical either way; only the "what's next to build" widget and the result
- * copy differ, branched on `pad.contractId`. Presentation note: the doc's "own full
- * screen... 10->0 countdown" animation is deliberately not built here (Sprint 11 polish
- * territory, same restraint Sprint 6 used for sondas) — pressing the dominant button
- * resolves the already-committed roll (rule 12) immediately and shows its result inline. */
+ * copy differ, branched on `pad.contractId`. UI_SPEC screen 5 (Sprint 11): pressing the
+ * dominant button still resolves `launchAurora`/`launchContract` IMMEDIATELY, exactly as
+ * before — N-10/N-11/N-12 and every other "fires at the countdown press" narrative beat
+ * (persistStore.ts's own launchAurora, tested in persistStore.test.ts) depends on that
+ * timing and is untouched. The CountdownSequence takeover is a pure UI reveal-delay
+ * layered on top: `counting` gates the RESULT from being shown, not the resolution
+ * itself, so the outcome is already decided (and already in `mission.launches`/records)
+ * for the whole ~11s the player spends watching the countdown animate. */
 export function LaunchSequencePanel({ padId }: { padId: PadId }) {
   const pad = useGameStore(useShallow((s) => s.mission.pads[padId]));
   const processes = useGameStore(useShallow((s) => s.processes));
@@ -283,12 +297,23 @@ export function LaunchSequencePanel({ padId }: { padId: PadId }) {
   const startContractWeather = useGameStore((s) => s.startContractWeather);
   const launchContract = useGameStore((s) => s.launchContract);
   const [dismissedLaunchId, setDismissedLaunchId] = useState<string | null>(null);
+  const [counting, setCounting] = useState(false);
+  // Captured at the moment of the click (see onClick below), not read live during the
+  // countdown — by the time CountdownSequence is actually rendering, `launches` already
+  // contains the just-resolved launch, so a live re-check would always read "not first"
+  // even when it was.
+  const [countdownNarrativeId, setCountdownNarrativeId] = useState<string | undefined>(undefined);
 
   if (!pad) return null;
 
   const isContract = pad.contractId != null;
   const offer = isContract ? offers.find((o) => o.id === pad.contractId) : undefined;
   const tier = offer && (offer.tier === 1 || offer.tier === 2) ? offer.tier : null;
+  // NARRATIVE §1 N-10 ("Countdown, mission 1"): scoped to Aurora I's literal first-ever
+  // launch ATTEMPT (not success) — true exactly when no auroraI/auroraII launch record
+  // exists yet anywhere, matching every other "fires once" N-id's own pattern.
+  const isFirstAuroraAttempt =
+    !isContract && !launches.some((l) => l.missionType === 'auroraI' || l.missionType === 'auroraII');
 
   const weatherProcess = findPadProcess(processes, padId, 'weather_window', isContract ? 'contractPayload' : 'auroraI');
   const latestLaunch = [...launches].reverse().find((l) => l.padId === padId);
@@ -316,7 +341,13 @@ export function LaunchSequencePanel({ padId }: { padId: PadId }) {
         Launch Sequence — Pad {padId === 'padA' ? 'A' : 'B'}
         {isContract && offer ? ` — ${offer.client}` : ''}
       </div>
-      {showResult && latestLaunch ? (
+      {counting ? (
+        // Checked BEFORE showResult: launchAurora/launchContract already resolved at
+        // click time (see the button's onClick below), so showResult is already true
+        // throughout the countdown too — counting must win the race, or the reveal
+        // would happen instantly underneath the countdown instead of after it.
+        <CountdownSequence narrativeId={countdownNarrativeId} onComplete={() => setCounting(false)} />
+      ) : showResult && latestLaunch ? (
         <ResultCard launch={latestLaunch} tierReward={tierReward} onDismiss={() => setDismissedLaunchId(latestLaunch.id)} />
       ) : (
         <>
@@ -356,11 +387,15 @@ export function LaunchSequencePanel({ padId }: { padId: PadId }) {
               if (pad.confidence < 100 && !window.confirm(`Launch at ${formatPercent(pad.confidence)}? Success is not guaranteed.`)) {
                 return;
               }
+              // Capture BEFORE resolving — `launches` here is still this render's
+              // pre-launch snapshot (see the state declaration's own note above).
+              setCountdownNarrativeId(isFirstAuroraAttempt ? 'N-10' : undefined);
               if (isContract) {
                 launchContract(padId);
               } else {
                 launchAurora(padId);
               }
+              setCounting(true);
             }}
           >
             {pad.committedRoll === null ? 'Complete the checklist' : `Launch at ${formatPercent(pad.confidence)}`}

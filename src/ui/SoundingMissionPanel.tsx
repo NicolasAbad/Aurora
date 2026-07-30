@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../state/persistStore';
 import { activePendingContracts } from '../core/contracts';
@@ -10,6 +10,8 @@ import { FAILURE_FLIGHT_DATA_RATE, FAILURE_HARDWARE_RECOVERY_RATE, FAILURE_XP_RA
 import { narrativeText } from '../data/narrative';
 import { formatDuration, formatPercent } from '../core/format';
 import { CostLabel } from './CostLabel';
+import { CountdownSequence } from './CountdownSequence';
+import { playFailureTone, playSuccessChime } from './sound';
 import { useNow } from './useNow';
 import { WeatherRadarSweep } from './WeatherRadarSweep';
 import type { LaunchRecord, Process, SoundingChecklistItemId } from '../core/types';
@@ -102,6 +104,13 @@ function RocketOption({ rocket, contractId }: { rocket: SoundingRocketDef; contr
  * same "Contract fulfilled is on top of the underlying flight" rule Aurora's contract
  * variant already follows (ECONOMY §8). */
 function ResultCard({ launch, onDismiss }: { launch: LaunchRecord; onDismiss: () => void }) {
+  // UI_SPEC §1c: success chime / failure tone at the moment a result first renders — same
+  // reveal-beat treatment LaunchSequencePanel's own ResultCard gives Aurora/contract results.
+  useEffect(() => {
+    if (launch.success) playSuccessChime();
+    else playFailureTone();
+  }, [launch.id, launch.success]);
+
   const rocket = SOUNDING_ROCKETS[launch.missionType as 's1' | 's2'];
   const headline = launch.success ? `${rocket.name} flight successful.` : "It didn't make it.";
   const detail = launch.success
@@ -148,7 +157,15 @@ const CHECKLIST_LABELS: Record<SoundingChecklistItemId, string> = {
   flightReview: 'Flight review',
 };
 
-function InFlightMission() {
+/** UI_SPEC screen 5 (Sprint 11): `launchSounding()` fires immediately on press (same
+ * "resolve now, reveal later" split LaunchSequencePanel's own countdown uses — no
+ * narrative beat here depends on the timing the way Aurora I's N-10 does, but keeping
+ * resolution synchronous with the click avoids a second, different launch-timing model).
+ * `mission.sounding` goes null the instant `launchSounding()` resolves, which unmounts
+ * THIS component (SoundingMissionPanel's own `hasMission` gate) — so the countdown
+ * reveal-gate can't live in local state here, it has to live in the parent, which is why
+ * this only calls `onLaunch()` rather than owning a `counting` state itself. */
+function InFlightMission({ onLaunch }: { onLaunch: () => void }) {
   const mission = useGameStore(useShallow((s) => s.mission.sounding))!;
   const processes = useGameStore(useShallow((s) => s.processes));
   const propellant = useGameStore((s) => s.resources.propellant.amount);
@@ -172,6 +189,7 @@ function InFlightMission() {
       return;
     }
     launchSounding();
+    onLaunch();
   }
 
   return (
@@ -252,6 +270,7 @@ export function SoundingMissionPanel() {
   const hasMission = useGameStore((s) => s.mission.sounding !== null);
   const launches = useGameStore(useShallow((s) => s.mission.launches));
   const [dismissedLaunchId, setDismissedLaunchId] = useState<string | null>(null);
+  const [counting, setCounting] = useState(false);
 
   const latestLaunch = [...launches].reverse().find((l) => l.missionType === 's1' || l.missionType === 's2');
   const showResult = !hasMission && latestLaunch && latestLaunch.id !== dismissedLaunchId;
@@ -261,10 +280,14 @@ export function SoundingMissionPanel() {
       <div className="research-panel__header">
         {hasMission ? 'Sounding rocket mission' : 'Launch a sounding rocket'}
       </div>
-      {showResult && latestLaunch ? (
+      {counting ? (
+        // Checked before showResult for the same reason LaunchSequencePanel's own
+        // countdown is: launchSounding() already resolved by the time this is true.
+        <CountdownSequence onComplete={() => setCounting(false)} />
+      ) : showResult && latestLaunch ? (
         <ResultCard launch={latestLaunch} onDismiss={() => setDismissedLaunchId(latestLaunch.id)} />
       ) : hasMission ? (
-        <InFlightMission />
+        <InFlightMission onLaunch={() => setCounting(true)} />
       ) : (
         <MissionPicker />
       )}

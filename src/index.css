@@ -1507,6 +1507,58 @@ body {
   cursor: not-allowed;
 }
 
+/* UI_SPEC screen 5 (Sprint 11, NEW): the countdown takeover — same "replaces the panel's
+ * own content" pattern .launch-result already established (not a separate app-level
+ * modal/backdrop), just a bolder, centered treatment for the one moment that earns it. */
+.countdown-sequence {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 16px;
+  position: relative;
+  min-height: 220px;
+}
+
+.countdown-sequence__digit {
+  font-size: 4.5em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+  line-height: 1;
+  animation: countdown-digit-pop 0.3s ease-out;
+}
+
+@keyframes countdown-digit-pop {
+  from {
+    font-weight: 300;
+    transform: scale(0.7);
+    opacity: 0.4;
+  }
+  to {
+    font-weight: 700;
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.countdown-sequence__caption {
+  min-height: 1.4em;
+  color: var(--text-dim);
+  font-size: 0.95em;
+  text-align: center;
+  max-width: 320px;
+}
+
+.countdown-sequence__particles {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
 .contracts-panel {
   border-top: 1px solid var(--border);
   margin-top: 4px;
