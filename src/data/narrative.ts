@@ -173,6 +173,27 @@ export const NARRATIVE_TEXT: Record<string, string> = {
   // (UI_SPEC §3 screen 8).
   'T-29':
     'The next chapter — crewed missions, the Moon, a station in orbit — is still ahead. For now: the program you built got something into space, on purpose, more than once.',
+  // §13 (v4.0, Sprint 11) — contextual job titles, keyed by `${buildingId}.${role}` (no
+  // separate ID column, same "id IS the key" reasoning as §8's research node descriptions
+  // immediately above). launchPadB reuses launchPad's own title (ECONOMY §4: same
+  // building, same job, second location).
+  'finance.technician': 'Fundraising associate',
+  'rndLab.scientist': 'Research fellow',
+  'supplyDepot.technician': 'Warehouse hand',
+  'fabrication.engineer': 'Fabrication engineer',
+  'fabrication.technician': 'Machine operator',
+  'refinery.engineer': 'Process engineer',
+  'testStand.engineer': 'Test engineer',
+  'testStand.technician': 'Stand technician',
+  'launchRail.technician': 'Rail crew',
+  'payloadProcessing.engineer': 'Integration engineer',
+  'payloadProcessing.scientist': 'Payload specialist',
+  'vab.engineer': 'Assembly engineer',
+  'vab.technician': 'VAB technician',
+  'launchPad.technician': 'Pad crew',
+  'launchPadB.technician': 'Pad crew',
+  'launchControl.controller': 'Flight controller',
+  'trackingStation.scientist': 'Telemetry analyst',
 };
 
 /** Resolves an ID to its text, filling any `{name}` placeholders (T-10's open-slot

@@ -171,7 +171,13 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
         return (
           <div key={role} className="building-tile__staff-row">
             <div className="building-tile__staff-row-main">
-              <span>{ROLE_LABEL[role]}</span>
+              <span>
+                {ROLE_LABEL[role]}
+                {/* UI_SPEC §2 building-tile rule / NARRATIVE §13 (Sprint 11): contextual
+                    job title as secondary text — presentation only, the mechanical role
+                    label right before it stays the actual source of truth. */}
+                <span className="building-tile__role-title"> — {narrativeText(`${buildingId}.${role}`)}</span>
+              </span>
               <div className="stepper">
                 <button
                   type="button"

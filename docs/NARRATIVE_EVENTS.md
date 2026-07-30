@@ -1,6 +1,12 @@
 # NARRATIVE_EVENTS.md — Aurora Program — Complete v1 game text (English)
 *All game text lives here, referenced by ID. Claude Code writes no new narrative: missing beats get added here first. Tone: skeptical press slowly turning believer; dry-humored internal memos.*
 
+**v4.0 changes (Sprint 11 — Polish):** new §13, contextual job titles — a short flavor
+title per (building, role) staff slot, shown as secondary text next to the mechanical
+role name (UI_SPEC §2 building-tile rule, presentation only). §12 is Flight Experience
+node descriptions (already live in code since Sprint 10 — see data/narrative.ts — still
+pending sync into this doc from the owner's side per Sprint 10's own note).
+
 **v3.9 changes (genre research + owner-selected new features):** T-24 (Confidence explainer, first time shown below 100%) and T-25 (first-orbital-attempt distinguishing beat before Aurora I's VAB work) added. New §11: Current Directive text table (UI_SPEC §2h) — a persistent, dynamic "what now" indicator addressing a recurring root-cause confusion pattern across multiple playtests.
 
 **v3.8 changes:** T-23 added — the level-10 building-expansion milestone's celebration toast (ECONOMY §4c).
@@ -153,3 +159,24 @@ Ordered roughly by when each becomes the active directive; the engine shows whic
 | Verb | Description |
 |---|---|
 | Rush Order | "Trade Funding for instant Materials when you need them now instead of waiting on the Depot." |
+
+## 13. Contextual job titles (Sprint 11, NEW — per-building staff role flavor, UI_SPEC §2 building-tile rule)
+Shown as dimmed secondary text next to the mechanical role name in a building's staff row — presentation only, the mechanical role stays the source of truth for slots/salary/promotion. No separate ID column (same "no ID column, the key IS the id" pattern §8 uses for research nodes): keyed in code by `${buildingId}.${role}`. Launch Pad B reuses Launch Pad's own title (same job, second location — ECONOMY §4's own "same cost/effect/copy as Pad A's" precedent for that building).
+| Building | Role | Title |
+|---|---|---|
+| Finance | Technician | "Fundraising associate" |
+| R&D Lab | Scientist | "Research fellow" |
+| Supply Depot | Technician | "Warehouse hand" |
+| Fabrication | Engineer | "Fabrication engineer" |
+| Fabrication | Technician | "Machine operator" |
+| Refinery | Engineer | "Process engineer" |
+| Engine Test Stand | Engineer | "Test engineer" |
+| Engine Test Stand | Technician | "Stand technician" |
+| Launch Rail | Technician | "Rail crew" |
+| Payload Processing | Engineer | "Integration engineer" |
+| Payload Processing | Scientist | "Payload specialist" |
+| VAB | Engineer | "Assembly engineer" |
+| VAB | Technician | "VAB technician" |
+| Launch Pad (and Pad B) | Technician | "Pad crew" |
+| Launch Control | Controller | "Flight controller" |
+| Tracking Station | Scientist | "Telemetry analyst" |
