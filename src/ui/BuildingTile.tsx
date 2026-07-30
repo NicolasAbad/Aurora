@@ -20,9 +20,17 @@ import {
   unassignedCount,
 } from '../core/staff';
 import { upgradeDeltaPreview } from '../core/upgradePreview';
-import type { BuildingId, ResourceId, RoleId } from '../core/types';
+import type { BuildingId, Modifier, ResourceId, RoleId, StaffState } from '../core/types';
 import { BuildingIcon } from './BuildingIcon';
 import { CostLabel } from './CostLabel';
+
+// Sprint 11 performance pass: a stub pool for roles this specific building has no slots
+// for — `assignedToBuilding`/`unassignedCount`/`buildingStaffRatio` (core/staff.ts) all
+// take a full StaffState, but only ever read `.pools[role]` for roles actually in
+// `def.slots`, so a stable, never-read stand-in for the rest is safe and lets the
+// selector below subscribe to just the relevant role(s) instead of all four.
+const EMPTY_POOL: StaffState['pools'][RoleId] = { hired: 0, assigned: {} as Record<BuildingId, number> };
+const EMPTY_MODIFIERS: Modifier[] = [];
 
 interface BuildingTileProps {
   buildingId: BuildingId;
@@ -34,9 +42,39 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
   const level = useGameStore((s) => s.buildings[buildingId].level);
   const starvedIndicator = useGameStore((s) => s.buildings[buildingId].starvedIndicator);
   const ownedUpgrades = useGameStore((s) => s.buildings[buildingId].upgrades);
-  const modifiers = useGameStore(useShallow((s) => s.modifiers));
-  const resources = useGameStore(useShallow((s) => s.resources));
-  const staff = useGameStore(useShallow((s) => s.staff));
+  // Only fabrication's consume-multiplier ever reads modifiers — every other tile gets a
+  // stable empty array back, so a modifier expiring/being added elsewhere never
+  // re-renders the other 17 tiles.
+  const modifiers = useGameStore(
+    useShallow((s) => (buildingId === 'fabrication' ? s.modifiers : EMPTY_MODIFIERS)),
+  );
+  // Only the specific resource ids this building's own cost + internal-upgrade costs
+  // actually reference (usually 1-3 of the 7) — was the whole `resources` slice before,
+  // re-rendering every tile on every tick regardless of which resources it cares about.
+  const relevantResourceIds = Array.from(
+    new Set([
+      ...(Object.keys(def.baseCost) as ResourceId[]),
+      ...(def.internalUpgrades ?? []).flatMap((u) => Object.keys(u.cost) as ResourceId[]),
+    ]),
+  );
+  const resourceAmounts = useGameStore(
+    useShallow((s) => Object.fromEntries(relevantResourceIds.map((id) => [id, s.resources[id].amount]))),
+  ) as Record<ResourceId, number>;
+  // Only the role pool(s) this building has slots for — unassignedCount/
+  // assignedToBuilding/buildingStaffRatio never read any other role for this buildingId.
+  const relevantRoles = Object.keys(def.slots ?? {}) as RoleId[];
+  const relevantPools = useGameStore(
+    useShallow((s) => Object.fromEntries(relevantRoles.map((r) => [r, s.staff.pools[r]]))),
+  ) as Partial<StaffState['pools']>;
+  const staff: StaffState = {
+    astronauts: [],
+    pools: {
+      technician: relevantPools.technician ?? EMPTY_POOL,
+      engineer: relevantPools.engineer ?? EMPTY_POOL,
+      scientist: relevantPools.scientist ?? EMPTY_POOL,
+      controller: relevantPools.controller ?? EMPTY_POOL,
+    },
+  };
   const buyBuilding = useGameStore((s) => s.buyBuilding);
   const buyInternalUpgrade = useGameStore((s) => s.buyInternalUpgrade);
   const assign = useGameStore((s) => s.assign);
@@ -50,7 +88,7 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
   const alreadyBuilt = isOneTime && level > 0;
   const cost = costAtLevel(def.baseCost, def.costFactor, level);
   const costEntries = Object.entries(cost) as [ResourceId, number][];
-  const canAfford = costEntries.every(([id, amount]) => resources[id].amount >= amount);
+  const canAfford = costEntries.every(([id, amount]) => resourceAmounts[id] >= amount);
 
   // ECONOMY §4 (v2.8): "slots exist only at building level >= 1" — an unbuilt building
   // must not appear as an assignment target at all, not just refuse the click.
@@ -161,7 +199,7 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
       {level >= 1 && def.internalUpgrades?.map((upgrade) => {
         const owned = ownedUpgrades.includes(upgrade.id);
         const canAffordUpgrade = (Object.entries(upgrade.cost) as [ResourceId, number][]).every(
-          ([id, amount]) => resources[id].amount >= amount,
+          ([id, amount]) => resourceAmounts[id] >= amount,
         );
         return (
           <div key={upgrade.id} className="building-tile__internal-upgrade">
