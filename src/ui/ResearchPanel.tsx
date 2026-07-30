@@ -6,6 +6,7 @@ import { isNodeAvailable, isNodeVisible } from '../core/research';
 import { progressFraction, remainingMs } from '../core/time';
 import { formatDuration } from '../core/format';
 import { useNow } from './useNow';
+import { AnimatedCheck } from './AnimatedCheck';
 import { CostLabel } from './CostLabel';
 import type { Process } from '../core/types';
 
@@ -79,7 +80,7 @@ function TreeNode({ node, selected, onSelect }: { node: ResearchNode; selected: 
       onClick={onSelect}
     >
       <span className="research-tree__node-mark">
-        {state === 'done' ? '✓' : state === 'in-progress' ? '◐' : '○'}
+        {state === 'done' ? <AnimatedCheck /> : state === 'in-progress' ? '◐' : '○'}
       </span>
       <span className="research-tree__node-name">{node.name}</span>
     </button>

@@ -9,6 +9,7 @@ import { CONTRACT_TIERS, TIER0_PAYLOAD_EXTRA_HARDWARE, TIER0_PAYLOAD_EXTRA_PROPE
 import { FAILURE_FLIGHT_DATA_RATE, FAILURE_HARDWARE_RECOVERY_RATE, FAILURE_XP_RATE } from '../data/launch';
 import { narrativeText } from '../data/narrative';
 import { formatDuration, formatPercent } from '../core/format';
+import { AnimatedCheck } from './AnimatedCheck';
 import { CostLabel } from './CostLabel';
 import { CountdownSequence } from './CountdownSequence';
 import { playFailureTone, playSuccessChime } from './sound';
@@ -43,7 +44,7 @@ interface ChecklistRowProps {
 function ChecklistRow({ label, done, process, children, radar }: ChecklistRowProps) {
   return (
     <div className={`checklist-row ${done ? 'checklist-row--done' : ''}`}>
-      <span className="checklist-row__mark">{done ? '✓' : '○'}</span>
+      <span className="checklist-row__mark">{done ? <AnimatedCheck /> : '○'}</span>
       <span className="checklist-row__label">{label}</span>
       {!done && process && (radar ? <WeatherRadarSweep process={process} /> : <ChecklistRing process={process} />)}
       {!done && !process && children}

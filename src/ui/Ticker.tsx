@@ -5,6 +5,7 @@ import { satelliteLaunches } from '../core/auroraMission';
 import { formatAmount, formatRate } from '../core/format';
 import { getResourceRatePerSecond } from '../core/selectors';
 import { BUILDINGS } from '../data/buildings';
+import { useRollingNumber } from './useRollingNumber';
 import type { BuildingId, ResourceId } from '../core/types';
 
 const PRIMARY: { id: ResourceId; label: string }[] = [
@@ -36,6 +37,14 @@ function buildingsThatRaiseCap(id: ResourceId): string[] {
   return (Object.values(BUILDINGS) as (typeof BUILDINGS)[BuildingId][])
     .filter((def) => def.capBonus?.[id] !== undefined)
     .map((def) => def.name);
+}
+
+/** UI_SPEC §1 / §1b item 3 (Sprint 11): "rolling number animations" — a dedicated
+ * component (not a hook call inline in a `.map()`) since `visiblePrimary`/`visibleSecondary`
+ * grow over the game as more resources are revealed, which would otherwise violate the
+ * Rules of Hooks (a variable number of hook calls across renders). */
+function RollingAmount({ value }: { value: number }) {
+  return <>{formatAmount(useRollingNumber(value))}</>;
 }
 
 interface TickerProps {
@@ -106,7 +115,7 @@ export function Ticker({ onOpenSettings, onOpenConstellation }: TickerProps = {}
             <>
               <span className="ticker__label">{label}</span>
               <span className="ticker__value">
-                {formatAmount(res.amount)}
+                <RollingAmount value={res.amount} />
                 {res.cap !== null ? ` / ${formatAmount(res.cap)}` : ''}
               </span>
               <span className="ticker__rate">{formatRate(rate)}/s</span>
@@ -139,7 +148,9 @@ export function Ticker({ onOpenSettings, onOpenConstellation }: TickerProps = {}
           {visibleSecondary.map(({ id, label }) => (
             <div key={id} className="ticker__stat ticker__stat--compact">
               <span className="ticker__label">{label}</span>
-              <span className="ticker__value">{formatAmount(resources[id].amount)}</span>
+              <span className="ticker__value">
+                <RollingAmount value={resources[id].amount} />
+              </span>
             </div>
           ))}
         </div>

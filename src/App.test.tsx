@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { App } from './App';
 import { useGameStore } from './state/persistStore';
 import { createInitialState } from './data/initialState';
@@ -22,10 +22,16 @@ describe('App', () => {
     expect(screen.getByRole('button', { name: /pitch investors/i })).toBeDefined();
   });
 
-  it('pitching increases Funding (Sprint 1 acceptance: the pitch loop works)', () => {
+  it('pitching increases Funding (Sprint 1 acceptance: the pitch loop works)', async () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: /pitch investors/i }));
-    expect(screen.getByText(/^10 \/ 500$/)).toBeDefined();
+    // Sprint 11: the ticker value rolls toward the new amount (useRollingNumber) rather
+    // than snapping instantly — the underlying store value IS already 10 synchronously
+    // (confirmed via the store directly), the DOM just takes a moment to catch up.
+    expect(useGameStore.getState().resources.funding.amount).toBe(10);
+    await waitFor(() => {
+      expect(screen.getByText(/^10 \/ 500$/)).toBeDefined();
+    });
   });
 });
 

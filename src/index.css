@@ -1478,6 +1478,35 @@ body {
   color: var(--accent);
 }
 
+/* UI_SPEC §1b item 3 (Sprint 11): the self-drawing checkmark replacing the plain ✓. */
+.animated-check {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+.animated-check path {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 26;
+  stroke-dashoffset: 26;
+  animation: check-draw 0.35s ease-out forwards;
+}
+
+@keyframes check-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+:root[data-reduced-motion='true'] .animated-check path {
+  animation: none;
+  stroke-dashoffset: 0;
+}
+
 .checklist-row__label {
   flex: 1;
 }

@@ -8,6 +8,7 @@ import { useGameStore } from '../state/persistStore';
 import { DEFAULT_FLIGHT_XP_TREE_STATE, isXpNodeAvailable, isXpNodeVisible, XP_NODES_PENDING_DESIGN } from '../core/flightXp';
 import { XP_TREE, type XpNode } from '../data/flightXpTree';
 import { narrativeText } from '../data/narrative';
+import { AnimatedCheck } from './AnimatedCheck';
 import { CostLabel } from './CostLabel';
 
 const BRANCH_LABELS: Record<XpNode['branch'], string> = {
@@ -41,7 +42,7 @@ function TreeNode({ node, purchased, selected, onSelect }: { node: XpNode; purch
       className={`research-tree__node research-tree__node--${state === 'pending-design' ? 'locked' : state}${selected ? ' research-tree__node--selected' : ''}`}
       onClick={onSelect}
     >
-      <span className="research-tree__node-mark">{state === 'done' ? '✓' : '○'}</span>
+      <span className="research-tree__node-mark">{state === 'done' ? <AnimatedCheck /> : '○'}</span>
       <span className="research-tree__node-name">{node.name}</span>
     </button>
   );
