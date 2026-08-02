@@ -3119,3 +3119,93 @@ combined as one audit pass). 539 → 562 tests. Baseline re-confirmed clean befo
   own modal parent's `--panel` to read as distinct, and as a single low-traffic nested
   detail box (not a repeated list-of-cards), didn't seem worth introducing a whole new
   `--panel-raised` CSS variable for.
+
+## Sprint 11.5 follow-up — owner playtest of the closed build, two priorities (2026-08-02)
+
+Owner played the Sprint 11.5 build itself and found a playtest-blocking bug plus two
+disclosure/presentation gaps. Worked as Priority 1 (stop-everything bug) then Priority 2
+(two numbered tasks), each Playwright-verified live and committed separately.
+
+**Priority 1 — real bug, fixed: passive Funding never visibly grew once a Technician
+staffed Finance.** Root-caused via live instrumentation, not guessing: `resolveEconomyTick`
+was computing Funding correctly the whole time (confirmed by logging the store's own
+value climbing normally tick over tick) — the bug was entirely in the DISPLAY.
+`useRollingNumber` (Sprint 11's rolling-number animation) kept `target` in its `useEffect`
+dependency array; once a resource has any passive production, `target` changes on
+essentially every game-loop tick (~60/s), so the hook's `requestAnimationFrame` was
+cancelled and rescheduled before its first callback ever ran, every single time. The
+eased position was always recomputed at elapsed≈0 and never advanced — the number froze
+at whatever it was the instant continuous ticking began. **Not a Sprint 11.5 regression**
+— latent since Sprint 11 shipped rolling numbers, never exposed before because pitch-only
+play never ticks fast enough to trigger it; confirmed by reverting the fix and re-running
+the full suite, all 563 tests (including Sprint 1's own store-level acceptance test)
+still passed with the bug fully present, since that test never renders React at all.
+`useRollingNumber.test.ts` had the same blind spot (one discrete target change, never a
+continuous stream). Fix: one persistent rAF loop, restarted only on
+`reducedMotion`/`durationMs` changes (never `target`), exponentially decaying toward
+whatever the latest target is via a ref. Two earlier regression-test designs (a bounded
+burst of target changes, then wait) passed against BOTH the buggy and fixed code — a
+finite test always has a quiet moment for the last surviving frame to converge, which the
+real, never-ending game loop never provides; the test that actually shipped asserts the
+real mechanism instead (`requestAnimationFrame` not restarted per target change),
+verified to fail on the old code and pass on the fix before trusting it. 563 tests
+(up from 562).
+
+**Priority 2 task 1 — CLAUDE.md rule 13 (new) + T-02 fixed + a second bug it surfaced.**
+New standing rule: trigger conditions must be re-checked against CURRENT disclosure state
+whenever a staged-reveal rule changes nearby, not just left as originally written. T-02
+("you can afford your first technician") used to fire on Funding ≥ 50 alone, predating
+the Campus staged-reveal rules — could fire before Finance (and therefore hiring itself)
+was even built. Now also requires `finance.level >= 1`. Applied by hand-editing HEAD's
+NARRATIVE_EVENTS.md rather than accepting the owner's replacement doc wholesale (rule
+5b): that replacement dropped several sprints of shipped-code-dependent content in
+transit (§13 contextual job titles, T-30 save-corruption warning, T-31 promotion-only
+copy, and reverted Basic engineering/Scientific method's text to pre-Sprint-11.5
+wording) — confirmed each was still live in code before discarding the regressive parts
+and hand-applying just the real change. Grepped every other FTUE tooltip and Current
+Directive against every disclosure gate in App.tsx per rule 13's own mandate ("T-02 might
+not be alone") and found a second real one: **D-10** ("Build the VAB") fired on the
+`pastKarman` record alone, but that only requires the Propulsion tech branch
+(soundingRockets → probe1Engine) — entirely independent of the Program branch's
+`flightProgram` node that actually unlocks the Launch complex where the VAB lives. A
+player can reach a successful S-2 well before researching that far. Now also requires
+`flightProgram` researched. Had zero prior test coverage (no D-04/D-07/D-10 tests
+existed before this). 567 tests (up from 563).
+
+**Priority 2 task 2 — Site Map SECOND rework (UI_SPEC v3.7).** The first resize (this
+sprint's own task 15, bigger corner thumbnail) still registered as no impact — real
+finding: a small always-visible corner widget loses the attention fight regardless of
+size. Detached the map from the Current Directive's corner entirely; it's now reached via
+its own ticker-area entry point (icon+count, same weight as the Constellation View's),
+and a new `SiteMapCelebration` fires automatically the instant a building completes its
+FIRST construction — a brief zoom-in with the new plot self-drawing in (reusing
+AnimatedCheck's stroke technique), then auto-dismissing. **Real bug found and fixed via
+live Playwright verification, not caught by unit tests:** the celebration's dismiss timer
+was keyed on the raw `buildings` object, which `resolveEconomyTick`'s own
+Fabrication/Refinery starvation bookkeeping hands a new reference every tick even when
+unchanged — the exact same freeze class as Priority 1's bug, just for a `setTimeout`
+instead of a rAF loop, found minutes after fixing the first one. Fixed by keying the
+effect on a stable primitive (built count) instead. Two apparent visual bugs during
+verification (Offices missing from the map, celebration backdrop invisible) both turned
+out to be screenshots caught mid-flight through CSS animations already in progress, not
+real bugs — confirmed by waiting for each to settle; noted here rather than silently
+discarded, since a phantom-bug chase costs a future session the same time a missed real
+one would. `builtBuildingCount` moved from SiteMap.tsx to `core/selectors.ts` (a pure
+derived value, not a component — rule 3; also fixed a react-refresh lint warning). 578
+tests (up from 567).
+
+**Verification, all three items:** typecheck/lint/build clean after each commit (not
+batched to the end). Playwright, through a real dev server (not the test suite) for
+every item: T-02 verified both directions (silent before Finance, fires after); the full
+Site Map flow (entry point from turn one with the correct count, full map open/close,
+detachment from the Current Directive, celebration firing and auto-dismissing under real
+continuous ticking) end to end with zero console errors. D-10 relies on unit coverage —
+reaching that specific game state (S-2 success, zero Program-branch research) live isn't
+practical to script. No sim changes required — none of the three items touch economy
+values, only display/disclosure logic.
+
+**Scope note:** dev servers accumulated across the session on ports 5173-5183 because
+`lsof` isn't available in this Windows/Git Bash environment, silently no-op-ing the
+intended `kill` after each restart — found and cleaned up via PowerShell
+(`Get-NetTCPConnection`/`Stop-Process`) partway through; worth remembering for any future
+session's own port-cleanup commands in this same environment.
