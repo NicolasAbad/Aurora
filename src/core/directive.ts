@@ -71,7 +71,18 @@ export function directiveCondition(id: (typeof DIRECTIVE_ORDER)[number], state: 
         !state.mission.launches.some((l) => l.missionType === 's1' || l.missionType === 's2')
       );
     case 'D-10':
-      return state.records.includes('pastKarman') && state.buildings.vab.level === 0;
+      // CLAUDE.md rule 13: real bug found alongside T-02's fix — `pastKarman` only
+      // requires the Propulsion tech branch (soundingRockets -> probe1Engine), which is
+      // entirely independent of the Program branch's `flightProgram` node that actually
+      // unlocks the Launch complex (ComplexTabs.tsx's LAUNCH_UNLOCK_TECH, where the VAB
+      // lives) — a player can reach an S-2 success well before researching that far,
+      // during which this directive would tell them to build a building they can't even
+      // see yet. Now requires the Launch complex to actually be unlocked too.
+      return (
+        state.records.includes('pastKarman') &&
+        state.buildings.vab.level === 0 &&
+        state.research.completed.includes('flightProgram')
+      );
     case 'D-11':
       return Object.values(state.mission.pads).some(
         (pad) => pad && pad.contractId == null && pad.rocketStatus !== 'none',

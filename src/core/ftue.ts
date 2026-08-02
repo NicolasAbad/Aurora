@@ -34,7 +34,12 @@ export function ftueTooltipCondition(id: (typeof FTUE_TOOLTIP_ORDER)[number], st
     case 'T-01':
       return true; // Start — eligible from the very first frame
     case 'T-02':
-      return state.resources.funding.amount >= 50; // "afford your first technician" (hireStaff base cost)
+      // "Afford your first technician" (hireStaff base cost) — CLAUDE.md rule 13 / NARRATIVE
+      // v3.6: fixed real bug, this used to check Funding alone, predating the Campus
+      // staged-reveal rules (UI_SPEC §2d); hiring itself is gated on Finance existing
+      // (StaffHiring only renders once financeLevel >= 1, App.tsx), so a Funding-only
+      // check could fire before hiring was even reachable. Both conditions now required.
+      return state.buildings.finance.level >= 1 && state.resources.funding.amount >= 50;
     case 'T-03':
       return totalHired(state.staff) > 0; // First hire
     case 'T-04':

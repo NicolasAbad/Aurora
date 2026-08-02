@@ -7,13 +7,26 @@ describe('ftueTooltipCondition', () => {
     expect(ftueTooltipCondition('T-01', createInitialState())).toBe(true);
   });
 
-  it('T-02 (50 Funding) tracks current balance, not lifetime earned', () => {
+  it('T-02 (50 Funding) tracks current balance, not lifetime earned, once Finance is built', () => {
     const state = createInitialState();
+    state.buildings.finance.level = 1;
     expect(ftueTooltipCondition('T-02', state)).toBe(false);
     state.resources.funding.amount = 49;
     expect(ftueTooltipCondition('T-02', state)).toBe(false);
     state.resources.funding.amount = 50;
     expect(ftueTooltipCondition('T-02', state)).toBe(true);
+  });
+
+  // CLAUDE.md rule 13 / NARRATIVE v3.6: real bug, T-02 used to fire on Funding alone,
+  // before the Campus staged-reveal rules existed — StaffHiring (and hiring itself)
+  // isn't reachable until Finance is built (App.tsx's financeLevel >= 1 gate), so a
+  // Funding-only check could tell the player "you can afford your first technician" with
+  // no way to act on it yet.
+  it('T-02 does NOT fire on Funding alone before Finance is built (real bug, fixed)', () => {
+    const state = createInitialState();
+    state.resources.funding.amount = 500;
+    expect(state.buildings.finance.level).toBe(0);
+    expect(ftueTooltipCondition('T-02', state)).toBe(false);
   });
 
   it('T-03 (First hire) tracks any role hired', () => {
@@ -108,6 +121,7 @@ describe('nextFtueTooltip', () => {
 
   it('skips a dismissed tooltip even if its condition is true, revealing the next one', () => {
     const state = createInitialState();
+    state.buildings.finance.level = 1;
     state.resources.funding.amount = 50; // T-01 and T-02 both eligible
     expect(nextFtueTooltip(state, new Set(['T-01']))).toBe('T-02');
   });

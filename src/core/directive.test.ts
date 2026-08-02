@@ -64,6 +64,30 @@ describe('currentDirective (UI_SPEC §2h, Sprint 9.5)', () => {
     expect(currentDirective(state)).toBe('D-09');
   });
 
+  it('D-10 once S-2/Kármán is done, flightProgram is researched, and the VAB is not yet built', () => {
+    const state = createInitialState();
+    state.buildings.finance.level = 1;
+    state.staff.pools.technician.hired = 1;
+    state.records = ['pastKarman'];
+    state.research.completed = ['flightProgram'];
+    expect(currentDirective(state)).toBe('D-10');
+  });
+
+  // CLAUDE.md rule 13: real bug found alongside T-02's fix. `pastKarman` (S-2 success)
+  // only requires the Propulsion tech branch, entirely independent of the Program
+  // branch's `flightProgram` node that actually unlocks the Launch complex (where the
+  // VAB lives, ComplexTabs.tsx) — a player can reach pastKarman well before researching
+  // that far. Without the fix, D-10 would tell them to build a building they can't even
+  // see yet.
+  it('D-10 does NOT fire on pastKarman alone if the Launch complex is not unlocked yet (real bug, fixed)', () => {
+    const state = createInitialState();
+    state.buildings.finance.level = 1;
+    state.staff.pools.technician.hired = 1;
+    state.records = ['pastKarman'];
+    expect(state.research.completed.includes('flightProgram')).toBe(false);
+    expect(currentDirective(state)).not.toBe('D-10');
+  });
+
   it('D-11 while an Aurora-story pad has an integration in progress', () => {
     const state: GameState = {
       ...createInitialState(),

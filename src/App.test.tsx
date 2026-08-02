@@ -42,17 +42,32 @@ describe('App — FTUE tooltip (T-01..T-09)', () => {
     expect(screen.getByText('Pitch your idea to raise your first funding.')).toBeDefined();
   });
 
-  it('dismissing T-01 reveals T-02 once Funding >= 50', () => {
+  it('dismissing T-01 reveals T-02 once Finance is built and Funding >= 50', () => {
     render(<App />);
     fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
     expect(screen.queryByText('Pitch your idea to raise your first funding.')).toBeNull();
 
     act(() => {
       useGameStore.setState((s) => ({
+        buildings: { ...s.buildings, finance: { ...s.buildings.finance, level: 1 } },
         resources: { ...s.resources, funding: { ...s.resources.funding, amount: 50 } },
       }));
     });
     expect(screen.getByText('You can afford your first technician now.')).toBeDefined();
+  });
+
+  // CLAUDE.md rule 13: real bug found alongside the fix above — T-02 used to fire on
+  // Funding alone, before Finance (and therefore hiring itself) was even reachable.
+  it('does NOT reveal T-02 on Funding alone before Finance is built (real bug, fixed)', () => {
+    render(<App />);
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
+
+    act(() => {
+      useGameStore.setState((s) => ({
+        resources: { ...s.resources, funding: { ...s.resources.funding, amount: 50 } },
+      }));
+    });
+    expect(screen.queryByText('You can afford your first technician now.')).toBeNull();
   });
 });
 

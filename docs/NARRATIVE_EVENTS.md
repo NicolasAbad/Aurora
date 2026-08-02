@@ -16,6 +16,8 @@ data/narrative.ts — still pending sync into this doc from the owner's side per
 
 **v3.7 changes (Sprint 9.5 — second manual-play pass):** T-11/T-12 rewritten (short idle flag + dynamic fully-staffed copy naming the real upgrade); T-13 adds permanent per-role salary display; T-18/T-19/T-20 close the "silent completion" gap (promotions, research, upgrades now log something, per UI_SPEC §2f); T-21/T-22 add sonda purpose blurbs (why launch this, what do I get).
 
+**v3.6 changes (CLAUDE.md rule 13):** T-02 trigger fixed — was firing on raw Funding threshold alone, predating the Campus staged-reveal rules (UI_SPEC §2d), and could fire before hiring was even unlocked. Now requires Finance built (level ≥ 1) as well as ≥50 Funding.
+
 **v3.5 changes:** research node descriptions (§8), UI feedback toasts (§9), and manual verb copy (§10) added — closing real content gaps (Sounding rockets, Auto-refuel, VAB queues, Rush Order all previously had no player-facing text). Sections renumbered sequentially.
 
 **v2.1 changes:** doc-ID references removed from player-facing text (N-08c, N-15); E-04 effect restated as pool + modifier (no tracked individuals); T-07 (payroll unpaid) and T-08 (propellant capacity) tooltips added.
@@ -47,7 +49,7 @@ data/narrative.ts — still pending sync into this doc from the owner's side per
 | ID | Moment | Text |
 |---|---|---|
 | T-01 | Start | "Pitch your idea to raise your first funding." |
-| T-02 | 50 Funding | "You can afford your first technician now." |
+| T-02 | Finance built (level ≥ 1) AND ≥50 Funding — **fixed real bug: this used to trigger on 50 Funding alone, predating the Campus staged-reveal rules (UI_SPEC §2d), and could fire before hiring was even unlocked** | "You can afford your first technician now." |
 | T-03 | First hire | "Assign them to Finance — they'll raise funds even while you're away." |
 | T-04 | First timer | "Processes keep running even when the game is closed." |
 | T-05 | Cap reached | "Storage is full. Expanding the Warehouse prevents wasted production." |
