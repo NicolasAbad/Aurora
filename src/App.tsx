@@ -20,6 +20,7 @@ import { CertificationPanel } from './ui/CertificationPanel';
 import { SoundingMissionPanel } from './ui/SoundingMissionPanel';
 import { ContractsPanel } from './ui/ContractsPanel';
 import { ConstellationView } from './ui/ConstellationView';
+import { SiteMapCelebration, SiteMapScreen } from './ui/SiteMap';
 import { LaunchSequencePanel } from './ui/LaunchSequencePanel';
 import { MissionLog } from './ui/MissionLog';
 import { TimeWarpControl } from './ui/TimeWarpControl';
@@ -417,6 +418,7 @@ export function App() {
   const dismissTip = (id: string) => setDismissedTips((prev) => new Set(prev).add(id));
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [constellationOpen, setConstellationOpen] = useState(false);
+  const [siteMapOpen, setSiteMapOpen] = useState(false);
 
   // UI_SPEC §7: "reduced-motion setting disables rolling numbers and pulses." Applied
   // as a root-level data attribute so index.css can override every animation in one
@@ -436,13 +438,19 @@ export function App() {
       <EventCard />
       {settingsOpen && <SettingsScreen onClose={() => setSettingsOpen(false)} />}
       {constellationOpen && <ConstellationView onClose={() => setConstellationOpen(false)} />}
+      {siteMapOpen && <SiteMapScreen onClose={() => setSiteMapOpen(false)} />}
+      <SiteMapCelebration />
       {__DEV_TOOLS__ && (
         <div className="dev-tools-row">
           <TimeWarpControl />
           <DevResetButton />
         </div>
       )}
-      <Ticker onOpenSettings={() => setSettingsOpen(true)} onOpenConstellation={() => setConstellationOpen(true)} />
+      <Ticker
+        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenConstellation={() => setConstellationOpen(true)}
+        onOpenSiteMap={() => setSiteMapOpen(true)}
+      />
       <SaveWarningBanner />
       <CurrentDirective />
       <ActiveProcessStrip onSelectComplex={setActiveComplex} />

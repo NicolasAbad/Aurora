@@ -3,7 +3,7 @@ import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../state/persistStore';
 import { satelliteLaunches } from '../core/auroraMission';
 import { formatAmount, formatRate } from '../core/format';
-import { getResourceRatePerSecond } from '../core/selectors';
+import { builtBuildingCount, getResourceRatePerSecond } from '../core/selectors';
 import { BUILDINGS } from '../data/buildings';
 import { useRollingNumber } from './useRollingNumber';
 import type { BuildingId, ResourceId } from '../core/types';
@@ -54,9 +54,15 @@ interface TickerProps {
   // UI_SPEC §2i (Sprint 10.5): "a small persistent ticker-area icon+count once ≥1 dot
   // exists." Same optional-prop pattern as onOpenSettings, for the same reason.
   onOpenConstellation?: () => void;
+  // UI_SPEC §2h (SECOND rework, v3.7): the Site Map's own dedicated entry point, same
+  // icon+count weight as onOpenConstellation above — unlike Constellation's "once ≥1 dot
+  // exists" gate, this is unconditional (Offices is built from turn one, so the count is
+  // never actually 0 in practice, and the map's whole point is being a persistent answer
+  // to "how big has my program gotten").
+  onOpenSiteMap?: () => void;
 }
 
-export function Ticker({ onOpenSettings, onOpenConstellation }: TickerProps = {}) {
+export function Ticker({ onOpenSettings, onOpenConstellation, onOpenSiteMap }: TickerProps = {}) {
   const resources = useGameStore(useShallow((s) => s.resources));
   const production = useGameStore(
     useShallow((s) => ({ buildings: s.buildings, staff: s.staff })),
@@ -65,6 +71,7 @@ export function Ticker({ onOpenSettings, onOpenConstellation }: TickerProps = {}
   // (salary.rate) and E-04 (salary.flat) are the only modifiers that ever target it.
   const modifiers = useGameStore((s) => s.modifiers);
   const satelliteCount = useGameStore((s) => satelliteLaunches(s.mission.launches).length);
+  const siteMapCount = useGameStore((s) => builtBuildingCount(s.buildings));
   const [capHintFor, setCapHintFor] = useState<ResourceId | null>(null);
 
   const visiblePrimary = PRIMARY.filter(({ id }) => isRevealed(id, resources));
@@ -72,6 +79,23 @@ export function Ticker({ onOpenSettings, onOpenConstellation }: TickerProps = {}
 
   return (
     <header className="ticker">
+      {onOpenSiteMap && (
+        <button
+          type="button"
+          className="ticker__sitemap-button"
+          aria-label={`Program Site Map: ${siteMapCount} building${siteMapCount === 1 ? '' : 's'} built`}
+          title="Program Site Map"
+          onClick={onOpenSiteMap}
+        >
+          <svg viewBox="0 0 24 24" className="ticker__sitemap-icon" aria-hidden="true">
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+          </svg>
+          <span>{siteMapCount}</span>
+        </button>
+      )}
       {onOpenConstellation && satelliteCount > 0 && (
         <button
           type="button"

@@ -1,8 +1,8 @@
-import { BUILDINGS } from '../data/buildings';
+import { BUILDINGS, BUILDING_IDS } from '../data/buildings';
 import { productionPerSecond } from './economy';
 import { applyModifiers } from './modifiers';
 import { totalSalaryPerSecond } from './staff';
-import type { BuildingId, GameState, Modifier, ResourceId } from './types';
+import type { BuildingId, BuildingState, GameState, Modifier, ResourceId } from './types';
 
 // Narrowed to what these selectors actually read, so callers (e.g. Ticker) can
 // subscribe to just `buildings` + `staff` instead of the whole store (rule 10).
@@ -48,4 +48,12 @@ export function getResourceRatePerSecond(
     total -= totalSalaryPerSecond(state.staff) * salaryRateMult + salaryFlatPerSecond;
   }
   return total;
+}
+
+/** Total built buildings right now — UI_SPEC §2h (Sprint 11.5, Site Map SECOND rework):
+ * the ticker-area entry point's "count," same icon+count shape as the Constellation
+ * View's. Lives here rather than in SiteMap.tsx (a pure derived value, not a component —
+ * CLAUDE.md rule 3) so Ticker.tsx can use it without importing UI-tree code. */
+export function builtBuildingCount(buildings: Record<BuildingId, BuildingState>): number {
+  return BUILDING_IDS.filter((id) => buildings[id].level >= 1).length;
 }

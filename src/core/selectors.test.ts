@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../data/initialState';
-import { getResourceRatePerSecond } from './selectors';
+import { BUILDING_IDS } from '../data/buildings';
+import { builtBuildingCount, getResourceRatePerSecond } from './selectors';
 
 describe('getResourceRatePerSecond', () => {
   it('is zero for every resource in the initial state (no staff, no leveled producers)', () => {
@@ -51,5 +52,25 @@ describe('getResourceRatePerSecond', () => {
     ];
     // (0.15 * 0.95 + 0.6) = 0.7425 salary cost -> -0.7425 net rate.
     expect(getResourceRatePerSecond(state, 'funding', modifiers, 0)).toBeCloseTo(-0.7425);
+  });
+});
+
+describe('builtBuildingCount (UI_SPEC §2h, Site Map SECOND rework)', () => {
+  it('counts Offices alone in the initial state (the only pre-built building)', () => {
+    const state = createInitialState();
+    expect(builtBuildingCount(state.buildings)).toBe(1);
+  });
+
+  it('increases by one for each building at level >= 1, regardless of level beyond that', () => {
+    const state = createInitialState();
+    state.buildings.finance.level = 1;
+    state.buildings.rndLab.level = 5; // a higher level still only counts once
+    expect(builtBuildingCount(state.buildings)).toBe(3); // offices + finance + rndLab
+  });
+
+  it('counts every building once it is all built', () => {
+    const state = createInitialState();
+    for (const id of BUILDING_IDS) state.buildings[id].level = 1;
+    expect(builtBuildingCount(state.buildings)).toBe(BUILDING_IDS.length);
   });
 });
