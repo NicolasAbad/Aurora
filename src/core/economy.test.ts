@@ -281,6 +281,29 @@ describe('resolveEconomyTick — Complex B consumers (ECONOMY §4b)', () => {
     expect(result.buildings.fabrication.starvedIndicator).toBe(false); // now clears
   });
 
+  // Sprint 11.5 follow-up: updateStarvation used to spread a brand-new BuildingState
+  // every tick, even once fedStreakMs/starvedIndicator had already settled — this exact
+  // reference churn was the mechanical root cause behind TWO real bugs this session
+  // (useRollingNumber, SiteMapCelebration), where a useEffect/timer keyed on `buildings`
+  // restarted every tick before its own dismiss/rAF could ever fire. Regression-tests the
+  // fix at its source rather than trusting every future consumer to avoid depending on
+  // `buildings` by reference.
+  it('once fed streak caps and starvedIndicator settles, further fed ticks return the SAME building object (not just equal values)', () => {
+    let state = fabricationState(1000); // plenty of Materials, never starves
+    let result = resolveEconomyTick(state.resources, state.buildings, state.staff, [], 1000);
+    for (let i = 0; i < 3; i++) {
+      state = { ...state, resources: result.resources, buildings: result.buildings };
+      result = resolveEconomyTick(state.resources, state.buildings, state.staff, [], 1000);
+    }
+    expect(result.buildings.fabrication.starvedIndicator).toBe(false);
+    expect(result.buildings.fabrication.fedStreakMs).toBe(3000); // hysteresis window fully elapsed
+
+    const steadyStateBuilding = result.buildings.fabrication;
+    state = { ...state, resources: result.resources, buildings: result.buildings };
+    const next = resolveEconomyTick(state.resources, state.buildings, state.staff, [], 1000);
+    expect(next.buildings.fabrication).toBe(steadyStateBuilding); // reference identity, not just equality
+  });
+
   it('oscillation case: Fabrication runs full-rate consistently while Refinery starves consistently, not both flickering', () => {
     // Supply Depot output tuned to exactly match Fabrication's per-tick demand, leaving
     // nothing for Refinery — fixed §4b claim order (Fabrication before Refinery) means

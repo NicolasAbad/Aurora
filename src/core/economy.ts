@@ -106,12 +106,24 @@ export interface EconomyTickResult {
 // call and a 1-min offline chunk both just add their own deltaMs to the same streak).
 const STARVATION_CLEAR_MS = 3000;
 
+// Sprint 11.5 follow-up: this used to spread a brand-new object every call, even once
+// `fedStreakMs`/`starvedIndicator` had already settled — at steady state (fed, streak
+// already capped) that meant `buildings.fabrication`/`buildings.refinery` got a new
+// reference on literally every tick forever, with the *values* inside never changing.
+// Two real bugs this session (useRollingNumber, SiteMapCelebration) turned out to be a
+// `useEffect`/timer keyed on an object like this one that "changes" every tick by
+// reference alone, which restarts the effect before its own setTimeout/rAF can ever
+// fire. Guarding the return here (same reference-stability pattern already used by
+// resolveRecords/markSeen elsewhere in core) closes the landmine at its source instead
+// of relying on every future consumer to remember not to depend on `buildings` directly.
 function updateStarvation(building: BuildingState, fed: boolean, deltaMs: number): BuildingState {
   if (!fed) {
+    if (building.starvedIndicator && building.fedStreakMs === 0) return building;
     return { ...building, starvedIndicator: true, fedStreakMs: 0 };
   }
   const fedStreakMs = Math.min(building.fedStreakMs + deltaMs, STARVATION_CLEAR_MS);
   const starvedIndicator = fedStreakMs >= STARVATION_CLEAR_MS ? false : building.starvedIndicator;
+  if (fedStreakMs === building.fedStreakMs && starvedIndicator === building.starvedIndicator) return building;
   return { ...building, fedStreakMs, starvedIndicator };
 }
 

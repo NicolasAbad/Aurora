@@ -3209,3 +3209,37 @@ values, only display/disclosure logic.
 intended `kill` after each restart — found and cleaned up via PowerShell
 (`Get-NetTCPConnection`/`Stop-Process`) partway through; worth remembering for any future
 session's own port-cleanup commands in this same environment.
+
+**Follow-up sweep — same bug class checked codebase-wide (2026-08-02).** Two real bugs in
+one session (useRollingNumber, SiteMapCelebration) sharing one shape — a `useEffect`/timer
+keyed on a store object that gets a new reference every tick even when its values are
+unchanged, restarting the effect before its own rAF/`setTimeout` ever fires — is a pattern,
+not a coincidence. Checked every other `useEffect` in `src/ui` and `App.tsx`, plus every
+`requestAnimationFrame`/`setInterval`/`setTimeout` call site in `src`:
+- `App.tsx`'s `MilestoneCallout` has the identical shape (`useShallow`-selected arrays +
+  effect + dismiss timer) but is safe: `records` and `narrative.seen` are threaded through
+  `resolveRecords`/`markSeen`, both of which already guard their return (same reference
+  back when nothing new was earned/seen) — the correct pattern, already established
+  elsewhere in `core` before this session.
+- `TierChangeToast`, `CountdownSequence`, `ResultCard` (both mission panels), `useNow`:
+  effect deps are either primitives (booleans, ids, `intervalMs`) or local component state
+  driven by their own timer, never a store object read by reference — structurally immune.
+- `main.tsx`'s `createGameLoop` and `startAutosave`'s `setInterval` aren't React effects at
+  all (module-scope, called once, read `getState()` live each tick) — no dependency array
+  to go stale.
+- `ManualActionButton`/`SettingsScreen`'s `setTimeout`s fire inside click handlers, not
+  effects with a dependency array — no restart-on-rerender exposure.
+
+No third live bug found. But traced the two known bugs to a shared root cause that was
+still present and unfixed: `core/economy.ts`'s `updateStarvation` (called every tick for
+Fabrication/Refinery) unconditionally spread a new `BuildingState` object on every call,
+even once `fedStreakMs`/`starvedIndicator` had already settled at steady state — the
+literal mechanism both bugs' `buildings` churn came from. `MilestoneCallout` only survived
+it by depending on different, better-guarded fields; nothing stopped a *future* effect from
+depending on `buildings.fabrication`/`buildings.refinery` directly and hitting the same
+freeze. Fixed at the source: guarded both branches to return the same reference when the
+values wouldn't actually change (same pattern `resolveRecords`/`markSeen` already use) —
+purely a reference-stability fix, zero observable behavior change, verified by the existing
+starvation/hysteresis tests still passing unmodified. Added one new regression test
+asserting reference identity (not just value equality) once the fed streak caps. 579 tests
+(up from 578); lint/build clean.
