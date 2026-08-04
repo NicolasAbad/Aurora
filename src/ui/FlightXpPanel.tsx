@@ -35,11 +35,19 @@ function nodeState(node: XpNode, purchased: string[]): NodeState {
 function TreeNode({ node, purchased, selected, onSelect }: { node: XpNode; purchased: string[]; selected: boolean; onSelect: () => void }) {
   if (!isXpNodeVisible(node, purchased)) return null;
   const state = nodeState(node, purchased);
+  // UI_SPEC §1d (Sprint 11.6 task 5, anti-slop re-audit): this panel reuses the exact
+  // same .research-tree__node styling as ResearchPanel — the "uniform cards regardless
+  // of importance" pattern task 1/3 fixed there was equally present here, since
+  // `mechanicChange` (GDD §9's own "changes a mechanic, not just a percentage" flag,
+  // already on the data — Partial reusability, Parallel integration) was never wired to
+  // any visual treatment. Reuses the SAME --weight-mechanic class ResearchPanel's own
+  // mechanic-changing nodes use — no new CSS needed, one consistent visual language.
+  const weightClass = node.mechanicChange ? ' research-tree__node--weight-mechanic' : '';
 
   return (
     <button
       type="button"
-      className={`research-tree__node research-tree__node--${state === 'pending-design' ? 'locked' : state}${selected ? ' research-tree__node--selected' : ''}`}
+      className={`research-tree__node research-tree__node--${state === 'pending-design' ? 'locked' : state}${weightClass}${selected ? ' research-tree__node--selected' : ''}`}
       onClick={onSelect}
     >
       <span className="research-tree__node-mark">{state === 'done' ? <AnimatedCheck /> : '○'}</span>
