@@ -10,7 +10,7 @@
 import { BUILDINGS } from '../data/buildings';
 import { costAtLevel } from './economy';
 import { totalHired, totalStaffCap } from './staff';
-import type { GameState } from './types';
+import type { BuildingId, GameState } from './types';
 
 export const DIRECTIVE_ORDER = [
   'D-01',
@@ -113,4 +113,31 @@ export function currentDirective(state: GameState): string | null {
     if (directiveCondition(id, state)) return id;
   }
   return null;
+}
+
+// UI_SPEC §1d (Sprint 11.6, NEW): "the building the Current Directive currently names
+// renders larger with accent-border treatment; everything else recedes." Not every
+// directive names a specific building (D-06 "pick a research node" is the Research tab,
+// not a Campus/Production/Testing/Launch tile; D-12 "check the Contracts panel" is its
+// own panel, not a building) — those return null, and BuildingTile.tsx's own logic
+// leaves every tile at its normal baseline when there's nothing on the building grid to
+// actually point at, rather than forcing a highlight onto an unrelated building.
+const DIRECTIVE_TARGET_BUILDING: Partial<Record<(typeof DIRECTIVE_ORDER)[number], BuildingId>> = {
+  'D-01': 'offices', // Pitch investors lives on the Offices tile (App.tsx)
+  'D-02': 'finance',
+  'D-03': 'finance', // "hire a Technician and assign them to Finance"
+  'D-04': 'crewQuarters',
+  'D-05': 'rndLab', // "...to staff the R&D Lab" — the promotion action itself lives in the Staff panel, but the payoff building is the Lab
+  'D-07': 'supplyDepot',
+  'D-08': 'testStand',
+  'D-09': 'launchRail', // sounding-rocket mission panel is reached from the Testing complex, same tab as Launch Rail
+  'D-10': 'vab',
+  'D-11': 'vab', // "Aurora I's stages integrate one at a time" — VAB integration in progress
+};
+
+/** Which building tile (if any) this directive is pointing at — the Site Map's own
+ * Directive-canvas highlight (UI_SPEC §2h third rework) reads the same mapping. */
+export function directiveTargetBuilding(id: string | null): BuildingId | null {
+  if (id === null) return null;
+  return DIRECTIVE_TARGET_BUILDING[id as (typeof DIRECTIVE_ORDER)[number]] ?? null;
 }

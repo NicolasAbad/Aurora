@@ -5,6 +5,7 @@ import { BUILDINGS } from '../data/buildings';
 import { RESOURCE_NAME } from '../data/resourceNames';
 import { ROLE_LABEL } from '../data/roles';
 import { narrativeText } from '../data/narrative';
+import { currentDirective, directiveTargetBuilding } from '../core/directive';
 import {
   costAtLevel,
   fabricationConsumeMultiplier,
@@ -78,6 +79,20 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
   const buyBuilding = useGameStore((s) => s.buyBuilding);
   const buyInternalUpgrade = useGameStore((s) => s.buyInternalUpgrade);
   const assign = useGameStore((s) => s.assign);
+  // UI_SPEC §1d (Sprint 11.6, NEW rule): "the building the Current Directive currently
+  // names renders larger with accent-border treatment; every other tile recedes to a
+  // smaller baseline" — the fix for the "uniform cards regardless of importance" slop
+  // signature, reusing the Directive system that already exists rather than a new
+  // mechanic. `currentDirective` returns a small string id (or null), so — same
+  // Zustand-selector shape CurrentDirective.tsx itself already uses — this tile only
+  // re-renders when the ACTIVE DIRECTIVE ID changes (a rare event), never per-tick.
+  const directiveId = useGameStore(currentDirective);
+  const directedBuildingId = directiveTargetBuilding(directiveId);
+  const isDirected = directedBuildingId === buildingId;
+  // Only recede when SOME tile is actually being pointed at (directedBuildingId !== null)
+  // — directives like D-06/D-12 that name a panel, not a building, must not shrink every
+  // tile on the board for no visible target.
+  const isReceded = directedBuildingId !== null && !isDirected;
 
   // UI_SPEC §2b: `locked` buildings (v1: Training Center only) render with their
   // condition and never a functional purchase path — not just disabled, genuinely
@@ -101,7 +116,9 @@ export function BuildingTile({ buildingId, children }: BuildingTileProps) {
     : null;
 
   return (
-    <div className="building-tile">
+    <div
+      className={`building-tile${isDirected ? ' building-tile--directed' : ''}${isReceded ? ' building-tile--receded' : ''}`}
+    >
       <div className="building-tile__header">
         <span className="building-tile__title">
           <BuildingIcon buildingId={buildingId} />

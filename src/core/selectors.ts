@@ -1,7 +1,7 @@
 import { BUILDINGS, BUILDING_IDS } from '../data/buildings';
 import { productionPerSecond } from './economy';
 import { applyModifiers } from './modifiers';
-import { totalSalaryPerSecond } from './staff';
+import { buildingStaffRatio, totalSalaryPerSecond } from './staff';
 import type { BuildingId, BuildingState, GameState, Modifier, ResourceId } from './types';
 
 // Narrowed to what these selectors actually read, so callers (e.g. Ticker) can
@@ -56,4 +56,42 @@ export function getResourceRatePerSecond(
  * CLAUDE.md rule 3) so Ticker.tsx can use it without importing UI-tree code. */
 export function builtBuildingCount(buildings: Record<BuildingId, BuildingState>): number {
   return BUILDING_IDS.filter((id) => buildings[id].level >= 1).length;
+}
+
+export type BuildingActivityState = 'active' | 'idle' | 'starved' | 'paused';
+
+/**
+ * UI_SPEC §2h (Sprint 11.6, THIRD reconception): the Site Map's actual reason to exist —
+ * "which buildings I've built" was already visible on every complex tab (redundant, the
+ * root cause the first two reworks never fixed); LIVE production/paused/starved state is
+ * genuinely new information no single tab can show at once (each tab only ever shows its
+ * own complex). Scoped deliberately to buildings that HAVE a production/consumption
+ * concept (`def.production` — Finance, Supply Depot, R&D Lab, Fabrication, Refinery):
+ * non-producer buildings (VAB, Launch Pad, Test Stand, Crew Quarters, ...) have no
+ * "production rate" to report, so this returns null for them rather than inventing an
+ * activity concept the docs never specified — the map falls back to their existing plain
+ * built/unbuilt rendering, same as before this rework.
+ * - `null`: not a producer, or not built yet.
+ * - `'idle'`: built, but nobody's currently assigned — nothing to pause or starve.
+ * - `'paused'`: GDD §1b insolvency — payroll unpaid, staffed production on hold. Checked
+ *   BEFORE starvation since insolvency's "ALL staffed production pauses" (ECONOMY §4b
+ *   item 1) is the outer gate the tick itself resolves first.
+ * - `'starved'`: a consumer (Fabrication/Refinery) whose inputs ran out this tick,
+ *   mirroring the same `starvedIndicator` BuildingTile.tsx already shows on the tile.
+ * - `'active'`: staffed, funded, fed — genuinely producing right now.
+ */
+export function buildingActivityState(
+  buildingId: BuildingId,
+  state: Pick<GameState, 'buildings' | 'staff' | 'economyFlags'>,
+): BuildingActivityState | null {
+  const def = BUILDINGS[buildingId];
+  if (!def.production) return null;
+  const building = state.buildings[buildingId];
+  if (building.level < 1) return null;
+
+  const ratio = buildingStaffRatio(state.staff, buildingId, building.level, building.upgrades);
+  if (ratio <= 0) return 'idle';
+  if (state.economyFlags.payrollUnpaid) return 'paused';
+  if (def.production.consumes && building.starvedIndicator) return 'starved';
+  return 'active';
 }

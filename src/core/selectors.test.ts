@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createInitialState } from '../data/initialState';
 import { BUILDING_IDS } from '../data/buildings';
-import { builtBuildingCount, getResourceRatePerSecond } from './selectors';
+import { buildingActivityState, builtBuildingCount, getResourceRatePerSecond } from './selectors';
 
 describe('getResourceRatePerSecond', () => {
   it('is zero for every resource in the initial state (no staff, no leveled producers)', () => {
@@ -72,5 +72,58 @@ describe('builtBuildingCount (UI_SPEC §2h, Site Map SECOND rework)', () => {
     const state = createInitialState();
     for (const id of BUILDING_IDS) state.buildings[id].level = 1;
     expect(builtBuildingCount(state.buildings)).toBe(BUILDING_IDS.length);
+  });
+});
+
+describe('buildingActivityState (UI_SPEC §2h, Site Map THIRD reconception)', () => {
+  it('is null for a non-producer building (nothing to report — VAB has no production field)', () => {
+    const state = createInitialState();
+    state.buildings.vab.level = 3;
+    expect(buildingActivityState('vab', state)).toBeNull();
+  });
+
+  it('is null for an unbuilt producer (level 0)', () => {
+    const state = createInitialState();
+    expect(buildingActivityState('finance', state)).toBeNull();
+  });
+
+  it('is idle when built but nobody is assigned', () => {
+    const state = createInitialState();
+    state.buildings.finance.level = 2;
+    expect(buildingActivityState('finance', state)).toBe('idle');
+  });
+
+  it('is active when staffed, funded, and (for a non-consumer) automatically fed', () => {
+    const state = createInitialState();
+    state.buildings.finance.level = 2;
+    state.staff.pools.technician.assigned.finance = 2;
+    expect(buildingActivityState('finance', state)).toBe('active');
+  });
+
+  it('is paused when payroll is unpaid, even if fully staffed (GDD §1b, outranks starvation)', () => {
+    const state = createInitialState();
+    state.buildings.fabrication.level = 2;
+    state.staff.pools.engineer.assigned.fabrication = 1;
+    state.staff.pools.technician.assigned.fabrication = 1;
+    state.buildings.fabrication.starvedIndicator = true; // both true at once — payroll must win
+    state.economyFlags.payrollUnpaid = true;
+    expect(buildingActivityState('fabrication', state)).toBe('paused');
+  });
+
+  it('is starved for a staffed consumer with starvedIndicator true and payroll paid', () => {
+    const state = createInitialState();
+    state.buildings.fabrication.level = 2;
+    state.staff.pools.engineer.assigned.fabrication = 1;
+    state.staff.pools.technician.assigned.fabrication = 1;
+    state.buildings.fabrication.starvedIndicator = true;
+    expect(buildingActivityState('fabrication', state)).toBe('starved');
+  });
+
+  it('a non-consumer producer (Finance has no `consumes`) is never starved, even with starvedIndicator true', () => {
+    const state = createInitialState();
+    state.buildings.finance.level = 2;
+    state.staff.pools.technician.assigned.finance = 2;
+    state.buildings.finance.starvedIndicator = true; // shouldn't happen in practice, but the field exists on every BuildingState
+    expect(buildingActivityState('finance', state)).toBe('active');
   });
 });

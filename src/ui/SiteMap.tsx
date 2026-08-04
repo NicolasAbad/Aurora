@@ -2,10 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { useGameStore } from '../state/persistStore';
 import { useSettings } from '../state/settings';
-import { builtBuildingCount } from '../core/selectors';
+import { currentDirective, directiveTargetBuilding } from '../core/directive';
+import { buildingActivityState, builtBuildingCount, type BuildingActivityState } from '../core/selectors';
 import { BUILDINGS, BUILDING_IDS } from '../data/buildings';
 import { BuildingIcon } from './BuildingIcon';
-import type { BuildingId, BuildingState, ComplexId } from '../core/types';
+import type { BuildingId, BuildingState, ComplexId, GameState } from '../core/types';
 
 // Fixed relative positions (SPRINTS.md Sprint 10.5, item 3): the 4 real building
 // complexes in the SAME order BUILDINGS.ts itself declares them — 'research'/'flightXp'
@@ -30,21 +31,36 @@ function isBuilt(id: BuildingId, buildings: Record<BuildingId, BuildingState>): 
   return buildings[id].level >= 1;
 }
 
+// UI_SPEC §2h (Sprint 11.6, THIRD reconception): activity state renders as its own
+// modifier class per plot, same "pictogram carries the meaning" language the pictograms
+// already use (§4) rather than a bolted-on badge. `null` (non-producer or unbuilt) means
+// "no live state to report" — the plot keeps its old plain built/unbuilt look.
+const ACTIVITY_CLASS: Record<BuildingActivityState, string> = {
+  active: 'site-map__plot--active',
+  idle: 'site-map__plot--idle',
+  starved: 'site-map__plot--starved',
+  paused: 'site-map__plot--paused',
+};
+
 function Plot({
   buildingId,
   built,
   showLabel,
   celebrating,
+  activity,
+  directed,
 }: {
   buildingId: BuildingId;
   built: boolean;
   showLabel: boolean;
   celebrating?: boolean;
+  activity?: BuildingActivityState | null;
+  directed?: boolean;
 }) {
   return (
     <div
-      className={`site-map__plot${built ? ' site-map__plot--built' : ''}${celebrating ? ' site-map__plot--celebrating' : ''}`}
-      title={BUILDINGS[buildingId].name}
+      className={`site-map__plot${built ? ' site-map__plot--built' : ''}${celebrating ? ' site-map__plot--celebrating' : ''}${activity ? ` ${ACTIVITY_CLASS[activity]}` : ''}${directed ? ' site-map__plot--directed' : ''}`}
+      title={`${BUILDINGS[buildingId].name}${activity ? ` — ${activity}` : ''}`}
     >
       {built && <BuildingIcon buildingId={buildingId} />}
       {showLabel && <span className="site-map__plot-label">{BUILDINGS[buildingId].name}</span>}
@@ -56,10 +72,17 @@ function SiteMapGrid({
   buildings,
   showLabels,
   celebratingId,
+  activityContext,
+  directedBuildingId,
 }: {
   buildings: Record<BuildingId, BuildingState>;
   showLabels: boolean;
   celebratingId?: BuildingId | null;
+  // UI_SPEC §2h THIRD rework: live per-building state. Optional — SiteMapCelebration
+  // (a transient, single-building spotlight) doesn't pass this, keeping its own moment
+  // uncluttered by unrelated plots pulsing; SiteMapScreen (the real destination) does.
+  activityContext?: Pick<GameState, 'buildings' | 'staff' | 'economyFlags'>;
+  directedBuildingId?: BuildingId | null;
 }) {
   return (
     <div className="site-map__grid">
@@ -74,6 +97,8 @@ function SiteMapGrid({
                 built={isBuilt(buildingId, buildings)}
                 showLabel={showLabels}
                 celebrating={buildingId === celebratingId}
+                activity={activityContext ? buildingActivityState(buildingId, activityContext) : null}
+                directed={buildingId === directedBuildingId}
               />
             ))}
           </div>
@@ -88,16 +113,25 @@ interface SiteMapScreenProps {
 }
 
 /**
- * UI_SPEC §2h (SECOND rework, v3.7): the Program Site Map as its own destination, not a
- * corner passenger on the Current Directive anymore — a bigger thumbnail still registered
- * as no impact (real playtest finding). Reached via a dedicated ticker-area icon+count
- * (Ticker.tsx, same weight as the Constellation View's own entry point) rather than being
- * rendered unconditionally in a corner. Schematic top-down layout, four complexes in
- * fixed relative positions, each building a blueprint pictogram that's already been
- * introduced via SiteMapCelebration's own moment by the time it's sitting in this view.
+ * UI_SPEC §2h (THIRD reconception, Sprint 11.6): the first two reworks (bigger
+ * thumbnail, own destination + celebration moment) both still registered as "no impact"
+ * — real finding: the root cause was never size or placement, it was that the map never
+ * showed anything the Campus/Production/Testing/Launch tabs don't already show
+ * ("which buildings I've built" is redundant with every tab). This rework changes what
+ * the map is FOR: (1) every producer plot reflects its LIVE production/paused/starved
+ * state (`buildingActivityState`, core/selectors.ts) — genuinely new information, since
+ * no single complex tab can show the WHOLE program's activity at once, only its own
+ * complex; (2) the map becomes the Current Directive's literal canvas — whatever
+ * building the Directive currently names is highlighted directly here, giving the map
+ * real navigational utility instead of being a passive backdrop. Reached via the same
+ * dedicated ticker-area icon+count as before (Ticker.tsx).
  */
 export function SiteMapScreen({ onClose }: SiteMapScreenProps) {
   const buildings = useGameStore(useShallow((s) => s.buildings));
+  const staff = useGameStore(useShallow((s) => s.staff));
+  const economyFlags = useGameStore(useShallow((s) => s.economyFlags));
+  const directiveId = useGameStore(currentDirective);
+  const directedBuildingId = directiveTargetBuilding(directiveId);
 
   return (
     <div className="site-map-backdrop" onClick={onClose}>
@@ -108,7 +142,18 @@ export function SiteMapScreen({ onClose }: SiteMapScreenProps) {
             ×
           </button>
         </div>
-        <SiteMapGrid buildings={buildings} showLabels />
+        <SiteMapGrid
+          buildings={buildings}
+          showLabels
+          activityContext={{ buildings, staff, economyFlags }}
+          directedBuildingId={directedBuildingId}
+        />
+        <div className="site-map-screen__legend">
+          <span className="site-map__legend-item site-map__legend-item--active">Producing</span>
+          <span className="site-map__legend-item site-map__legend-item--idle">Idle</span>
+          <span className="site-map__legend-item site-map__legend-item--starved">Starved</span>
+          <span className="site-map__legend-item site-map__legend-item--paused">Payroll paused</span>
+        </div>
       </div>
     </div>
   );

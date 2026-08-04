@@ -24,6 +24,71 @@ describe('SiteMapScreen', () => {
     expect(screen.getByText('Offices')).toBeDefined(); // built from the start
     expect(screen.getByText('Finance')).toBeDefined(); // unbuilt in the initial state
   });
+
+  it('shows the legend for live activity states', () => {
+    render(<SiteMapScreen onClose={() => {}} />);
+    expect(screen.getByText('Producing')).toBeDefined();
+    expect(screen.getByText('Idle')).toBeDefined();
+    expect(screen.getByText('Starved')).toBeDefined();
+    expect(screen.getByText('Payroll paused')).toBeDefined();
+  });
+});
+
+describe('SiteMapScreen — live activity state (UI_SPEC §2h THIRD reconception)', () => {
+  it("a staffed, producing building's plot carries the active state in its title", () => {
+    const state = createInitialState();
+    state.buildings.finance.level = 2;
+    state.staff.pools.technician.assigned.finance = 2;
+    useGameStore.setState(state);
+    render(<SiteMapScreen onClose={() => {}} />);
+    expect(screen.getByTitle('Finance — active')).toBeDefined();
+  });
+
+  it("a built-but-unstaffed producer's plot carries the idle state", () => {
+    const state = createInitialState();
+    state.buildings.finance.level = 1; // built, nobody assigned
+    useGameStore.setState(state);
+    render(<SiteMapScreen onClose={() => {}} />);
+    expect(screen.getByTitle('Finance — idle')).toBeDefined();
+  });
+
+  it('a starved consumer carries the starved state', () => {
+    const state = createInitialState();
+    state.buildings.fabrication.level = 2;
+    state.staff.pools.engineer.assigned.fabrication = 1;
+    state.staff.pools.technician.assigned.fabrication = 1;
+    state.buildings.fabrication.starvedIndicator = true;
+    useGameStore.setState(state);
+    render(<SiteMapScreen onClose={() => {}} />);
+    expect(screen.getByTitle('Fabrication — starved')).toBeDefined();
+  });
+
+  it('payroll-unpaid overrides every staffed producer to the paused state', () => {
+    const state = createInitialState();
+    state.buildings.finance.level = 2;
+    state.staff.pools.technician.assigned.finance = 2;
+    state.economyFlags.payrollUnpaid = true;
+    useGameStore.setState(state);
+    render(<SiteMapScreen onClose={() => {}} />);
+    expect(screen.getByTitle('Finance — paused')).toBeDefined();
+  });
+
+  it('a non-producer building (VAB) has no activity suffix at all — nothing to report', () => {
+    const state = createInitialState();
+    state.buildings.vab.level = 2;
+    useGameStore.setState(state);
+    render(<SiteMapScreen onClose={() => {}} />);
+    expect(screen.getByTitle('VAB')).toBeDefined();
+  });
+
+  it('highlights the Current Directive-named building as the directed plot', () => {
+    const state = createInitialState();
+    state.resources.funding = { amount: 0, cap: 1000, lifetimeEarned: 0 }; // D-01: pitch investors -> Offices
+    useGameStore.setState(state);
+    render(<SiteMapScreen onClose={() => {}} />);
+    const officesPlot = screen.getByTitle('Offices').closest('.site-map__plot');
+    expect(officesPlot?.className).toContain('site-map__plot--directed');
+  });
 });
 
 describe('SiteMapCelebration (UI_SPEC §2h, Site Map SECOND rework)', () => {

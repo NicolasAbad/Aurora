@@ -281,6 +281,20 @@ body {
   font-style: italic;
 }
 
+/* Real bug found via narrow-viewport Playwright audit (2026-08): the comment above
+ * ("sits below the tier-toast's fixed position so the two never overlap if both fire
+ * close together") assumed the tier-toast stays one line, which is only true at desktop
+ * widths. T-14's text ("Fabrication now produces Titanium-tier Hardware.") wraps to 2
+ * lines at 414/375px and 3 lines at 320px, growing the toast past the milestone-callout's
+ * fixed top:64px and covering it entirely (verified via getBoundingClientRect: tier-toast
+ * bottom edge reaches 106px at 320px width). Bump the offset at narrow widths only —
+ * desktop's tight single-line spacing is unaffected. */
+@media (max-width: 480px) {
+  .milestone-callout {
+    top: 120px;
+  }
+}
+
 /* UI_SPEC §3.4/NARRATIVE §9 (T-16/T-17): dismissible first-entry tooltip banner. */
 .first-entry-tip {
   display: flex;
@@ -403,6 +417,45 @@ body {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  border: 1px solid transparent; /* reserves the directed tile's border width so nothing else shifts when it appears */
+  transition: padding 0.25s ease, border-color 0.25s ease, max-width 0.25s ease;
+}
+
+/* UI_SPEC §1d (Sprint 11.6, NEW rule — real finding: uniform card sizing regardless of
+ * importance is its own slop signature, independent of borders/gradients/hero-metrics
+ * already banned above). Fix: tie visual weight to the Current Directive (§2h) — the
+ * specific building it currently names grows and gets the accent-border treatment
+ * (a deliberate, semantic use of a border, not the banned decorative default); every
+ * other tile recedes to a quieter, smaller baseline. Reuses BuildingTile.tsx's own
+ * `directiveId`/`directiveTargetBuilding` read — no new mechanic, pure presentation. */
+.building-tile--directed {
+  padding: 22px;
+  max-width: 360px;
+  border-color: var(--accent);
+}
+
+.building-tile--directed .building-tile__name {
+  font-size: 1.15em;
+  font-weight: 600;
+}
+
+.building-tile--directed .building-icon {
+  width: 28px;
+  height: 28px;
+}
+
+.building-tile--receded {
+  padding: 11px 16px;
+  max-width: 280px;
+  opacity: 0.72;
+}
+
+.building-tile--receded .building-tile__name {
+  font-size: 0.92em;
+}
+
+:root[data-reduced-motion='true'] .building-tile {
+  transition: none;
 }
 
 .building-tile__header {
@@ -868,7 +921,13 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 100;
+  /* Real bug found via Playwright audit: this was 100 — BELOW the tier-toast (200),
+   * milestone-callout/event-card (199), and site-map celebration (280), all of which are
+   * plausible to fire around the same moment as an offline catch-up. Raised to the same
+   * tier as the other explicit modals (Settings/Constellation/Site Map, all 300) so a
+   * passive toast can never render on top of a modal the player must actually read and
+   * dismiss. */
+  z-index: 300;
 }
 
 .away-modal {
@@ -947,7 +1006,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 110;
+  /* Real bug found via Playwright audit: this was 110 (kept just above the away-modal's
+   * old 100, per the comment above) but still far below the milestone-callout (199) that
+   * fires from the SAME triggering event almost every time (Aurora II success earns a
+   * Program Record too) — confirmed via getBoundingClientRect overlap at narrow widths,
+   * the callout rendered on top of this modal's own header. Raised to the same tier as the
+   * other explicit modals (300), one step above .away-modal-backdrop to preserve this
+   * comment's original "stacks above the away-modal" intent. */
+  z-index: 310;
 }
 
 .milestone-screen {
@@ -1865,6 +1931,94 @@ body {
   }
 }
 
+/* UI_SPEC §2h (Sprint 11.6, THIRD reconception): the map's actual reason to exist — live
+ * per-building state no single complex tab can show at once. `--idle` is deliberately the
+ * quietest of the four (a built-but-unstaffed producer is the normal early-game default,
+ * not a problem state) so `--active`'s pulse reads as the standout, not the baseline.
+ * Accessibility (UI_SPEC §7): color is never the sole signal — starved/paused each get a
+ * distinct ::after glyph too, on top of the color change, same rule BuildingTile's own
+ * "— STARVED" text satisfies with words instead (no room for words at this plot size). */
+.site-map__plot--idle {
+  filter: saturate(0.55) brightness(0.9);
+}
+
+.site-map__plot--active {
+  box-shadow: 0 0 0 2px rgba(255, 122, 26, 0.35);
+  animation: site-map-fade-in 0.6s ease, site-map-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes site-map-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(255, 122, 26, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(255, 122, 26, 0.05);
+  }
+}
+
+.site-map__plot--starved {
+  border-color: var(--amber);
+  position: relative;
+}
+
+.site-map__plot--starved .building-icon {
+  stroke: var(--amber);
+}
+
+.site-map__plot--starved::after {
+  content: '!';
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--amber);
+  color: var(--bg);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 12px;
+  text-align: center;
+}
+
+.site-map__plot--paused {
+  border-color: var(--text-dim);
+  filter: grayscale(0.6);
+  position: relative;
+}
+
+.site-map__plot--paused .building-icon {
+  stroke: var(--text-dim);
+}
+
+.site-map__plot--paused::after {
+  content: '❚❚';
+  position: absolute;
+  top: -7px;
+  right: -8px;
+  font-size: 7px;
+  letter-spacing: -1px;
+  color: var(--text-dim);
+  background: var(--bg);
+  padding: 0 1px;
+  border-radius: 2px;
+}
+
+/* UI_SPEC §1d/§2h (Sprint 11.6): the map IS the Current Directive's canvas now — whatever
+ * building the Directive names gets the same visual-weight language as
+ * .building-tile--directed (larger, accent-highlighted), a literal spatial pointer
+ * instead of the map being a passive backdrop. */
+.site-map__plot--directed {
+  transform: scale(1.35);
+  box-shadow: 0 0 0 2px var(--accent), 0 0 10px rgba(255, 122, 26, 0.5);
+  z-index: 1;
+}
+
+:root[data-reduced-motion='true'] .site-map__plot--active {
+  animation: none;
+  box-shadow: 0 0 0 2px rgba(255, 122, 26, 0.3);
+}
+
 .site-map-backdrop {
   position: fixed;
   inset: 0;
@@ -1872,7 +2026,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 250;
+  /* Real bug found via Playwright audit: this was 250, BELOW
+   * .site-map-celebration-backdrop's 280 — a building completing while this full map is
+   * already open (or a player opening it right after a celebration fires) let the passive,
+   * auto-dismissing celebration cover this deliberately-opened screen and block its Close
+   * button (confirmed via elementFromPoint at the close button's coordinates resolving to
+   * the celebration backdrop, not the button). Raised to match Settings' tier (300) — an
+   * explicit player-opened modal should never be blocked by a passive auto-fired one. */
+  z-index: 300;
 }
 
 .site-map-screen {
@@ -1910,6 +2071,46 @@ body {
 
 .site-map-screen__header button:hover {
   color: var(--text);
+}
+
+.site-map-screen__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  font-size: 0.72em;
+  color: var(--text-dim);
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.site-map__legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.site-map__legend-item::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.site-map__legend-item--active::before {
+  background: var(--accent);
+}
+
+.site-map__legend-item--idle::before {
+  background: var(--border);
+}
+
+.site-map__legend-item--starved::before {
+  background: var(--amber);
+}
+
+.site-map__legend-item--paused::before {
+  background: var(--text-dim);
 }
 
 /* Full-screen context: larger plots, building-name labels below each. */
@@ -2195,7 +2396,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 260;
+  /* Real bug found via Playwright audit: this was 260, BELOW
+   * .site-map-celebration-backdrop's 280. The Tracking Station tile hosts BOTH "View
+   * Constellation" and (once built) triggers its own celebration — a player who taps that
+   * button right after finishing the building (a very likely sequence) got the celebration
+   * on top, blocking this modal's Close button for its ~2.4s auto-dismiss window
+   * (confirmed via elementFromPoint). Raised to match Settings' tier (300), same reasoning
+   * as .site-map-backdrop's identical fix right above. */
+  z-index: 300;
 }
 
 .constellation-screen {
