@@ -88,7 +88,19 @@ export function directiveCondition(id: (typeof DIRECTIVE_ORDER)[number], state: 
         (pad) => pad && pad.contractId == null && pad.rocketStatus !== 'none',
       );
     case 'D-12':
-      return state.records.includes('firstOrbit') && state.contracts.active.length === 0;
+      // CLAUDE.md rule 13: real bug found alongside T-02/D-10/T-08's own fixes — this
+      // directive points the player at "the Contracts panel," but App.tsx only renders
+      // ContractsPanel once Launch Rail is built (level >= 1). `firstOrbit` fires purely
+      // off `auroraISuccess` (core/records.ts) with no dependency on Launch Rail — a
+      // player can reach Aurora I / firstOrbit via Test Stand + VAB alone, skipping
+      // sounding rockets and Launch Rail entirely, in which case this directive would
+      // send them to a panel that isn't rendered anywhere yet. Now requires Launch Rail
+      // built too, the same gate ContractsPanel itself uses.
+      return (
+        state.records.includes('firstOrbit') &&
+        state.contracts.active.length === 0 &&
+        state.buildings.launchRail.level >= 1
+      );
   }
 }
 

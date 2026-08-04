@@ -68,10 +68,16 @@ describe('ftueTooltipCondition', () => {
     expect(ftueTooltipCondition('T-07', state)).toBe(true);
   });
 
-  it('T-08 (VAB build starts) fires once any pad leaves rocketStatus "none"', () => {
+  it('T-08 (VAB build starts) fires once any pad leaves rocketStatus "none" AND Propellant Depot is revealed', () => {
+    // CLAUDE.md rule 13 fix: this tooltip names the Propellant Depot, which only reveals
+    // once 'soundingRockets' is researched (UI_SPEC §2e step 3) — the Program branch that
+    // unlocks the VAB (basicEngineering -> ... -> flightProgram) never requires that node,
+    // so rocketStatus leaving 'none' alone is not sufficient.
     const state = createInitialState();
     expect(ftueTooltipCondition('T-08', state)).toBe(false);
     state.mission.pads.padA!.rocketStatus = 'integrating';
+    expect(ftueTooltipCondition('T-08', state)).toBe(false); // Propellant Depot still hidden
+    state.research.completed.push('soundingRockets');
     expect(ftueTooltipCondition('T-08', state)).toBe(true);
   });
 

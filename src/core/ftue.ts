@@ -59,7 +59,20 @@ export function ftueTooltipCondition(id: (typeof FTUE_TOOLTIP_ORDER)[number], st
       // VAB build starts: the first VAB stage has been paid for (stagesDone tracks
       // completed stages, but the checklist item / rocketStatus flips the moment
       // integration begins — rocketStatus leaves 'none' as soon as the first stage starts).
-      return Object.values(state.mission.pads).some((pad) => pad && pad.rocketStatus !== 'none');
+      // CLAUDE.md rule 13: real bug found alongside T-02/D-10's own fixes — this text
+      // names the Propellant Depot ("Your Depot holds 250 per level"), but the Program
+      // branch (basicEngineering -> ... -> flightProgram, which unlocks the VAB) is
+      // entirely independent of the Propulsion branch's `soundingRockets` node, which is
+      // what actually reveals the Propellant Depot tile (UI_SPEC §2e step 3,
+      // ProductionPanel's refineryAndPropDepotRevealed). A player can start VAB
+      // integration (any stage before 'engines', which alone requires Orbital-1
+      // certified) having never researched soundingRockets at all — this tooltip would
+      // then reference a building the player has never seen. Now requires that reveal
+      // condition too.
+      return (
+        state.research.completed.includes('soundingRockets') &&
+        Object.values(state.mission.pads).some((pad) => pad && pad.rocketStatus !== 'none')
+      );
     case 'T-09':
       return state.buildings.rndLab.level >= 1 && state.staff.pools.scientist.hired === 0;
     case 'T-24':

@@ -104,11 +104,17 @@ describe('currentDirective (UI_SPEC §2h, Sprint 9.5)', () => {
     expect(currentDirective(state)).toBe('D-11');
   });
 
-  it('D-12 once Aurora I has succeeded with no contract accepted', () => {
+  it('D-12 once Aurora I has succeeded with no contract accepted, AND the Contracts panel is revealed', () => {
+    // CLAUDE.md rule 13 fix: ContractsPanel only renders once Launch Rail is built
+    // (App.tsx), but 'firstOrbit' fires purely off auroraISuccess with no Launch Rail
+    // dependency — a player can reach orbit via Test Stand + VAB alone, skipping
+    // sounding rockets/Launch Rail entirely, so that alone must not be sufficient here.
     const state = createInitialState();
     state.buildings.finance.level = 1;
     state.staff.pools.technician.hired = 1;
     state.records = ['firstOrbit'];
+    expect(currentDirective(state)).not.toBe('D-12'); // Contracts panel still hidden
+    state.buildings.launchRail.level = 1;
     expect(currentDirective(state)).toBe('D-12');
   });
 
