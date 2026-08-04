@@ -1,299 +1,35 @@
 # PROGRESS.md — Aurora Program
 
-## Sprint 0 — Foundations — COMPLETE (2026-07-24, reconciled against docs v2.2 same day)
+## Sprint 0 — Foundations — COMPLETE (2026-07-24, compressed 2026-08-04)
 
-All 6 tasks done; acceptance criterion verified (app loads, persists across reload,
-shows Funding 0 and the pitch button; `sim/run.ts` produces a coherent day-by-day CSV).
+Scaffold (Vite/React/TS/Zustand, ESLint/Prettier/Vitest), `core/types.ts`/`economy.ts`/
+`format.ts`/`selectors.ts`, all 18 buildings transcribed, `persistStore.ts`+`migrations.ts`
+(schemaVersion 1), UI shell (Ticker/ComplexTabs/minimal Campus panel), and `sim/run.ts`
+(dev-only headless balance simulator, structurally excluded from the prod bundle). Acceptance
+verified: app loads/persists, sim produces a coherent CSV. Reconciliation against docs v2.2
+fixed 6 doc/code mismatches (pitch-yield formula, Crew Quarters' staff-cap bonus, number
+formatting to 3 sig figs) and one real process finding: an early Program-Records reading was
+presented as settled fact without asking, which CLAUDE.md rule 1 was written partly in
+response to — flag ambiguity, don't resolve it unilaterally.
 
-**Built:**
-- Vite + React + TS + Zustand scaffold; ESLint (flat config) + Prettier + Vitest wired.
-- `src/core/types.ts` — GameState schema transcribed from CLAUDE.md, with `UnlockCondition`
-  and a few other CLAUDE.md-referenced-but-undefined types (`ContractState`, `LaunchRecord`,
-  `TelemetryEvent`) given a first structural shape (placeholders — Sprint 9/2 own the real
-  ones; kept schema-compatible now so schemaVersion 1 needs no migration later).
-- `src/core/economy.ts` — `costAtLevel`, `productionPerSecond`, `pitchYield`, unit-tested
-  against ECONOMY_MODEL §2/§4 values.
-- `src/core/format.ts`, `src/core/selectors.ts` — number formatting (§12, 3 sig figs) and
-  a `getResourceRatePerSecond` selector, both unit-tested.
-- `src/data/buildings.ts` — all 18 buildings + internal upgrades transcribed from
-  ECONOMY_MODEL §4, including Crew Quarters' `staffCapBonus: 3`.
-- `src/data/initialState.ts` — starting GameState per ECONOMY_MODEL §1.
-- `src/state/persistStore.ts` + `migrations.ts` — localStorage save/load, schemaVersion 1,
-  migration registry (empty, scaffolded), autosave every 10s + on close/hide, unit-tested.
-- UI shell: `Ticker` (4 resources + rates, cap/amber/over-cap states, secondary row),
-  `ComplexTabs` (Campus active, others locked with stated condition), a minimal Campus
-  panel (Offices + a disabled Pitch button — full manual-action wiring is Sprint 1 task 1,
-  intentionally not built early to avoid overlapping that sprint's scope).
-- `sim/run.ts` — headless balance simulator (dev-only; nothing under `/src` imports it, so
-  it's structurally excluded from the production bundle — confirmed via `npm run build`).
-  Runs a bot policy against the real `core/economy.ts` + `data/buildings.ts`, plus local
-  transcriptions of research/certification/sonda/Aurora-I values ECONOMY_MODEL owns but no
-  data module exists for yet. `npm run sim -- --days=N --seed=N`.
+**Bot-profile instrumentation (`sim/run.ts` gained `optimal`/`human` profiles — the human
+profile, 3×20min sessions/day, is what every later pacing target is stated against) drove
+three real economy passes, applied to ECONOMY_MODEL as owner decisions, not sim guesses:**
+- **v2.1**: day-5 pacing floor codified (human must not reach Aurora I before simulated
+  day 5) — the sim's own bootstrap-day-1 Research stall (`basicEngineering` blocked ~12h
+  every seed while the promotion chain runs) is a byproduct of this, not a bug.
+- **v2.3**: R&D Lab rate cut 0.1→0.03 R/s/level, Flight Data raised ~1.5× across every
+  reward, target reformulated as **20-35% of Research income per era** (sonda/satellite
+  reported separately, pre-flight has no target — lab-only by construction). A real sim bug
+  surfaced here too: `resolveManualPitch`'s insolvency check read Finance's theoretical
+  rate instead of the actual `payrollUnpaid` flag, causing a true funding deadlock once
+  balance landed exactly at the pitch threshold while insolvent.
+- **v2.4**: contract rewards made explicit per tier (was a single ambiguous range).
 
-**Also fixed during reconciliation:** the v2.2 update to CLAUDE.md had landed at
-`docs/CLAUDE.md` instead of the root `CLAUDE.md` the harness actually auto-loads each
-session (CLAUDE.md's own text says it "lives at repo root"). Diffed the two (one line:
-the `staffCapBonus` field), applied it to root `CLAUDE.md`, deleted the stray `docs/`
-copy so there's a single source of truth again.
-
-## Sprint 0 findings — all six resolved against docs v2.2
-
-1. **Pitch yield.** Resolved: single formula, `10 + 5 × (officesLevel − 1)` (ECONOMY §2).
-   Added `core/economy.ts`'s `pitchYield()`, unit-tested (lv1=10, lv2=15, lv3=20).
-   `sim/run.ts` now calls it instead of its old ad-hoc `5 × level`.
-2. **Crew Quarters staff cap.** Resolved: `BuildingDef` gained `staffCapBonus?: number`
-   (CLAUDE.md schema + `core/types.ts`); Crew Quarters sets it to `3`. Starting staff cap
-   is 2 (ECONOMY §1). `sim/run.ts`'s `staffCap()` now reads `2 + staffCapBonus × level`
-   instead of its old guessed base of 3.
-3. **Tech-tree bootstrap dependency.** Resolved: ECONOMY §3 now states the bootstrap rule
-   explicitly ("role-unlock techs gate direct hiring only; promotions are gated only by
-   the Classroom"). `sim/run.ts` already implemented this in Sprint 0 — no code change
-   needed, just confirms the sim wasn't guessing.
-4. **Aurora I stage durations.** Resolved: ECONOMY §7 now states Satellite payload = 15
-   min, Flight review = instant (0 min, pure Research spend, applies to all flight
-   reviews). Matches what `sim/run.ts` already assumed — no code change needed.
-5. **Number formatting.** Resolved: ECONOMY §12 now specifies 3 significant figures
-   exactly (10.0K / 125K / 1.25M / 3.10B). `core/format.ts` rewritten to match
-   (decimals = 2/1/0 depending on the mantissa's magnitude); tests updated to check all
-   four documented examples.
-6. **Program Record triggers ("Launch 1" wording) — my Sprint-0 finding here was wrong,
-   not just resolved.** I had written it up as "confirmed, not a gap" — asserting that
-   "Launch 1" meant the S-2 flight — without asking. That was an assumption presented as
-   settled fact, which is exactly what CLAUDE.md rule 1 says not to do. ECONOMY §8b now
-   defines record triggers by named event instead: First flight = first S-1 sonda
-   *launch*, Kármán = first successful S-2, First orbit = Aurora I success. Fixed in
-   `sim/run.ts`: `firstFlight` now awards on the first S-1 to lift off (was incorrectly
-   bundled with `pastKarman` at S-2); `pastKarman` stays on first S-2 success; `firstOrbit`
-   stays on Aurora I success (was already correct).
-
-   **Correction on top of that fix (same day):** the owner caught a second imprecision —
-   "First flight" triggers on the S-1 *launching* (lifted off, whether it later succeeds
-   or fails — same spirit as "First ignition, even the scripted failure"), not on it
-   *succeeding*. My first fix had described it as "first successful S-1." The sim doesn't
-   model S-1 failure at all (see `sim/run.ts` header), so "launched" and "succeeded" are
-   the same event in its current behavior either way — but the code comment and this
-   file's wording were imprecise, and now say "launch," not "success."
-
-   **The open question this uncovered — now resolved by the owner, not by me:** ECONOMY
-   §8b retired "Launch 1" as a record-trigger label, but ECONOMY §4 (Launch Pad B) and
-   GDD §3 (Payload Processing) still used launch-number wording for those two *building
-   unlocks* without saying which event it meant. Docs now say explicitly: both unlock on
-   **Aurora I success** (ECONOMY §4, GDD §3, GDD v2.2 changelog) — "Launch 1" is retired
-   everywhere, not just in §8b. Applied: `UnlockCondition`'s `firstLaunch` kind renamed to
-   `auroraISuccess` in `core/types.ts`; `data/buildings.ts`'s Payload Processing and
-   Launch Pad B both use it now; `sim/run.ts`'s `isUnlocked()` checks
-   `state.auroraILaunched` directly (the internal `firstLaunchHappened` flag, which had
-   been doing double duty as both "has the bot flown its one S-2" and this unlock
-   placeholder, is now two separate things: `s2Flown` for the former, `auroraILaunched`
-   — already tracked — for the latter).
-
-## Process note
-
-Per the reminder that came with this reconciliation: going forward, any doc ambiguity is
-a stop-and-ask, not an interpretation — including a clearly-documented one. Finding #6's
-open question was written up that way on purpose (flagged, not guessed at), and came back
-resolved by the owner rather than by further guessing — which is what should happen next
-time too.
-
-## Instrumentation upgrade: "optimal" vs "human" bot profiles
-
-The 3-day Aurora I result reported earlier (below) came from a single always-on bot, and
-there was no way to tell from it whether that was the ECONOMY being fast or the bot being
-superhuman. Per instruction: **no ECONOMY_MODEL value was changed to investigate this** —
-only the simulator's instrumentation.
-
-**What changed in `sim/run.ts`:**
-- Two profiles now run every invocation, each producing its own CSV and console report:
-  - **`optimal`** — the original Sprint 0 bot, unchanged: always on, re-evaluates
-    spending every 15 simulated minutes around the clock. An upper bound, not a target.
-  - **`human`** — new. 3 active sessions/day of ~20 min (hours 7/14/21, a sim-only
-    scheduling assumption, not sourced from any doc). Manual actions (pitch, Funding
-    Rounds, hiring, building, promotions) and starting any new process (research node,
-    certification test, sonda assembly, accepting a contract) only happen in a session.
-    The rest of the day resolves like the game's own offline rule (ECONOMY §11):
-    resources and salaries at 60%, capped at 10h (16h once Remote Ops is researched);
-    process *timers already in progress* still complete at 100% regardless, same as the
-    real offline rule specifies.
-- CSV gained a funding-income breakdown by source (pitch / Funding Rounds / passive
-  Finance / contracts / records) — previously one merged "passive" + "one-time" pair.
-  Research's lab-vs-Flight-Data split already existed and is unchanged. Implementing the
-  Funding Rounds column meant giving the bot Funding Round I/II logic it didn't have
-  before (reputation-gated, prefers II once both qualify) — an instrumentation
-  necessity, not an economy change: the bot now uses an action the docs already define.
-- Both profiles report milestones, the 5-checkpoint salary ratio, Flight Data share, and
-  which simulated day Aurora I launched on (or "not reached").
-
-**A bug the first draft of this exposed:** the initial "human" implementation gated only
-manual *spending* decisions (pitch/hire/build) to sessions, but left starting new
-research/certification/sonda/contract processes running every tick regardless of session
-— so "human" reached Aurora I in 3 days too, same as "optimal," which made no sense (a
-player who's only around 3 sessions/day shouldn't out-pace a bot that's never away).
-Fixed: starting a new process is a player action (a checklist click, an "accept offer"
-click) exactly like the others, so it's gated the same way now — with one doc-grounded
-exception: VAB stages auto-advance once "VAB queues" tech is researched, since
-auto-queueing stages is literally what that research node does (ECONOMY §5).
-
-## Days to Aurora I — both profiles (seed 42, 30-day run, current bot policies)
-
-| Profile | Days to Aurora I | Salary ratio (settles) | Flight Data share |
-|---|---|---|---|
-| optimal | 3 | ~53% (target 30-50%) | ~16.9% (target ≥25%) |
-| human | **5** | ~55% (target 30-50%) | ~1.9% (target ≥25%) |
-
-**Decision rule (owner's, applied literally, not interpreted):** flag only if human
-reaches Aurora I in *under* 5 days. Day 5 does not satisfy "under 5" — no flag raised,
-per the rule as given. Reporting the number precisely because it's a boundary case, not
-a comfortable margin: a slightly different bot policy or session schedule could plausibly
-land on day 4 or day 6. No ECONOMY_MODEL value was changed based on this result, per
-instruction 3's rule either way.
-
-**Also worth the owner's attention, separately from the day-5 rule:** the human profile's
-Flight Data share (~1.9%) is far under the ≥25% target once the sonda loop is
-session-gated — sondas just don't fly often enough at 3×20min/day to matter much against
-lab Research income at this bot's policy. This is a different signal than "days to Aurora
-I" and isn't covered by the standing decision rule, but it's the kind of thing the
-Flight-Data-share sanity check exists to catch. Flagged as an observation, not a
-recommendation — not tuning it.
-
-Both profiles' full day-by-day CSVs are in `sim/output/` (gitignored, regenerated per
-run): `day-by-day-optimal-seed42-30d.csv`, `day-by-day-human-seed42-30d.csv`.
-
-Re-run per CLAUDE.md workflow whenever ECONOMY_MODEL values change: `npm run sim --
---days=N --seed=N` runs both profiles in one invocation.
-
-**Superseded by the v2.3 rebalance below** — the owner's decisions on both signals above
-(day-5 accepted as a codified floor; the 1.9% Flight Data share confirmed as a real
-economy bug) changed the relevant values and the target itself. Left in place as a
-record of what prompted v2.3, not as current numbers.
-
-## v2.3 rebalance — owner decisions applied
-
-Two decisions on the signals above, both applied to data, not guessed at:
-
-1. **Day-5 pacing floor: accepted, now codified.** `sim/run.ts` reports it every run
-   (`printSummary`'s "Pacing floor" line, PASS/FAIL, always shown for the human
-   profile) and raises a loud FLAG in the final comparison if human ever reaches
-   Aurora I before simulated day 5. Rationale carried over from the owner: "human" is
-   an efficient lower bound (no FTUE friction, no mistakes, no launch failures) — real
-   players will be slower. Revisit with real testers at Sprint 8, not before.
-2. **Flight Data at 1.9%: confirmed as a real economy bug, rebalanced in ECONOMY v2.3.**
-   R&D Lab cut 0.1 → 0.03 R/s per level; Flight Data raised ~1.5× across the board
-   (scripted failure 100→150, S-1 80→120, S-2 400→600, Aurora I 800→1,200, contracts
-   now explicitly 250-450 — see below). Target reformulated as a per-era range:
-   **Flight Data = 20-35% of Research income**, checked separately for the sonda and
-   satellite eras (pre-flight is reported too but has no target — lab-only by
-   construction, before any flight has happened).
-
-**Applied to data:**
-- `src/data/buildings.ts`: R&D Lab `basePerSec` 0.1 → 0.03.
-- `sim/run.ts`'s local reward tables: scripted-failure Flight Data 100→150, `S1_REWARD`
-  120, `S2_REWARD` 600, `AURORA_I_REWARD` 1,200 (all ECONOMY §6/§7a/§8 v2.3 values).
-- `sim/run.ts` gained era classification (`classifyEra()`): each CSV row is now tagged
-  `preFlight` / `sonda` / `satellite`, based on `firstFlightDataDay` (first Flight Data
-  ever earned) and `auroraILaunchedDay`. `printSummary` reports the Flight Data share
-  per era instead of one merged number.
-
-**A gap found and fixed while wiring this up:** ECONOMY §8's "Contract fulfilled" row
-(+40-80 XP / +250-450 Flight Data) was never implemented in the sim at all —
-`tickContract` only ever paid Funding + Reputation. Since the sim only models tier-0
-contracts, it now uses the low end of both ranges (40 XP / 250 Flight Data) — a specific
-choice within a documented range, not an invented number, but flagged as a modeling
-choice since the doc doesn't say which tier maps to which end of the range.
-
-**A second, more serious bug found on the v2.3 re-run:** "optimal" went from reaching
-Aurora I on day 3 to not reaching it at all within 30 days — funding stuck at exactly
-200, payroll unpaid for the entire day, every day, from day 3 onward. Root cause:
-`resolveManualPitch`'s condition was `passiveFundingRate(state) <= 0 || funding < 200`.
-`passiveFundingRate` returns Finance's *theoretical* rate, which stays positive once
-Finance is built+staffed — it doesn't know insolvency is actually blocking that income.
-Once funding landed exactly at/above 200 while insolvent, neither condition was true, so
-the bot stopped pitching forever, and with no income, insolvency never cleared: a true
-deadlock. Fixed by checking `state.payrollUnpaid` explicitly, matching GDD §1b's own
-description of pitching as the insolvency bail-out. This was a sim bug (bad bot logic),
-not an economy issue — the R&D Lab/Flight Data rebalance didn't cause it directly, but
-shifted the exact purchase/timing sequence enough that funding happened to land on the
-deadlock condition this run, where it hadn't before.
-
-### Results (seed 42, 30-day run, post-fix)
-
-| Profile | Days to Aurora I | Pacing floor | Salary ratio (settles) |
-|---|---|---|---|
-| optimal | 3 | n/a (floor only applies to human) | ~53% (target 30-50%) |
-| human | 5 | **PASS** (reached day 5, not before) | ~55% (target 30-50%) |
-
-**Flight Data share per era — human profile (the target's stated population):**
-
-| Era | Days | Share | Target |
-|---|---|---|---|
-| pre-flight | 2 | 0.0% | none (lab-only by design) |
-| sonda | 2 | **14.7%** | 20-35% |
-| satellite | 26 | **16.2%** | 20-35% |
-
-**Reporting, not tuning, per instruction:** both eras miss the 20-35% target even after
-the v2.3 rebalance, though less badly than the pre-rebalance 1.9% overall figure. The
-sonda era is only 2 simulated days wide for this bot/seed (Aurora I follows fast once the
-sonda campaign starts), so that figure in particular rests on a small sample — worth a
-longer or different-seed run before reading too much into it. Optimal's own per-era
-split is in its CSV/console output for reference, but the target is scoped to the human
-profile per GDD §1, so that's what's reported here.
-
-Both profiles' full CSVs (with the new `era` column) are in `sim/output/`, regenerated
-per run: `day-by-day-optimal-seed42-30d.csv`, `day-by-day-human-seed42-30d.csv`.
-
-## v2.4: contract rewards made explicit per tier
-
-ECONOMY §8's contract reward range (+40-80 XP / +250-450 Flight Data) is now explicit
-per tier (XP 40/60/80, Flight Data 250/350/450 for tier-0/1/2; Reputation now defers to
-§10's 3/10/25 instead of the old, self-contradicting +10-25 range). `sim/run.ts`'s
-`CONTRACT_REWARDS` table now reads tier-0 directly from the spec instead of resting on
-last pass's "low end of the range" interpretation (which happened to match, but no
-longer needs to be trusted to). Tiers 1/2 are in the table for when satellite contracts
-are implemented; the sim still only models tier-0.
-
-## Multi-seed sweep: human profile, seeds 1-10, 45 days
-
-Requested before any further Flight Data tuning, since one seed with a 2-day sonda
-sample was too thin to act on. `npm run sim -- --sweep=true --days=45` runs this (default
-sweep length 45 days if `--days` omitted).
-
-**Days to Aurora I:** median 5.0, range 5.0-5.0 (all 10 seeds identical).
-**Days to Kármán line:** median 4.0, range 4.0-4.0 (all 10 seeds identical).
-**Flight Data share — sonda era:** median 14.7%, range 14.7-14.7% (target 20-35%).
-**Flight Data share — satellite era:** median 15.9%, range 15.9-15.9% (target 20-35%).
-
-**Important caveat on the zero variance — read before trusting the range numbers at face
-value:** this isn't a bug, but it means the sweep explored less than it looks like. The
-bot's policy is deterministic everywhere except one roll: Orbital-1 base certification
-(80% success, ECONOMY §6). Verified `mulberry32` produces genuinely different sequences
-per seed (checked outside the sim). Of seeds 1-10, 9 succeed on the first attempt with
-zero behavioral difference from each other (nothing else in the bot branches on RNG); seed
-4 fails and retries at half duration (adds ~1.5h), but that shift is invisible at
-day-level granularity and rounds away in the aggregated percentages. So: the median is a
-trustworthy central estimate (nothing suggests it's an outlier), but the "range" column
-doesn't mean "explored variance is zero" — it means this particular bot rarely gambles,
-so seed alone barely moves the needle. Real variance (players failing launches, missing
-sessions, gambling on Confidence) isn't modeled by either bot profile.
-
-**Research stalls (>12h blocked on an eligible node with deps clear):** all 10 seeds
-show exactly one — `basicEngineering`, crossing the 12h threshold on day 1, every time.
-This is the bootstrap gap: Research sits at 0 for the better part of a day while the bot
-buys Crew Quarters + Classroom and runs the Technician→Engineer→Scientist promotion
-chain (15min + 45min timers, each gated on Funding) before the R&D Lab has any Scientist
-to staff it at all. No further stalls were logged after day 1 for any seed — once the
-pipeline is running, no single node sits blocked past 12h again under this bot's
-priority order. This stall is a consequence of the promotion bootstrap taking real time
-more than of the R&D Lab rate specifically (it happens before the Lab produces anything
-regardless of its rate) — flagged since it's a genuine scarcity finding, not the one
-being asked about, but the kind of thing worth knowing about.
-
-**Decision-rule check (owner's rule, applied to the data, not by me):** median sonda
-share 14.7% and median satellite share 15.9% are both under 20% — per the standing rule,
-that's the "raise Flight Data values in the docs" branch. Reporting the numbers; the
-decision and any v2.5 values are the owner's.
-
-Per-seed detail: `sim/output/sweep-summary-human-seeds1-10-45d.csv`. Per-seed full
-day-by-day CSVs are also written (one per seed, same naming convention as the dual-profile
-run) but not enumerated here — regenerate via the command above.
+Multi-seed sweep (seeds 1-10, 45 days) confirmed day-5/Kármán-day-4 as stable across seeds
+(the bot's only RNG source, Orbital-1's 80% cert roll, barely moves outcomes at day
+granularity) and both Flight Data shares still under the 20-35% target — carried forward
+into the next rebalance pass rather than tuned blind.
 
 ## Sprint 1 — Economic core — COMPLETE (2026-07-24)
 
@@ -3243,3 +2979,162 @@ purely a reference-stability fix, zero observable behavior change, verified by t
 starvation/hysteresis tests still passing unmodified. Added one new regression test
 asserting reference identity (not just value equality) once the fed streak caps. 579 tests
 (up from 578); lint/build clean.
+
+## Sprint 11.6 — Research tree redesign & visual impact pass — COMPLETE (2026-08-04)
+
+*Owner sequencing override: two things found independently of the dual-audit review (docs
+replaced to v4.2/v4.3/v3.9) — the research tree "has zero impact," and the shipped UI still
+reads as generic/AI-made despite passing Sprint 11.5's own audit. Run before Sprint 11.7's
+economy retune, per explicit instruction.*
+
+**Doc reconciliation, before any task work (CLAUDE.md rule 5b — SECOND occurrence of the
+same regression class this session, worse this time):** both `ECONOMY_MODEL.md` and
+`NARRATIVE_EVENTS.md` replacements were authored from a base older than what's shipped.
+`NARRATIVE_EVENTS.md` (v3.9 base, repo at v4.0) dropped §13 contextual job titles, T-30,
+T-31, and reverted Basic engineering/Scientific method to pre-promotion-only wording —
+restored all four, kept the genuine U-10..U-16 doc-sync addition. `ECONOMY_MODEL.md`
+(pre-v4.1 base) was worse: it silently reverted **live shipped values** — starting Funding
+cap (1,000 → described as 500), Fabrication's Materials-per-Hardware (3 → described as 2),
+the hiring-cost exponent in its own formula line (1.20 → 1.15, self-contradicting a few
+lines below that correctly said "raised and closed"), and dropped Finance's §4d
+multi-resource cost thresholds entirely. All four confirmed against actual code
+(`initialState.ts`, `buildings.ts`, `roles.ts`) before restoring — flagged explicitly
+because this sprint's own research-tree redesign needed to sim-verify against a doc that
+actually matches the shipped economy, not a stale one. Also confirmed and committed two
+parallel-audit fixes sitting uncommitted from a prior session (T-08/D-12, same rule-13
+disclosure-gate class as T-02/D-10) — read both diffs, verified each condition change
+against the real gates in App.tsx before trusting them.
+
+**Task 2 — Building-tile visual hierarchy (UI_SPEC §1d new rule).** A NEW slop signature,
+independent of borders/gradients already banned: uniform card sizing regardless of
+importance. Fix reuses the Current Directive system that already exists — no new mechanic.
+`core/directive.ts` gained `directiveTargetBuilding(id)`, mapping each D-01..D-12 to the
+building it names (`null` for D-06/D-12, which point at a panel, not a building — those
+leave every tile at its normal baseline rather than forcing a highlight onto nothing).
+`BuildingTile.tsx` reads it via the same small-string Zustand selector `CurrentDirective.tsx`
+already uses (`useGameStore(currentDirective)`), so a tile only re-renders when the ACTIVE
+DIRECTIVE changes, never per-tick (rule 10). The named building renders larger with an
+accent border (a deliberate semantic use, not the banned decorative default); every other
+tile recedes to a smaller, quieter baseline — same "recede when not relevant" language
+UI_SPEC §4c's manual-verb de-emphasis already established.
+
+**Task 4 — Program Site Map, THIRD reconception (UI_SPEC §2h).** The first two reworks
+(bigger thumbnail, then own destination + celebration) both still registered as "no
+impact" — the real root cause was never size or placement: the map never showed anything
+the complex tabs don't already show. This rework changes what it's FOR. New
+`core/selectors.ts::buildingActivityState` derives active/idle/starved/paused per producer
+building (payroll-unpaid checked BEFORE starvation, matching the tick's own §4b resolution
+order — insolvency's "ALL staffed production pauses" is the outer gate); non-producer
+buildings (VAB, Test Stand, ...) get `null` — nothing invented for them, the map falls back
+to plain built/unbuilt. The map now pulses producing plots, flags starved/paused ones with
+BOTH color and a distinct glyph (UI_SPEC §7: color is never the sole signal — a `!` badge
+for starved, `❚❚` for paused), and highlights whatever building the Directive currently
+names directly on the map (same `directiveTargetBuilding` task 2 built). The
+celebration-on-new-building moment is untouched. A live insolvency check surfaced a
+test-fixture bug on my own end (a hand-built seed save with `certifications.probe1.attempted:
+true` but an empty `records` array fired a one-time `firstIgnition` Funding payout that
+masked the scenario I was testing) — fixed the fixture, not a product bug, but worth
+remembering for future seed-save construction. 8 new selector tests, 7 new SiteMap tests.
+
+**Task 1 — Research tree redesign & expansion (ECONOMY §5c v4.3), the big one.** Roughly
+doubled the tree: 15 → 32 nodes across the same 4 branches (Materials 7, Propulsion 8,
+Operations 8, Program 9). Per §5c's binding principles:
+- **One mutually-exclusive fork per branch** (8 nodes, a real permanent choice) — new
+  `excludes` field on `ResearchNode`, symmetric by construction, checked in
+  `isNodeAvailable`/`isNodeVisible`. Each fork's two sides double as that branch's 2
+  required mechanic-changing nodes: Materials' Lean vs Volume fabrication (the latter needed
+  a genuinely new `fabrication.rate` modifier target, since a single `effect` field can't
+  carry two independent numbers — its consumption-side bump is checked by id instead, same
+  shape as the mechanic node below); Propulsion's Aggressive vs Safety-margin fuel mixture
+  (BACKLOG's own sketch, simplified to two concrete levers — Propellant cost and failure
+  severity — rather than also touching `core/confidence.ts`'s carefully-balanced "100%
+  always reachable" guarantee, disclosed as a deliberate simplification, not silently
+  dropped); Operations' Round-the-clock automation (new `offline.rateMult` target — the one
+  node in the whole redesign scoped to the offline-resolution path specifically) vs
+  Hands-on operations (the already-wired `process.duration` target); Program's Move fast
+  (new `promotion.allRates` target, stacking on top of the existing per-step accelerators)
+  vs Public trust (`reputation.gain`).
+- **A ninth mechanic-changing node outside any fork:** Materials' Refinery priority
+  protocols flips ECONOMY §4b's fixed Fabrication-then-Refinery claim order — checked by id
+  in `resolveEconomyTick`, a documented, deliberate extension of the fixed-order rule.
+- **A repeatable end-node per branch** (4 total) — a genuine Research sink. Never enters
+  `research.completed`; a new `research.repeatablePurchases` field (additive optional,
+  CLAUDE.md rule 5, no migration) is its own progress. Cost escalates by
+  `costGrowthFactor^priorPurchases`; each purchase registers its OWN modifier id
+  (`research:${id}:${purchaseNumber}`) so purchases STACK instead of the 2nd+ being
+  silently dropped by `registerModifier`'s dedupe-by-id.
+- **6 cross-branch prerequisite nodes** (3 pairs) — deliberately all pointing at PLAIN
+  (non-fork, non-repeatable) nodes: a cross-branch dep on a fork SIDE would create an
+  unintended second-order exclusion for whichever player chose the other side.
+- `ResearchPanel.tsx`: an excluded node states why, permanently, naming the sibling chosen
+  instead (never a bare padlock); a repeatable node shows its purchase count and escalating
+  cost with a "Buy again" button instead of "Done."
+- `hardwareRecoveryRate(completedTech)` (new, `data/launch.ts`) centralizes what used to be
+  3 separately-duplicated 60% constants across `auroraMission`/`contractMission`/
+  `soundingMission` — a real small cleanup alongside the fork it exists for.
+
+Sim-verified: existing critical-path milestones (day 2/6/13 to Aurora I/II, salary ratio,
+Flight Data share) are byte-identical to pre-redesign — none of the 32 nodes sit on the
+critical path, all appended after it in `sim/run.ts`'s `RESEARCH_PRIORITY`. All 9 new
+non-repeatable priority nodes are researched by the human profile within days 6-9,
+extending real content into what was previously a flat 24-day repeat stretch. Repeatable
+nodes are NOT modeled by the sim's own bot (`techCompleted` is a Set, can't represent "buy
+again at an escalating cost" — disclosed here rather than silently skipped, same treatment
+this file already gives its other known simplifications). Checked analytically instead:
+non-repeatable tree cost roughly doubled (4,115 → 9,185 R), plus 4 new unbounded sinks,
+cutting the "75× banked Research vs. tree cost" ratio my own prior dual-audit review found
+to roughly 34× — real progress, not a fix; Sprint 11.7's own income-reduction work still has
+room to close the rest, exactly the "coordinate, don't sequence blind" interaction this
+sprint's own instructions called out.
+
+**Task 3 — Research node visual hierarchy.** Folded into task 1's own `ResearchPanel.tsx`
+work rather than a separate pass: fork/mechanic/repeatable nodes get a `visualWeight` field,
+rendering larger and bolder than a plain percentage node. CSS classes prefixed
+`--weight-fork`/`--weight-mechanic`/`--weight-repeatable` (not bare `--repeatable`) since
+`'repeatable'` is legitimately both a NodeState (once purchased) and a visualWeight
+(always, for that node) — same string, two different concerns, needed to stay stylable
+independently.
+
+**Task 5 — Anti-slop re-audit against the new uniform-card rule.** Swept every
+repeated-card-shaped list render for the pattern task 2/1/3 just fixed elsewhere. Found one
+more real instance: `FlightXpPanel.tsx` reuses the identical `.research-tree__node`
+styling, and its own `mechanicChange` field (GDD §9's "changes a mechanic" flag, already on
+the data for Partial reusability/Parallel integration) was never wired to any visual
+treatment — same violation, sibling panel. Fixed by reusing the SAME `--weight-mechanic`
+class, zero new CSS. Checked and left alone as genuinely uniform-by-design, not a
+violation: `CertificationPanel` (sequential checklist, same reasoning as
+`LaunchSequencePanel`'s own rows), `StaffHiring` (4 role pools are legitimately
+parallel/equal-weight — the Directive system never targets a specific role).
+**Flagged, not fixed:** `ContractsPanel` shows the same flat card regardless of tier (a
+20× value spread between tier 0 and tier 2) — a real but much weaker instance, since at
+most 2-3 offer cards are ever visible simultaneously versus BuildingTile's 18 or the
+research tree's 32+14; the anti-slop rule's own "12 identical KPI cards" framing is about
+scale. Left for a future pass rather than inventing a new visual-weight mechanism for it
+now.
+
+**Verification, all tasks:** typecheck/lint/build clean after each commit. 615 tests (up
+from 579 at Sprint 11.5's close), +36 across this sprint. Playwright, through a real dev
+server: task 2/4 verified at fresh-game, mid-game, and insolvency states (computed styles
+confirmed, not just class names — `opacity: 0.72`/`padding: 11px 16px` for receded tiles,
+`border-color: rgb(255, 122, 26)` for directed); task 1/3's fork exclusion verified by
+actually completing one side via real time-warp and confirming the sibling flips to
+`--excluded` with the correct reason text live; repeatable purchase flow (2 prior
+purchases, correct escalated cost `1,620 = 500 × 1.8²`, "Buy again"); Flight XP's
+mechanic-node styling confirmed live. Zero console errors across every check.
+
+**Deviations from the letter of ECONOMY §5c, disclosed:** BACKLOG's fuel-mixture fork
+sketch mentioned a Confidence-ceiling difference between the two sides; implemented as
+Propellant cost + failure-recovery-rate instead, to avoid touching `core/confidence.ts`'s
+guarantee math within this pass. §5c principle 3's own text cites "the audit-found GDD §9
+violation (Organization/Prestige currently have zero)" as the reason for the research
+tree's own mechanic-changing requirement — but Organization/Prestige are Flight XP tree
+branches (a different system, different resource), not research tree branches; the
+research tree's 4 branches (Materials/Propulsion/Operations/Program) all correctly got 2
+mechanic-changing nodes per the LITERAL principle, and the XP-tree GDD §9 gap itself
+stayed exactly where BACKLOG's own "Independent analysis" section already placed it —
+deferred pending playtest data, not pulled into this sprint's scope. Not resolved
+unilaterally; flagging the doc's own mismatched citation rather than guessing which
+reading was intended.
+
+**Holding, per explicit instruction:** no further work until the owner's own follow-up
+test of this build.
