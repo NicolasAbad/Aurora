@@ -1,14 +1,7 @@
 # NARRATIVE_EVENTS.md — Aurora Program — Complete v1 game text (English)
 *All game text lives here, referenced by ID. Claude Code writes no new narrative: missing beats get added here first. Tone: skeptical press slowly turning believer; dry-humored internal memos.*
 
-**v4.0 changes (Sprint 11 — Polish):** new §13, contextual job titles — a short flavor
-title per (building, role) staff slot, shown as secondary text next to the mechanical
-role name (UI_SPEC §2 building-tile rule, presentation only). T-30 added — the
-save-migration audit found a real silent-data-loss bug (an unreadable save on disk was
-indistinguishable from "no save yet"); this is the one-time warning shown instead. §12 is
-Flight Experience node descriptions (already live in code since Sprint 10 — see
-data/narrative.ts — still pending sync into this doc from the owner's side per Sprint
-10's own note).
+**v4.2 changes (reconciliation — CLAUDE.md rule 5b, SECOND occurrence of the same transit regression):** the incoming replacement copy was authored from a pre-v4.0 base (its own header line read v3.9, while the repo was already at v4.0) and silently dropped four things that shipped code renders live: **§13 contextual job titles** (all 16 entries — `BuildingTile.tsx:179` resolves them via `narrativeText(\`${buildingId}.${role}\`)`), **T-30** (`SaveWarningBanner.tsx:15`), **T-31** (`StaffHiring.tsx:96`), and it reverted **Basic engineering / Scientific method** to their pre-Sprint-11.5 "unlocks hiring directly" wording — which contradicts GDD §2 v2.11 / ECONOMY §3 v4.1 (Engineer and Scientist are promotion-ONLY) and contradicts T-31, dropped in the same pass. All four restored from HEAD rather than letting the doc contradict shipped behavior. **The replacement's genuine additions were kept in full:** U-10 through U-16 (seven upgrade descriptions that were live in code but never transcribed here — a real doc-sync fix), its doc-sync note, and the corrected Aluminum alloys effect text. This is the same content that regressed once before (see the Sprint 11.5 Priority-2 entry in PROGRESS.md); if a third replacement is sent, diff it against the repo before applying.
 
 **v3.9 changes (genre research + owner-selected new features):** T-24 (Confidence explainer, first time shown below 100%) and T-25 (first-orbital-attempt distinguishing beat before Aurora I's VAB work) added. New §11: Current Directive text table (UI_SPEC §2h) — a persistent, dynamic "what now" indicator addressing a recurring root-cause confusion pattern across multiple playtests.
 
@@ -16,7 +9,7 @@ data/narrative.ts — still pending sync into this doc from the owner's side per
 
 **v3.7 changes (Sprint 9.5 — second manual-play pass):** T-11/T-12 rewritten (short idle flag + dynamic fully-staffed copy naming the real upgrade); T-13 adds permanent per-role salary display; T-18/T-19/T-20 close the "silent completion" gap (promotions, research, upgrades now log something, per UI_SPEC §2f); T-21/T-22 add sonda purpose blurbs (why launch this, what do I get).
 
-**v3.6 changes (CLAUDE.md rule 13):** T-02 trigger fixed — was firing on raw Funding threshold alone, predating the Campus staged-reveal rules (UI_SPEC §2d), and could fire before hiring was even unlocked. Now requires Finance built (level ≥ 1) as well as ≥50 Funding.
+**v3.6 changes:** T-02 trigger fixed — was firing on raw Funding threshold alone, predating the staged-reveal rules; now requires Finance built.
 
 **v3.5 changes:** research node descriptions (§8), UI feedback toasts (§9), and manual verb copy (§10) added — closing real content gaps (Sounding rockets, Auto-refuel, VAB queues, Rush Order all previously had no player-facing text). Sections renumbered sequentially.
 
@@ -94,6 +87,15 @@ Rule: no upgrade, building or hire may be offered without plain-language copy sa
 | U-07 | Antenna Network (Tracking Station) | "More ground antennas, more telemetry recovered. +25% Flight Experience from every flight." |
 | U-08 | Weather Station (Tracking Station) | "Your own forecasting. Launch weather windows open every 2 minutes instead of 2–5." |
 | U-09 | Clean Room (VAB) | "A contamination-controlled bay. Required to accept constellation-batch contracts — the program's most lucrative clients." |
+| U-10 | Grants desk (Finance) | "A dedicated fundraising line. +1 Technician slot at Finance." |
+| U-11 | Technical archive (R&D Lab) | "A real research library. +1 Scientist slot at the Lab." |
+| U-12 | Second research track (R&D Lab) | "Run two research nodes at once. The program's biggest R&D investment — priced to take real time to reach." |
+| U-13 | Bulk contracts (Supply Depot) | "Standing supply agreements. +1 Technician slot at the Depot." |
+| U-14 | Recovery loop (Refinery) | "Reclaim more of what goes in. −10% Materials consumed per Propellant." |
+| U-15 | QA station (Fabrication) | "Fewer rejected parts. −15% Materials consumed per Hardware." |
+| U-16 | Inventory system (Warehouse) | "Smarter stacking. +25% to the cap bonus each Warehouse level grants." |
+
+**Doc-sync note (caught by audit):** U-10 through U-16 were implemented and working in shipped code since the Sprint 8 economy unlock but were never transcribed here — NARRATIVE_EVENTS.md claims to be the complete source of truth for player-facing text and wasn't, for these seven entries. Values/effects: BACKLOG.md's Campus/Production upgrade table (now closed/implemented, kept there for its pricing history).
 
 Rules: **v2-only upgrades (Sound Suppression, Cryogenic Stand, Heavy Crane) are NOT rendered in v1 at all** — not greyed, not teased. Every building tile likewise states what it produces or enables in plain language, never only a number.
 
@@ -105,11 +107,10 @@ Rules: **v2-only upgrades (Sound Suppression, Cryogenic Stand, Heavy Crane) are 
 | T-12a | A building shows full slots, and a slot-adding upgrade for it exists and isn't bought yet | "Fully staffed. Buy '[Upgrade Name]' to add another slot." |
 | T-12b | A building shows full slots, and no slot-adding upgrade exists for it | "Fully staffed. This building's slots are fixed — level up to raise output instead." |
 | T-13 | Hiring panel, per role, always visible (not just on the idle-hire flag) | "Hire [Role] ($[cost]) — [salary]/s" — the recurring cost is part of the hire decision every time, not only when it's a mistake. |
-
 ## 8. Research node descriptions (player-facing — every node states its effect, including zero-effect gates)
 | Branch | Node | Description |
 |---|---|---|
-| Materials | Aluminum alloys | "Certifying aluminum stock for flight hardware. No other effect — unlocks Titanium research." |
+| Materials | Aluminum alloys | "Certifying aluminum stock for flight hardware. −10% Materials consumed per Hardware produced." |
 | Materials | Titanium | "Unlocks Titanium-tier Hardware. Fabrication starts producing at this tier automatically — no switch to flip." |
 | Propulsion | Sounding rockets | "Groundwork for suborbital flight. No other effect — unlocks Probe-1 engine certification at the Test Stand." |
 | Propulsion | Probe-1 engine | "Certify the engine that powers your S-1 and S-2 sounding rockets." |
@@ -146,11 +147,6 @@ Rules: **v2-only upgrades (Sound Suppression, Cryogenic Stand, Heavy Crane) are 
 | T-30 | Sprint 11, save-migration audit: boot found a save on disk that couldn't be read (corrupt JSON or an unrecognized schema version) — a real save, not just "no save yet," so this must never be silent | "Your last save couldn't be read, so we're starting fresh. Sorry about that — exporting a save from Settings now and then is the best safety net." |
 | T-31 | Sprint 11.5, Engineer/Scientist's hiring-panel row, in place of the old Hire button (ECONOMY §3 v4.1: neither has a direct-hire path anymore) | "Promotion only — see Promotions below." |
 
-## 10. Manual verb descriptions (missing from earlier docs — same "no purchasable without effect text" rule)
-| Verb | Description |
-|---|---|
-| Rush Order | "Trade Funding for instant Materials when you need them now instead of waiting on the Depot." |
-
 ## 11. Current Directive text (persistent "what now" indicator, UI_SPEC §2h)
 Ordered roughly by when each becomes the active directive; the engine shows whichever is most relevant to current state. Claude Code may add intermediate directives as needed, following the same terse, action-first phrasing (a directive states the NEXT action, not a status report).
 | ID | Active when | Text |
@@ -167,6 +163,11 @@ Ordered roughly by when each becomes the active directive; the engine shows whic
 | D-10 | S-2/Kármán done, VAB not yet built | "Build the VAB to begin your first satellite." |
 | D-11 | Aurora I integration in progress | "Keep building — Aurora I's stages integrate one at a time." |
 | D-12 | Aurora I complete, no contract accepted | "Check the Contracts panel — client work is now available." |
+
+## 10. Manual verb descriptions (missing from earlier docs — same "no purchasable without effect text" rule)
+| Verb | Description |
+|---|---|
+| Rush Order | "Trade Funding for instant Materials when you need them now instead of waiting on the Depot." |
 
 ## 13. Contextual job titles (Sprint 11, NEW — per-building staff role flavor, UI_SPEC §2 building-tile rule)
 Shown as dimmed secondary text next to the mechanical role name in a building's staff row — presentation only, the mechanical role stays the source of truth for slots/salary/promotion. No separate ID column (same "no ID column, the key IS the id" pattern §8 uses for research nodes): keyed in code by `${buildingId}.${role}`. Launch Pad B reuses Launch Pad's own title (same job, second location — ECONOMY §4's own "same cost/effect/copy as Pad A's" precedent for that building).
