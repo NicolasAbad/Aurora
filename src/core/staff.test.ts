@@ -91,6 +91,27 @@ describe('promotionCost / promotionDurationMs (ECONOMY §5 v4.1 promotion accele
     expect(promotionCost(engineerToScientist, modifiers)).toBe(225); // 300 * 0.75
     expect(promotionDurationMs(engineerToScientist, modifiers)).toBe(45 * 60_000 * 0.75);
   });
+
+  // ECONOMY §5c v4.3 (Sprint 11.6): Program research's "Move fast" fork — a SECOND,
+  // more general accelerator that STACKS on top of the per-step ones above, rather than
+  // replacing them.
+  it('"Move fast" (promotion.allRates) stacks on top of the per-step accelerator, both applying', () => {
+    const modifiers = [
+      { id: 'research:basicEngineering', source: 'basicEngineering', target: 'promotion.technicianToEngineer', op: 'mult' as const, value: 0.75 },
+      { id: 'research:moveFast', source: 'moveFast', target: 'promotion.allRates', op: 'mult' as const, value: 0.85 },
+    ];
+    // 100 * 0.75 (step accelerator) * 0.85 (general accelerator) = 63.75
+    expect(promotionCost(techToEngineer, modifiers)).toBeCloseTo(64, 0); // Math.ceil(63.75)
+    expect(promotionDurationMs(techToEngineer, modifiers)).toBeCloseTo(15 * 60_000 * 0.75 * 0.85, 0);
+  });
+
+  it('"Move fast" alone (no per-step accelerator owned) still discounts both promotion steps', () => {
+    const modifiers = [
+      { id: 'research:moveFast', source: 'moveFast', target: 'promotion.allRates', op: 'mult' as const, value: 0.85 },
+    ];
+    expect(promotionCost(techToEngineer, modifiers)).toBe(85); // 100 * 0.85
+    expect(promotionCost(engineerToScientist, modifiers)).toBe(255); // 300 * 0.85
+  });
 });
 
 describe('buildingSlotCount — ECONOMY §4c (v3.8, Sprint 9.5 building-expansion milestone)', () => {

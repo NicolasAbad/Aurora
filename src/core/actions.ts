@@ -4,7 +4,7 @@
 import { BUILDINGS } from '../data/buildings';
 import { CERTIFICATION_TESTS_BY_ID } from '../data/certifications';
 import { PROMOTIONS } from '../data/roles';
-import { RESEARCH_BY_ID } from '../data/researchTree';
+import { RESEARCH_BY_ID, repeatableNodeCost } from '../data/researchTree';
 import {
   buildingSlotCount,
   hiringCost,
@@ -323,11 +323,16 @@ export function startResearch(
 ): StartResearchResult | null {
   const node = RESEARCH_BY_ID.get(nodeId);
   const buildingLevels = buildings ? buildingLevelsFor(buildings) : {};
-  if (!node || !isNodeAvailable(node, research.completed, buildingLevels)) return null;
+  const repeatablePurchases = research.repeatablePurchases ?? {};
+  if (!node || !isNodeAvailable(node, research.completed, buildingLevels, repeatablePurchases)) return null;
   // ECONOMY §5b v4.1: Funding/Materials alongside Research, for the subset of nodes that
   // declare `secondaryCost` — reuses the same canAffordCost/payCost every other cost in
   // this file goes through, merged with the Research cost into one object.
-  const cost = { research: node.costR, ...node.secondaryCost };
+  // ECONOMY §5c v4.3 (Sprint 11.6): a repeatable node's cost escalates by its own prior
+  // purchase count instead of the flat `costR`/`secondaryCost` every other node uses.
+  const cost = node.repeatable
+    ? repeatableNodeCost(node, repeatablePurchases[nodeId] ?? 0)
+    : { research: node.costR, ...node.secondaryCost };
   if (!canAffordCost(resources, cost)) return null;
 
   let targetSlot: 'inProgress' | 'secondInProgress';

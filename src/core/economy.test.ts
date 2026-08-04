@@ -339,6 +339,86 @@ describe('resolveEconomyTick — Complex B consumers (ECONOMY §4b)', () => {
     expect(state.resources.hardware.amount).toBeGreaterThan(0); // Fabrication genuinely ran
     expect(state.resources.propellant.amount).toBe(0); // Refinery never got a single tick's worth
   });
+
+  // ECONOMY §5c v4.3 (Sprint 11.6): "Refinery priority protocols" (Materials research) —
+  // mechanic-changing, flips WHICH of the two wins a Materials shortage. Same exact
+  // oscillation setup as the test above, just with the node completed, to prove the
+  // outcome genuinely inverts rather than just tweaking a number.
+  it('"Refinery priority protocols" flips the oscillation case: Refinery now wins, Fabrication starves', () => {
+    const state = createInitialState();
+    state.buildings.supplyDepot.level = 3;
+    state.staff.pools.technician.hired = 2;
+    state.staff.pools.technician.assigned.supplyDepot = 2;
+    state.buildings.fabrication.level = 5;
+    state.staff.pools.engineer.hired = 2;
+    state.staff.pools.technician.hired += 1;
+    state.staff.pools.engineer.assigned.fabrication = 1;
+    state.staff.pools.technician.assigned.fabrication = 1;
+    state.buildings.refinery.level = 1;
+    state.staff.pools.engineer.assigned.refinery = 1;
+    state.resources.materials.amount = 0;
+    state.resources.materials.cap = null;
+    state.resources.funding.amount = 100_000;
+    state.resources.funding.cap = null;
+    // Propellant's cap defaults to 0 (ECONOMY §1: "requires Propellant Depot") — unlike
+    // the un-swapped oscillation test above (where Refinery never actually produces
+    // anything), THIS test needs Refinery's output to actually get credited.
+    state.resources.propellant.cap = null;
+
+    const result = resolveEconomyTick(state.resources, state.buildings, state.staff, ['refineryPriorityProtocols'], 1000);
+    expect(result.buildings.refinery.starvedIndicator).toBe(false);
+    expect(result.buildings.fabrication.starvedIndicator).toBe(true);
+    expect(result.resources.propellant.amount).toBeGreaterThan(0); // Refinery genuinely ran
+    expect(result.resources.hardware.amount).toBe(0); // Fabrication never got a claim
+  });
+
+  // ECONOMY §5c v4.3: "Volume fabrication" fork (Materials) — +25% output via the NEW
+  // `fabrication.rate` modifier target, +15% Materials/Hardware consumed via the
+  // checked-by-id bump — two independent numbers a single `effect` field couldn't carry.
+  // The rate half is a REGISTERED modifier (same as every other research effect —
+  // resolveResearch, not resolveEconomyTick's own completedTech, is what registers it),
+  // so the test passes it explicitly, exactly as core/research.ts's own resolution would
+  // have produced it once the node actually completed.
+  it('"Volume fabrication" boosts Fabrication output 25% and its Materials cost 15%', () => {
+    const state = createInitialState();
+    state.buildings.fabrication.level = 4;
+    state.staff.pools.engineer.hired = 1;
+    state.staff.pools.technician.hired = 1;
+    state.staff.pools.engineer.assigned.fabrication = 1;
+    state.staff.pools.technician.assigned.fabrication = 1;
+    state.resources.materials.amount = 1000;
+    state.resources.materials.cap = null;
+    state.resources.funding.amount = 10_000;
+    state.resources.funding.cap = null;
+    const volumeFabricationModifier = {
+      id: 'research:volumeFabrication',
+      source: 'volumeFabrication',
+      target: 'fabrication.rate' as const,
+      op: 'mult' as const,
+      value: 1.25,
+    };
+
+    const baseline = resolveEconomyTick(state.resources, state.buildings, state.staff, [], 1000);
+    const boosted = resolveEconomyTick(
+      state.resources,
+      state.buildings,
+      state.staff,
+      ['volumeFabrication'],
+      1000,
+      1,
+      [volumeFabricationModifier],
+    );
+
+    const baselineHardware = baseline.resources.hardware.amount;
+    const boostedHardware = boosted.resources.hardware.amount;
+    expect(boostedHardware).toBeCloseTo(baselineHardware * 1.25, 5);
+
+    const baselineConsumed = 1000 - baseline.resources.materials.amount;
+    const boostedConsumed = 1000 - boosted.resources.materials.amount;
+    // Consumed = output * consumePerUnit; output itself is already 1.25x, and
+    // consumePerUnit is a further 1.15x on top -> 1.25 * 1.15 = 1.4375x total.
+    expect(boostedConsumed).toBeCloseTo(baselineConsumed * 1.25 * 1.15, 5);
+  });
 });
 
 // ECONOMY §4/§5 v3.6 (Sprint 8 economy unlock): QA station and Aluminum alloys both

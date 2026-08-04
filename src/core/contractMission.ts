@@ -13,7 +13,7 @@ import { buildingForPad, EMPTY_CHECKLIST } from './auroraMission';
 import { CONTRACT_PAYLOAD_STAGE_ID, CONTRACT_TIERS, SATELLITE_BUILD, type SatelliteBuildDef } from '../data/contracts';
 import {
   FAILURE_FLIGHT_DATA_RATE,
-  FAILURE_HARDWARE_RECOVERY_RATE,
+  hardwareRecoveryRate,
   FAILURE_REINTEGRATION_DURATION_RATE,
   FAILURE_XP_RATE,
   WEATHER_WINDOW_MAX_MS,
@@ -408,7 +408,7 @@ export function launchContractMission(
       ...nextResources,
       flightxp: applyGrant(nextResources.flightxp, reward.flightxp * FAILURE_XP_RATE * xpMult, true),
       research: applyGrant(nextResources.research, reward.flightData * FAILURE_FLIGHT_DATA_RATE, true),
-      hardware: creditHardware(nextResources.hardware, build.hardware * FAILURE_HARDWARE_RECOVERY_RATE, hwTier, true),
+      hardware: creditHardware(nextResources.hardware, build.hardware * hardwareRecoveryRate(completedTech), hwTier, true),
     };
     halfDurationNext[padId] = true;
   }

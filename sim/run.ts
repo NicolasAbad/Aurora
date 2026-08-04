@@ -153,6 +153,39 @@ const DAY_MS = 24 * HOUR;
 // tree carries (name/branch/effect/description) are simply unused here.
 const RESEARCH = RESEARCH_TREE;
 const RESEARCH_BY_ID = new Map(RESEARCH.map((n) => [n.id, n]));
+// ECONOMY §5c v4.3 (Sprint 11.6): the 17 new nodes added by the tree redesign. The
+// critical-path 15 above are unchanged; these are new SIDE content, not required to
+// reach Aurora I/II, so — same "bot picks up whatever's next and affordable" model this
+// whole priority list already uses — they're appended after the content that gates
+// actual milestones, exercising them once the bot has headroom rather than distorting
+// the pacing checkpoints this file's own sanity rules are keyed to.
+// Only ONE side of each mutually-exclusive fork is listed (this bot model has no
+// `excludes` awareness of its own — see findNextResearchNode — so listing both would let
+// it "research" a real-game-invalid pair): leanFabrication over volumeFabrication,
+// safetyMarginMixture over aggressiveFuelMixture (the gentler-failure profile suits a
+// bot that's optimizing for reliably reaching milestones), handsOnOperations over
+// round-the-clock (matters online too, not just for an offline gap this bot doesn't
+// simulate), moveFast over publicTrust (a faster staff pipeline serves the bot's own
+// "reach Aurora sooner" objective directly; Reputation from publicTrust doesn't).
+// Repeatable end-nodes (appliedMaterialsScience, advancedPropulsionResearch,
+// operationalExcellence, institutionalKnowledge) are NOT modeled here — this bot's
+// `techCompleted` is a Set (member-once), which can't represent "buy again at an
+// escalating cost." Disclosed, not silently skipped: the abundance question they're
+// meant to answer (does the redesign give banked Research somewhere to go) is checked
+// analytically instead (total tree cost vs. banked Research at the same milestones),
+// same treatment BACKLOG already gives this file's other disclosed simplifications.
+const NEW_TREE_PRIORITY = [
+  'consumptionCalibration',
+  'refineryPriorityProtocols',
+  'ignitionSequencing',
+  'propellantChemistry',
+  'leanFabrication',
+  'safetyMarginMixture',
+  'logisticsAutomationII',
+  'handsOnOperations',
+  'moveFast',
+];
+
 const RESEARCH_PRIORITY = [
   'basicEngineering',
   'scientificMethod',
@@ -169,6 +202,7 @@ const RESEARCH_PRIORITY = [
   'titanium',
   'vabQueues',
   'autoRefuel',
+  ...NEW_TREE_PRIORITY,
 ];
 
 // Buildings the bot actively invests in, in priority order (cheapest-affordable-first

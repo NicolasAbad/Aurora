@@ -376,7 +376,16 @@ export interface GameState {
   // secondInProgress (ECONOMY §4 v3.6, R&D Lab's "Second research track" upgrade):
   // additive optional (CLAUDE.md rule 5) — absent/undefined means exactly the pre-v3.6
   // single-track behavior, no migration needed.
-  research: { completed: string[]; inProgress: Process | null; secondInProgress?: Process | null };
+  // repeatablePurchases (ECONOMY §5c v4.3, Sprint 11.6): purchase counts for repeatable
+  // end-nodes — additive optional (CLAUDE.md rule 5, absent = 0 purchases everywhere, no
+  // migration needed). A repeatable node is never added to `completed` (its own count IS
+  // its completion state — see core/research.ts's isNodeAvailable).
+  research: {
+    completed: string[];
+    inProgress: Process | null;
+    secondInProgress?: Process | null;
+    repeatablePurchases?: Record<string, number>;
+  };
   // Sprint 5 (ECONOMY §6): same shape as `research` above — one test in progress at a
   // time, permanent per-engine progress that survives save/load.
   certifications: { engines: Record<EngineId, EngineCertificationState>; inProgress: Process | null };

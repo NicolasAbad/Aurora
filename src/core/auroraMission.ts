@@ -10,7 +10,7 @@ import {
 } from '../data/auroraI';
 import {
   FAILURE_FLIGHT_DATA_RATE,
-  FAILURE_HARDWARE_RECOVERY_RATE,
+  hardwareRecoveryRate,
   FAILURE_REINTEGRATION_DURATION_RATE,
   FAILURE_XP_RATE,
   WEATHER_WINDOW_MAX_MS,
@@ -448,7 +448,7 @@ export function launchAuroraMission(
       research: applyGrant(nextResources.research, AURORA_I_REWARD.flightData * FAILURE_FLIGHT_DATA_RATE, true),
       hardware: creditHardware(
         nextResources.hardware,
-        hardwareSpentOnIntegration * FAILURE_HARDWARE_RECOVERY_RATE,
+        hardwareSpentOnIntegration * hardwareRecoveryRate(completedTech),
         tier,
         true,
       ),

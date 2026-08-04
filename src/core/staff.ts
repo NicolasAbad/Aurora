@@ -40,16 +40,22 @@ function promotionAcceleratorTarget(to: RoleId): string {
 }
 
 /** Effective Funding cost for `promo`, net of any owned accelerator (basicEngineering/
- * scientificMethod). `modifiers`/`now` default to `[]`/`0` — omitting them yields the
- * plain documented cost, same optional-tail pattern as hiringCost above. */
+ * scientificMethod) AND, on top, ECONOMY §5c v4.3 (Sprint 11.6) Program research's "Move
+ * fast" fork — a SECOND, more general accelerator stacking with the per-step ones above
+ * rather than replacing them (chained `applyModifiers` calls, same "apply one target,
+ * then another" composition the rest of the codebase already uses when two independent
+ * levers touch the same value). `modifiers`/`now` default to `[]`/`0` — omitting them
+ * yields the plain documented cost, same optional-tail pattern as hiringCost above. */
 export function promotionCost(promo: PromotionDef, modifiers: Modifier[] = [], now = 0): number {
-  return Math.ceil(applyModifiers(promo.costFunding, modifiers, promotionAcceleratorTarget(promo.to), now));
+  const afterStepAccelerator = applyModifiers(promo.costFunding, modifiers, promotionAcceleratorTarget(promo.to), now);
+  return Math.ceil(applyModifiers(afterStepAccelerator, modifiers, 'promotion.allRates', now));
 }
 
 /** Effective training duration for `promo`, net of any owned accelerator — same
  * accelerator target as promotionCost, applied to the duration instead of the cost. */
 export function promotionDurationMs(promo: PromotionDef, modifiers: Modifier[] = [], now = 0): number {
-  return applyModifiers(promo.durationMs, modifiers, promotionAcceleratorTarget(promo.to), now);
+  const afterStepAccelerator = applyModifiers(promo.durationMs, modifiers, promotionAcceleratorTarget(promo.to), now);
+  return applyModifiers(afterStepAccelerator, modifiers, 'promotion.allRates', now);
 }
 
 // ECONOMY §4 v3.6 (Sprint 8 economy unlock): slot-adding internal upgrades. Generic

@@ -179,6 +179,11 @@ export function trackingStationFlightXpMultiplier(level: number, antennaNetworkB
  * output, which counts as trivially "fed" (not starved) — GDD's "staffing IS the
  * priority lever" note: nobody assigned means it isn't trying to claim anything, so it
  * shouldn't show as blocked. `consumeMultiplier` (default 1): see the two functions above.
+ * `outputRateMultiplier` (default 1, ECONOMY §5c v4.3 Sprint 11.6): Materials research's
+ * "Volume fabrication" fork — scales desired OUTPUT (and therefore the Materials it
+ * claims, proportionally) on top of `consumeMultiplier`'s separate per-unit scaling, so
+ * "+25% output, +15% consumption per unit" compose as two independent factors rather than
+ * one node having to encode both in a single number.
  */
 function resolveConsumer(
   buildingId: 'fabrication' | 'refinery',
@@ -188,11 +193,12 @@ function resolveConsumer(
   deltaSec: number,
   deltaMs: number,
   consumeMultiplier = 1,
+  outputRateMultiplier = 1,
 ): { buildingState: BuildingState; materials: ResourceState; producedAmount: number } {
   const def = BUILDINGS[buildingId];
   const ratio = buildingStaffRatio(staff, buildingId, buildingState.level);
   const desiredOutput =
-    productionPerSecond(def.production!.basePerSec, buildingState.level, ratio) * deltaSec;
+    productionPerSecond(def.production!.basePerSec, buildingState.level, ratio) * deltaSec * outputRateMultiplier;
   const consumePerUnit = def.production!.consumes!.materials! * consumeMultiplier;
   const desiredConsume = desiredOutput * consumePerUnit;
   const fed = desiredOutput <= 0 || materials.amount >= desiredConsume;
@@ -283,27 +289,51 @@ export function resolveEconomyTick(
     ) * productionDeltaSec;
   const research = applyGrant(resources.research, rndAmount, false);
 
-  // --- Consumers (§4b step 3): fixed order, Fabrication then Refinery ---
-  const fabConsumeMult = fabricationConsumeMultiplier(
-    buildings.fabrication.upgrades.includes('qaStation'),
-    modifiers,
-    now,
-  );
-  const fab = resolveConsumer(
-    'fabrication',
-    buildings.fabrication,
-    staff,
-    materials,
-    productionDeltaSec,
-    deltaMs,
-    fabConsumeMult,
-  );
-  materials = fab.materials;
-  const hardware = creditHardware(resources.hardware, fab.producedAmount, currentHardwareTier(completedTech));
+  // --- Consumers (§4b step 3): Fabrication then Refinery, UNLESS "Refinery priority
+  // protocols" (Materials research, ECONOMY §5c v4.3 Sprint 11.6) is owned — a genuine
+  // mechanic-changing node (not a percentage): it flips WHICH of the two wins a Materials
+  // shortage, a real felt change to who starves first when supply falls short. §4b's
+  // "v1: Fabrication, then Refinery" ordering is the default this node deliberately,
+  // documentedly overrides — not a violation of the fixed-order rule, an extension of it.
+  const refineryFirst = completedTech.includes('refineryPriorityProtocols');
+
+  // ECONOMY §5c v4.3: "Volume fabrication" fork (Materials) — +25% output (registered as
+  // a `fabrication.rate` modifier, applied below) AND +15% Materials/Hardware consumed.
+  // The consumption half is checked directly by id (a single `effect` field can't carry
+  // two numbers) rather than a second registered modifier, same "checked by id" shape
+  // refineryPriorityProtocols already uses above. "Lean fabrication" (its excluded
+  // sibling) only ever touches the registered fabricationConsumeMultiplier path below,
+  // never rate — the two forks genuinely pull in opposite directions.
+  const volumeFabricationConsumeMult = completedTech.includes('volumeFabrication') ? 1.15 : 1;
+  const fabConsumeMult =
+    fabricationConsumeMultiplier(buildings.fabrication.upgrades.includes('qaStation'), modifiers, now) *
+    volumeFabricationConsumeMult;
+  const fabRateMult = applyModifiers(1, modifiers, 'fabrication.rate', now);
 
   const refConsumeMult = refineryConsumeMultiplier(buildings.refinery.upgrades.includes('recoveryLoop'));
-  const ref = resolveConsumer('refinery', buildings.refinery, staff, materials, productionDeltaSec, deltaMs, refConsumeMult);
-  materials = ref.materials;
+
+  function runFabrication(mat: ResourceState) {
+    return resolveConsumer('fabrication', buildings.fabrication, staff, mat, productionDeltaSec, deltaMs, fabConsumeMult, fabRateMult);
+  }
+  function runRefinery(mat: ResourceState) {
+    return resolveConsumer('refinery', buildings.refinery, staff, mat, productionDeltaSec, deltaMs, refConsumeMult);
+  }
+
+  let fab: ReturnType<typeof runFabrication>;
+  let ref: ReturnType<typeof runRefinery>;
+  if (refineryFirst) {
+    ref = runRefinery(materials);
+    materials = ref.materials;
+    fab = runFabrication(materials);
+    materials = fab.materials;
+  } else {
+    fab = runFabrication(materials);
+    materials = fab.materials;
+    ref = runRefinery(materials);
+    materials = ref.materials;
+  }
+
+  const hardware = creditHardware(resources.hardware, fab.producedAmount, currentHardwareTier(completedTech));
   const propellant = applyGrant(resources.propellant, ref.producedAmount, false);
 
   return {

@@ -5,7 +5,7 @@
 // button) — see the header note on each function below.
 import {
   FAILURE_FLIGHT_DATA_RATE,
-  FAILURE_HARDWARE_RECOVERY_RATE,
+  hardwareRecoveryRate,
   FAILURE_REINTEGRATION_DURATION_RATE,
   FAILURE_XP_RATE,
   SONDA_CONFIDENCE_BASE,
@@ -358,7 +358,7 @@ export function launchSoundingMission(
       research: applyGrant(nextResources.research, def.successReward.flightData * FAILURE_FLIGHT_DATA_RATE, true),
       hardware: creditHardware(
         nextResources.hardware,
-        def.assemblyHardware * FAILURE_HARDWARE_RECOVERY_RATE,
+        def.assemblyHardware * hardwareRecoveryRate(completedTech),
         tier,
         true,
       ),

@@ -28,6 +28,26 @@ export interface ResearchNode {
   // checked directly by id elsewhere (e.g. core/hardware.ts's currentHardwareTier,
   // ROLES' unlockTech, BuildingDef.unlockCondition), not modeled as a numeric modifier.
   effect?: { target: string; op: 'mult' | 'add'; value: number };
+  // ECONOMY §5c v4.3 (Sprint 11.6): mutually-exclusive fork — symmetric by construction
+  // (each side lists the other's id). Once EITHER side is completed, core/research.ts's
+  // isNodeAvailable permanently excludes the other for that save — a real, irreversible
+  // playstyle choice, not just a sequencing preference.
+  excludes?: string[];
+  // ECONOMY §5c v4.3: a genuine repeatable end-node (principle 5) — never enters
+  // `research.completed`; its own `research.repeatablePurchases[id]` count is its
+  // completion state, so it's always available again once its deps are met. Cost scales
+  // by `costGrowthFactor` per prior purchase (core/actions.ts's startResearch); `effect`
+  // (if present) registers a NEW modifier per purchase (unique id, so they stack via
+  // applyModifiers' reduce — see core/research.ts's resolveResearch) rather than the
+  // single fixed-id modifier a normal node's `modifierForNode` registers once.
+  repeatable?: { costGrowthFactor: number; maxPurchases?: number };
+  // UI_SPEC §5c principle 6 / Sprint 11.6 task 3: visual-hierarchy classification for
+  // the redesigned tree's lane layout (screen 3) — a fork/repeatable/mechanic-changing
+  // node renders larger/more distinct than a plain percentage node. Independent of
+  // `excludes`/`repeatable`/`effect` existing (kept as its own explicit flag rather than
+  // inferred, since inference would be fragile — e.g. a gate-only node also has no
+  // `effect` but isn't "mechanic-changing"). Undefined = plain node, default size.
+  visualWeight?: 'fork' | 'repeatable' | 'mechanic';
   // NARRATIVE_EVENTS §8 (v3.5): every node's player-facing blurb, INCLUDING the
   // honest-zero-effect ones (aluminum/soundingRockets) — rule 9, "referenced by ID."
   // Unlike InternalUpgradeDef.narrativeId, §8 has no separate ID column: the node's own
@@ -63,6 +83,82 @@ export const RESEARCH_TREE: ResearchNode[] = [
     // Unlocks the Titanium Hardware tier — checked directly by id in
     // core/hardware.ts's currentHardwareTier, not a modifier.
   },
+  // ECONOMY §5c v4.3 (Sprint 11.6): everything below this line through the end of the
+  // Program branch is the tree-redesign & expansion pass — see that section for the
+  // binding principles (real expansion, one fork per branch, 2 mechanic-changing nodes
+  // per branch, cross-branch prerequisites, a repeatable end-node per branch). Every
+  // node ABOVE this line is untouched, pre-existing content (rule 5b: shipped, tested
+  // behavior).
+  {
+    id: 'consumptionCalibration',
+    name: 'Consumption calibration',
+    branch: 'materials',
+    costR: 90,
+    durationMs: 25 * MIN,
+    deps: ['aluminum'],
+    // Stacks multiplicatively with aluminum's own -10% and Fabrication's QA station
+    // upgrade — same "linear per-source, applied one at a time" composition every other
+    // materialsPerHardware source already uses.
+    effect: { target: 'fabrication.materialsPerHardware', op: 'mult', value: 0.92 }, // further -8%
+  },
+  {
+    id: 'refineryPriorityProtocols',
+    name: 'Refinery priority protocols',
+    branch: 'materials',
+    costR: 180,
+    durationMs: 45 * MIN,
+    deps: ['aluminum'],
+    // Mechanic-changing, not a modifier: flips ECONOMY §4b's fixed Fabrication-then-
+    // Refinery claim order specifically for this save — checked by id in
+    // core/economy.ts's resolveEconomyTick. A real, felt change to which of the two
+    // starves first when Materials falls short, not a percentage.
+    visualWeight: 'mechanic',
+  },
+  {
+    id: 'leanFabrication',
+    name: 'Lean fabrication',
+    branch: 'materials',
+    costR: 400,
+    durationMs: 90 * MIN,
+    // Cross-branch prerequisite (ECONOMY §5c principle 4): higher-throughput fabrication
+    // doctrine leans on Propulsion's own test-stand efficiency work first.
+    deps: ['titanium', 'ignitionSequencing'],
+    excludes: ['volumeFabrication'],
+    effect: { target: 'fabrication.materialsPerHardware', op: 'mult', value: 0.85 }, // further -15%, pure efficiency
+    visualWeight: 'fork',
+  },
+  {
+    id: 'volumeFabrication',
+    name: 'Volume fabrication',
+    branch: 'materials',
+    costR: 400,
+    durationMs: 90 * MIN,
+    deps: ['titanium', 'ignitionSequencing'],
+    excludes: ['leanFabrication'],
+    // Mechanic-changing: a NEW `fabrication.rate` target (core/economy.ts) scales desired
+    // OUTPUT itself (+25%) — genuinely different from the modifier system's existing
+    // per-unit consumption knob every other Materials node uses. Its own +15%
+    // consumption cost is a SECOND number a single `effect` field can't also carry — that
+    // half is checked directly by this node's id in resolveEconomyTick, same "checked by
+    // id, not a registered modifier" shape refineryPriorityProtocols above already uses.
+    effect: { target: 'fabrication.rate', op: 'mult', value: 1.25 },
+    visualWeight: 'fork',
+  },
+  {
+    id: 'appliedMaterialsScience',
+    name: 'Applied materials science',
+    branch: 'materials',
+    costR: 500,
+    durationMs: HOUR,
+    deps: ['consumptionCalibration'],
+    // Repeatable end-node (ECONOMY §5c principle 5): a genuine Research sink — always
+    // purchasable again once its one dependency is met, cost escalating ×1.8 per prior
+    // purchase, each purchase stacking another -2% Materials/Hardware (registered as its
+    // own modifier id — see modifierForRepeatablePurchase).
+    effect: { target: 'fabrication.materialsPerHardware', op: 'mult', value: 0.98 },
+    repeatable: { costGrowthFactor: 1.8 },
+    visualWeight: 'repeatable',
+  },
   // --- Propulsion ---
   {
     id: 'soundingRockets',
@@ -95,6 +191,74 @@ export const RESEARCH_TREE: ResearchNode[] = [
     deps: ['probe1Engine'],
     // No separate buildingDep: transitively requires Test Stand already, via probe1Engine.
     secondaryCost: { materials: 200 }, // certification-adjacent, higher tier than Probe-1
+  },
+  {
+    id: 'ignitionSequencing',
+    name: 'Ignition sequencing',
+    branch: 'propulsion',
+    costR: 150,
+    durationMs: 40 * MIN,
+    deps: ['probe1Engine'],
+    // Stacks multiplicatively with the Instrumentation upgrade and Test Stand's own
+    // per-level -3% (core/economy.ts's certificationDurationMultiplier already applies
+    // both) — same composition pattern as Materials' consumption stack.
+    effect: { target: 'certification.duration', op: 'mult', value: 0.9 },
+  },
+  {
+    id: 'propellantChemistry',
+    name: 'Propellant chemistry',
+    branch: 'propulsion',
+    costR: 200,
+    durationMs: HOUR,
+    deps: ['probe1Engine'],
+    // Stacks with the Propulsion XP tree's own Efficient mixtures (-10% Propellant) —
+    // same currency (Propellant per launch), different source, additive stacking via
+    // applyModifiers' reduce like every other multi-source target.
+    effect: { target: 'launch.propellant', op: 'mult', value: 0.92 },
+  },
+  {
+    id: 'aggressiveFuelMixture',
+    name: 'Aggressive fuel mixture',
+    branch: 'propulsion',
+    costR: 600,
+    durationMs: 150 * MIN,
+    deps: ['orbital1Engine'],
+    excludes: ['safetyMarginMixture'],
+    // Mechanic-changing: cheaper Propellant on EVERY launch, but a genuinely worse
+    // outcome when a launch fails — checked by id in data/launch.ts's
+    // hardwareRecoveryRate (45% recovered instead of the standard 60%), read by every
+    // mission-failure resolution (sondas, Aurora, contracts) identically. BACKLOG's
+    // original sketch also proposed a raised Confidence ceiling; simplified to these two
+    // concrete levers (Propellant cost + failure severity) to keep the pair
+    // implementable without touching core/confidence.ts's carefully-balanced "100%
+    // always reachable" guarantee — flagged transparently, not silently dropped.
+    effect: { target: 'launch.propellant', op: 'mult', value: 0.85 },
+    visualWeight: 'fork',
+  },
+  {
+    id: 'safetyMarginMixture',
+    name: 'Safety-margin mixture',
+    branch: 'propulsion',
+    costR: 600,
+    durationMs: 150 * MIN,
+    deps: ['orbital1Engine'],
+    excludes: ['aggressiveFuelMixture'],
+    // Mirror of aggressiveFuelMixture: costlier Propellant, gentler failures (75%
+    // Hardware recovered instead of 60%) — same hardwareRecoveryRate helper.
+    effect: { target: 'launch.propellant', op: 'mult', value: 1.1 },
+    visualWeight: 'fork',
+  },
+  {
+    id: 'advancedPropulsionResearch',
+    name: 'Advanced propulsion research',
+    branch: 'propulsion',
+    costR: 700,
+    durationMs: 90 * MIN,
+    deps: ['propellantChemistry'],
+    // Repeatable end-node: each purchase stacks another -3% Propellant per launch.
+    effect: { target: 'launch.propellant', op: 'mult', value: 0.97 },
+    repeatable: { costGrowthFactor: 1.8 },
+    visualWeight: 'repeatable',
   },
   // --- Operations ---
   {
@@ -136,6 +300,61 @@ export const RESEARCH_TREE: ResearchNode[] = [
     // checked directly by id in core/auroraMission.ts's startNextAuroraStage, same
     // "feature toggle, not a numeric modifier" pattern as vabQueues above.
     secondaryCost: { materials: 150 }, // ECONOMY §5b v4.1: real plumbing/equipment, not just know-how
+  },
+  {
+    id: 'logisticsAutomationII',
+    name: 'Logistics automation II',
+    branch: 'operations',
+    costR: 250,
+    durationMs: HOUR,
+    deps: ['basicLogistics'],
+    // Further -20% pad transfer, stacking with Basic logistics' own -25%.
+    effect: { target: 'transfer.duration', op: 'mult', value: 0.8 },
+  },
+  {
+    id: 'roundTheClockAutomation',
+    name: 'Round-the-clock automation',
+    branch: 'operations',
+    costR: 550,
+    durationMs: 2 * HOUR,
+    // Cross-branch prerequisite: automating a facility to run well unsupervised leans on
+    // Materials' own consumption-calibration work first (waste while unwatched is the
+    // real risk this doctrine is meant to solve).
+    deps: ['autoRefuel', 'consumptionCalibration'],
+    excludes: ['handsOnOperations'],
+    // Mechanic-changing: a NEW `offline.rateMult` target, checked in
+    // core/offlineResolution.ts, boosts the effective rate resources/salaries accrue at
+    // WHILE AWAY specifically (60% -> ~69%) — its excluded sibling instead speeds up
+    // process.duration, which matters identically online or offline; this is the one
+    // node in the whole redesign scoped to the offline-resolution path alone.
+    effect: { target: 'offline.rateMult', op: 'mult', value: 1.15 },
+    visualWeight: 'fork',
+  },
+  {
+    id: 'handsOnOperations',
+    name: 'Hands-on operations',
+    branch: 'operations',
+    costR: 550,
+    durationMs: 2 * HOUR,
+    deps: ['autoRefuel', 'consumptionCalibration'],
+    excludes: ['roundTheClockAutomation'],
+    // Already-wired target (E-05's own temporary effect uses the same one) — every
+    // process (research, certification, integration, transfer, training, weather) -15%
+    // duration, online or offline alike.
+    effect: { target: 'process.duration', op: 'mult', value: 0.85 },
+    visualWeight: 'fork',
+  },
+  {
+    id: 'operationalExcellence',
+    name: 'Operational excellence',
+    branch: 'operations',
+    costR: 800,
+    durationMs: 2 * HOUR,
+    deps: ['logisticsAutomationII'],
+    // Repeatable end-node: each purchase stacks another -3% on every process's duration.
+    effect: { target: 'process.duration', op: 'mult', value: 0.97 },
+    repeatable: { costGrowthFactor: 1.9 },
+    visualWeight: 'repeatable',
   },
   // --- Program ---
   {
@@ -182,6 +401,36 @@ export const RESEARCH_TREE: ResearchNode[] = [
     deps: ['testStand'],
   },
   {
+    id: 'moveFast',
+    name: 'Move fast',
+    branch: 'program',
+    costR: 550,
+    durationMs: 2 * HOUR,
+    // Cross-branch prerequisite: a fast-moving institutional culture is proven out by
+    // fast propulsion R&D first, not just declared.
+    deps: ['flightOperations', 'propellantChemistry'],
+    excludes: ['publicTrust'],
+    // Mechanic-changing: a NEW, MORE GENERAL `promotion.allRates` target (core/staff.ts)
+    // stacks on top of basicEngineering/scientificMethod's existing PER-STEP promotion
+    // accelerators — a genuinely faster staff pipeline overall, not a bigger single-step
+    // percentage.
+    effect: { target: 'promotion.allRates', op: 'mult', value: 0.85 },
+    visualWeight: 'fork',
+  },
+  {
+    id: 'publicTrust',
+    name: 'Public trust',
+    branch: 'program',
+    costR: 550,
+    durationMs: 2 * HOUR,
+    deps: ['flightOperations', 'propellantChemistry'],
+    excludes: ['moveFast'],
+    // Stacks with the Prestige XP tree's own Public relations node (+20% Reputation) —
+    // same currency, different source.
+    effect: { target: 'reputation.gain', op: 'mult', value: 1.15 },
+    visualWeight: 'fork',
+  },
+  {
     id: 'flightProgram',
     name: 'Flight program',
     branch: 'program',
@@ -206,6 +455,24 @@ export const RESEARCH_TREE: ResearchNode[] = [
     durationMs: 6 * HOUR,
     deps: ['flightProgram'],
   },
+  {
+    id: 'institutionalKnowledge',
+    name: 'Institutional knowledge',
+    branch: 'program',
+    costR: 900,
+    durationMs: 150 * MIN,
+    deps: ['orbitalFlight'],
+    // Repeatable end-node: each purchase stacks another +3% contract pay — deliberately
+    // NOT a hiring-cost/salary target (every OTHER lever in this branch touches
+    // headcount economics, which Sprint 11.7's own retune is working to bring back
+    // in-band; this sink stays orthogonal to that work on purpose) and directly
+    // reinforces Sprint 11.7's separate "contract pay is 0.22% of income" finding — one
+    // node addressing two flagged problems (Research abundance + contract irrelevance)
+    // at once.
+    effect: { target: 'contract.pay', op: 'mult', value: 1.03 },
+    repeatable: { costGrowthFactor: 1.9 },
+    visualWeight: 'repeatable',
+  },
 ];
 
 export const RESEARCH_BY_ID: Map<string, ResearchNode> = new Map(
@@ -218,4 +485,32 @@ export const RESEARCH_BY_ID: Map<string, ResearchNode> = new Map(
 export function modifierForNode(node: ResearchNode): Modifier | null {
   if (!node.effect) return null;
   return { id: `research:${node.id}`, source: node.id, ...node.effect };
+}
+
+/** Sprint 11.6 (ECONOMY §5c principle 5): a repeatable node's Nth purchase gets its own
+ * modifier id (`research:${id}:${purchaseNumber}`), unlike modifierForNode's single fixed
+ * id — registerModifier dedupes by id, so each purchase's distinct id is what makes them
+ * STACK via applyModifiers' reduce instead of the 2nd+ purchase being silently dropped as
+ * "already registered." `purchaseNumber` is 1-indexed (the Nth purchase, not the count
+ * after it) purely for a readable id; the modifier's effect is identical every purchase
+ * (repeatable nodes escalate COST, not per-purchase effect size — see ResearchNode's own
+ * `repeatable` field doc). */
+export function modifierForRepeatablePurchase(node: ResearchNode, purchaseNumber: number): Modifier | null {
+  if (!node.effect) return null;
+  return { id: `research:${node.id}:${purchaseNumber}`, source: node.id, ...node.effect };
+}
+
+/** Sprint 11.6: a repeatable node's cost at its next purchase — `costGrowthFactor^priorPurchases`
+ * applied to both the Research cost and any secondaryCost, same escalation shape
+ * `core/economy.ts`'s `costAtLevel` uses for buildings, kept separate since research
+ * costs round differently (no `costFactor: null` one-time case to share with). */
+export function repeatableNodeCost(
+  node: ResearchNode,
+  priorPurchases: number,
+): { research: number } & Partial<Record<ResourceId, number>> {
+  const growth = node.repeatable ? node.repeatable.costGrowthFactor ** priorPurchases : 1;
+  const secondary = Object.fromEntries(
+    Object.entries(node.secondaryCost ?? {}).map(([id, amount]) => [id, Math.round(amount * growth)]),
+  );
+  return { research: Math.round(node.costR * growth), ...secondary };
 }

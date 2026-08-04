@@ -1,4 +1,5 @@
 import { resolveEconomyTick } from './economy';
+import { applyModifiers } from './modifiers';
 import { resolveProcesses } from './time';
 import type { GameState, Modifier, Process, StaffState } from './types';
 
@@ -57,6 +58,12 @@ export function resolveOffline(
   let payrollUnpaid = wasPayrollUnpaid;
   let elapsedSoFar = 0;
   let remaining = appliedMs;
+  // ECONOMY §5c v4.3 (Sprint 11.6): Operations research's "Round-the-clock automation"
+  // fork — a genuine mechanic change to what happens while the player is AWAY
+  // specifically (its excluded sibling, "Hands-on operations", instead speeds up
+  // `process.duration`, already-wired and identical online or offline — this is the one
+  // node in the whole redesign that only ever matters for this exact resolution path).
+  const offlineRate = OFFLINE_RATE * applyModifiers(1, modifiers, 'offline.rateMult', now);
 
   while (remaining > 0) {
     const chunk = Math.min(CHUNK_MS, remaining);
@@ -66,7 +73,7 @@ export function resolveOffline(
       staff,
       completedTech,
       chunk,
-      OFFLINE_RATE,
+      offlineRate,
       modifiers,
       now,
     );

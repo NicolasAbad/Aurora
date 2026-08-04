@@ -1406,6 +1406,49 @@ body {
   border-color: var(--accent);
 }
 
+/* ECONOMY §5c v4.3 (Sprint 11.6): a fork-excluded node — permanently unavailable, but
+ * "never a bare padlock" (UI_SPEC §4) applies just as much here as to an unmet dep, so
+ * this stays visually distinct from plain --locked (dimmer still, no pulse it could
+ * ever earn back) rather than looking identical to "not yet reached." */
+.research-tree__node--excluded {
+  opacity: 0.35;
+  text-decoration: line-through;
+  text-decoration-color: var(--text-dim);
+}
+
+/* A repeatable node already purchased at least once — still genuinely actionable (never
+ * "done"), so it keeps the accent border --available uses, but skips the pulse: it's not
+ * a fresh unlock competing for attention, just a standing option. */
+.research-tree__node--repeatable {
+  border-color: var(--accent);
+}
+
+.research-tree__node--repeatable .research-tree__node-mark {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* UI_SPEC §5c principle 6 / Sprint 11.6 task 3: visual weight tied to node importance —
+ * the tree redesign must not repeat the "uniform cards regardless of importance" slop
+ * signature §1d already named for building tiles (task 2), just applied to nodes. A
+ * fork/repeatable/mechanic-changing node is a genuinely bigger decision than a plain
+ * percentage node, so it reads as physically larger, not just differently colored. */
+.research-tree__node--weight-fork,
+.research-tree__node--weight-mechanic,
+.research-tree__node--weight-repeatable {
+  padding: 9px 12px;
+  font-size: 1em;
+  font-weight: 600;
+}
+
+.research-tree__node--weight-fork {
+  border-color: var(--accent);
+}
+
+.research-tree__node--weight-mechanic {
+  border-color: var(--amber);
+}
+
 @keyframes research-node-pulse {
   0%,
   100% {

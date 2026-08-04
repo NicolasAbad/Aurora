@@ -43,6 +43,42 @@ describe('isNodeAvailable', () => {
       expect(isNodeAvailable(node('aluminum'), [], { testStand: 0 })).toBe(true);
     });
   });
+
+  // ECONOMY §5c v4.3 (Sprint 11.6): mutually-exclusive forks — a real, permanent
+  // playstyle choice, not just a sequencing preference.
+  describe('excludes (fork exclusivity, Sprint 11.6)', () => {
+    const deps = ['titanium', 'ignitionSequencing']; // leanFabrication/volumeFabrication's shared deps
+
+    it('both fork sides are available before either is chosen', () => {
+      expect(isNodeAvailable(node('leanFabrication'), deps)).toBe(true);
+      expect(isNodeAvailable(node('volumeFabrication'), deps)).toBe(true);
+    });
+
+    it('completing one side permanently excludes the other, symmetrically', () => {
+      expect(isNodeAvailable(node('volumeFabrication'), [...deps, 'leanFabrication'])).toBe(false);
+      expect(isNodeAvailable(node('leanFabrication'), [...deps, 'volumeFabrication'])).toBe(false);
+    });
+  });
+
+  // ECONOMY §5c v4.3: a repeatable node is never "completed" in the exclusionary sense —
+  // its own purchase count is its progress, so it stays available indefinitely.
+  describe('repeatable nodes (Sprint 11.6)', () => {
+    it('is available with 0 prior purchases once its dep is met', () => {
+      expect(isNodeAvailable(node('appliedMaterialsScience'), ['consumptionCalibration'])).toBe(true);
+    });
+
+    it('stays available after several purchases (no maxPurchases set on this node)', () => {
+      expect(
+        isNodeAvailable(node('appliedMaterialsScience'), ['consumptionCalibration'], {}, { appliedMaterialsScience: 7 }),
+      ).toBe(true);
+    });
+
+    it('is unavailable once maxPurchases is reached, for a node that declares one', () => {
+      const capped = { ...node('appliedMaterialsScience'), repeatable: { costGrowthFactor: 1.8, maxPurchases: 2 } };
+      expect(isNodeAvailable(capped, ['consumptionCalibration'], {}, { appliedMaterialsScience: 1 })).toBe(true);
+      expect(isNodeAvailable(capped, ['consumptionCalibration'], {}, { appliedMaterialsScience: 2 })).toBe(false);
+    });
+  });
 });
 
 describe('isNodeVisible — UI_SPEC §2b progressive disclosure', () => {
@@ -71,6 +107,14 @@ describe('isNodeVisible — UI_SPEC §2b progressive disclosure', () => {
   it('a node whose tech deps are met but buildingDep is not stays visible', () => {
     expect(isNodeVisible(node('probe1Engine'), ['soundingRockets'])).toBe(true);
     expect(isNodeVisible(node('probe1Engine'), ['soundingRockets'], { testStand: 0 })).toBe(true);
+  });
+
+  // ECONOMY §5c v4.3 (Sprint 11.6): a fork-excluded node stays visible (showing WHY it's
+  // gone, per UI_SPEC §4's "never a bare padlock") rather than vanishing once its sibling
+  // is chosen — its own deps are still met, which is exactly why it's excluded, not locked.
+  it('a fork-excluded node stays visible', () => {
+    const deps = ['titanium', 'ignitionSequencing', 'leanFabrication'];
+    expect(isNodeVisible(node('volumeFabrication'), deps)).toBe(true);
   });
 });
 
@@ -159,6 +203,43 @@ describe('resolveResearch', () => {
       const result = resolveResearch(makeState({ inProgress: process }), [], 5 * MIN);
       expect(result.justCompletedIds).toEqual(['soundingRockets']);
       expect(result.research.secondInProgress).toBeNull();
+    });
+  });
+
+  // ECONOMY §5c v4.3 (Sprint 11.6): a repeatable node's completion never joins
+  // `completed` — its own repeatablePurchases count is its progress, and each purchase
+  // registers its OWN modifier id so purchases stack instead of the 2nd+ being dropped.
+  describe('repeatable nodes (Sprint 11.6)', () => {
+    function repeatableProcess(startedAt = 0): Process {
+      return { id: 'r1', kind: 'research', startedAt, durationMs: 60 * MIN, payload: { nodeId: 'appliedMaterialsScience' } };
+    }
+
+    it('the first purchase does NOT join `completed`, and registers purchase-1 modifier', () => {
+      const result = resolveResearch(makeState({ inProgress: repeatableProcess() }), [], 60 * MIN);
+      expect(result.justCompletedIds).toEqual(['appliedMaterialsScience']);
+      expect(result.research.completed).toEqual([]);
+      expect(result.research.repeatablePurchases).toEqual({ appliedMaterialsScience: 1 });
+      expect(result.modifiers).toEqual([
+        {
+          id: 'research:appliedMaterialsScience:1',
+          source: 'appliedMaterialsScience',
+          target: 'fabrication.materialsPerHardware',
+          op: 'mult',
+          value: 0.98,
+        },
+      ]);
+    });
+
+    it('a second purchase increments the count and STACKS a second distinct modifier', () => {
+      const first = resolveResearch(makeState({ inProgress: repeatableProcess() }), [], 60 * MIN);
+      const state2: ResearchState = { ...first.research, inProgress: repeatableProcess(60 * MIN) };
+      const second = resolveResearch(state2, first.modifiers, 120 * MIN);
+      expect(second.research.repeatablePurchases).toEqual({ appliedMaterialsScience: 2 });
+      expect(second.modifiers).toHaveLength(2);
+      expect(second.modifiers.map((m) => m.id)).toEqual([
+        'research:appliedMaterialsScience:1',
+        'research:appliedMaterialsScience:2',
+      ]);
     });
   });
 });

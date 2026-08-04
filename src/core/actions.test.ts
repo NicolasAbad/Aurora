@@ -413,6 +413,57 @@ describe('startResearch', () => {
       expect(result!.research.secondInProgress).toBeUndefined();
     });
   });
+
+  // ECONOMY §5c v4.3 (Sprint 11.6): mutually-exclusive forks.
+  describe('excludes (fork exclusivity)', () => {
+    it('refuses a fork side once its sibling is already completed', () => {
+      const state = createInitialState();
+      state.resources.research.amount = 10_000;
+      state.research.completed = ['aluminum', 'titanium', 'soundingRockets', 'probe1Engine', 'ignitionSequencing', 'leanFabrication'];
+      expect(startResearch(state.resources, state.research, 'volumeFabrication', Date.now())).toBeNull();
+    });
+
+    it('the OTHER fork side still starts normally when neither has been chosen yet', () => {
+      const state = createInitialState();
+      state.resources.research.amount = 10_000;
+      state.research.completed = ['aluminum', 'titanium', 'soundingRockets', 'probe1Engine', 'ignitionSequencing'];
+      const result = startResearch(state.resources, state.research, 'volumeFabrication', Date.now());
+      expect(result).not.toBeNull();
+    });
+  });
+
+  // ECONOMY §5c v4.3: repeatable end-nodes — cost escalates by the node's own prior
+  // purchase count, and it's never permanently "done."
+  describe('repeatable nodes', () => {
+    function readyState() {
+      const state = createInitialState();
+      state.resources.research.amount = 100_000;
+      state.research.completed = ['aluminum', 'consumptionCalibration'];
+      return state;
+    }
+
+    it('the first purchase costs exactly the base costR', () => {
+      const state = readyState();
+      const result = startResearch(state.resources, state.research, 'appliedMaterialsScience', Date.now());
+      expect(result).not.toBeNull();
+      expect(result!.resources.research.amount).toBe(100_000 - 500); // base cost, 0 prior purchases
+    });
+
+    it('a second purchase costs MORE, scaled by costGrowthFactor^priorPurchases', () => {
+      const state = readyState();
+      state.research.repeatablePurchases = { appliedMaterialsScience: 1 };
+      const result = startResearch(state.resources, state.research, 'appliedMaterialsScience', Date.now());
+      expect(result).not.toBeNull();
+      expect(result!.resources.research.amount).toBe(100_000 - Math.round(500 * 1.8)); // 1 prior purchase
+    });
+
+    it('is still startable after being "completed" once — never permanently done', () => {
+      const state = readyState();
+      state.research.repeatablePurchases = { appliedMaterialsScience: 5 };
+      const result = startResearch(state.resources, state.research, 'appliedMaterialsScience', Date.now());
+      expect(result).not.toBeNull();
+    });
+  });
 });
 
 describe('startPromotion', () => {

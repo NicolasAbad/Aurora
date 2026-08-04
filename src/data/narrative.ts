@@ -85,6 +85,24 @@ export const NARRATIVE_TEXT: Record<string, string> = {
   flightOperations: 'Unlocks hiring Controllers directly.',
   flightProgram: 'Unlocks the Launch complex.',
   orbitalFlight: 'Unlocks Aurora II and the orbital mission class.',
+  // §8 continued (v4.3, Sprint 11.6 — research tree redesign & expansion, ECONOMY §5c).
+  consumptionCalibration: 'Tighter process control at Fabrication. A further 8% less Material wasted per Hardware, stacking with Aluminum alloys.',
+  refineryPriorityProtocols: 'Refinery now claims its Materials before Fabrication does — when supply runs short, Propellant production wins the shortage, not Hardware.',
+  leanFabrication: 'Permanent choice: pure efficiency. A further 15% less Material per Hardware — the leanest fabrication line the program can run. Forecloses Volume fabrication for this program.',
+  volumeFabrication: 'Permanent choice: pure throughput. +25% Hardware output, but 15% more Material consumed per Hardware — built for scale, not efficiency. Forecloses Lean fabrication for this program.',
+  appliedMaterialsScience: 'Ongoing materials research. Each round: a further 2% less Material per Hardware. Cost rises each time you buy it again — a standing outlet for banked Research, not a one-time node.',
+  ignitionSequencing: 'Refined ignition procedures. -10% engine certification time, stacking with the Test Stand’s own upgrades.',
+  propellantChemistry: 'Better fuel formulation. -8% Propellant spent per launch, stacking with the Efficient mixtures Flight Experience node.',
+  aggressiveFuelMixture: 'Permanent choice: push the mixture harder. -15% Propellant per launch, but a launch failure recovers less Hardware than usual. Forecloses Safety-margin mixture for this program.',
+  safetyMarginMixture: 'Permanent choice: build in a margin. +10% Propellant per launch, but a launch failure recovers more Hardware than usual. Forecloses Aggressive fuel mixture for this program.',
+  advancedPropulsionResearch: 'Ongoing propulsion research. Each round: a further 3% less Propellant per launch. Cost rises each time you buy it again.',
+  logisticsAutomationII: 'A second pass on ground handling. A further 20% off pad transfer time, stacking with Basic logistics.',
+  roundTheClockAutomation: 'Permanent choice: automate for when you’re away. +15% to the rate resources and salaries accrue at while offline. Forecloses Hands-on operations for this program.',
+  handsOnOperations: 'Permanent choice: run it hands-on. -15% duration on every timed process, online or offline alike. Forecloses Round-the-clock automation for this program.',
+  operationalExcellence: 'Ongoing operations research. Each round: a further 3% off every process’s duration. Cost rises each time you buy it again.',
+  moveFast: 'Permanent choice: build a fast-moving program. A further, more general discount stacking on top of your existing promotion accelerators — faster staff pipeline overall. Forecloses Public trust for this program.',
+  publicTrust: 'Permanent choice: build a trusted program. +15% Reputation from every source, stacking with the Public relations Flight Experience node. Forecloses Move fast for this program.',
+  institutionalKnowledge: 'Ongoing program research. Each round: a further 3% on contract pay. Cost rises each time you buy it again.',
   // §12 (v4.0, Sprint 10) — Flight Experience node descriptions, keyed by the node's own
   // id (XP_TREE / data/flightXpTree.ts), same "no separate ID column, id IS the key"
   // reasoning as the research node descriptions immediately above.

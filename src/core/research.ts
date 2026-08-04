@@ -1,4 +1,4 @@
-import { modifierForNode, RESEARCH_BY_ID, type ResearchNode } from '../data/researchTree';
+import { modifierForNode, modifierForRepeatablePurchase, RESEARCH_BY_ID, type ResearchNode } from '../data/researchTree';
 import { registerModifier } from './modifiers';
 import type { BuildingId, Modifier, Process } from './types';
 
@@ -10,6 +10,9 @@ export interface ResearchState {
   // pre-v3.6 single-track behavior, no migration needed). Only ever populated once
   // `inProgress` is already occupied — see core/actions.ts's startResearch.
   secondInProgress?: Process | null;
+  // ECONOMY §5c v4.3 (Sprint 11.6): repeatable end-node purchase counts. Additive
+  // optional (CLAUDE.md rule 5, absent = 0 everywhere, no migration needed).
+  repeatablePurchases?: Record<string, number>;
 }
 
 /** ECONOMY §5b v4.1 (Sprint 11.5): a node's building prerequisite, if any, is built
@@ -21,14 +24,33 @@ function buildingDepMet(node: ResearchNode, buildingLevels: Partial<Record<Build
   return !node.buildingDep || (buildingLevels[node.buildingDep] ?? 0) >= 1;
 }
 
-/** Deps met and not already completed — the node could be started right now. */
+/** ECONOMY §5c v4.3 (Sprint 11.6): true once ANY node this one `excludes` is completed —
+ * a fork is symmetric by construction, so checking this node's own `excludes` list is
+ * sufficient (no need to also scan every OTHER node for a reverse reference). */
+function isExcludedByFork(node: ResearchNode, completed: string[]): boolean {
+  return (node.excludes ?? []).some((id) => completed.includes(id));
+}
+
+/** Deps met and not already completed — the node could be started right now.
+ * ECONOMY §5c v4.3 (Sprint 11.6): a repeatable node is never "completed" in the
+ * exclusionary sense (its own purchase count is its progress, tracked separately —
+ * see ResearchState.repeatablePurchases), so it skips the `!completed.includes` check
+ * entirely and instead only respects its own `maxPurchases` cap, if any. A fork-excluded
+ * node is never available once its sibling is chosen, permanently, for that save. */
 export function isNodeAvailable(
   node: ResearchNode,
   completed: string[],
   buildingLevels: Partial<Record<BuildingId, number>> = {},
+  repeatablePurchases: Record<string, number> = {},
 ): boolean {
+  if (node.repeatable) {
+    const purchases = repeatablePurchases[node.id] ?? 0;
+    const maxed = node.repeatable.maxPurchases !== undefined && purchases >= node.repeatable.maxPurchases;
+    return !maxed && node.deps.every((d) => completed.includes(d)) && buildingDepMet(node, buildingLevels);
+  }
   return (
     !completed.includes(node.id) &&
+    !isExcludedByFork(node, completed) &&
     node.deps.every((d) => completed.includes(d)) &&
     buildingDepMet(node, buildingLevels)
   );
@@ -46,9 +68,14 @@ export function isNodeVisible(
   node: ResearchNode,
   completed: string[],
   buildingLevels: Partial<Record<BuildingId, number>> = {},
+  repeatablePurchases: Record<string, number> = {},
 ): boolean {
-  if (completed.includes(node.id) || isNodeAvailable(node, completed, buildingLevels)) return true;
-  if (!node.deps.every((d) => completed.includes(d) || isNodeAvailable(RESEARCH_BY_ID.get(d)!, completed, buildingLevels))) {
+  if (completed.includes(node.id) || isNodeAvailable(node, completed, buildingLevels, repeatablePurchases)) return true;
+  if (
+    !node.deps.every(
+      (d) => completed.includes(d) || isNodeAvailable(RESEARCH_BY_ID.get(d)!, completed, buildingLevels, repeatablePurchases),
+    )
+  ) {
     return false;
   }
   return true;
@@ -77,6 +104,7 @@ export function resolveResearch(
   now: number,
 ): ResearchResolution {
   let nextCompleted = research.completed;
+  let nextRepeatablePurchases = research.repeatablePurchases ?? {};
   let nextModifiers = modifiers;
   const justCompletedIds: string[] = [];
 
@@ -84,10 +112,21 @@ export function resolveResearch(
     if (!process || now < process.startedAt + process.durationMs) return process ?? null;
     const nodeId = process.payload.nodeId as string;
     const node = RESEARCH_BY_ID.get(nodeId);
-    const modifier = node ? modifierForNode(node) : null;
-    nextCompleted = [...nextCompleted, nodeId];
-    nextModifiers = modifier ? registerModifier(nextModifiers, modifier) : nextModifiers;
     justCompletedIds.push(nodeId);
+    if (node?.repeatable) {
+      // ECONOMY §5c v4.3: a repeatable node never joins `completed` — its OWN purchase
+      // count is its progress. Each purchase gets its own modifier id (unlike a normal
+      // node's single fixed id) so repeated purchases STACK instead of the 2nd+ being
+      // silently dropped as "already registered" by registerModifier's dedupe-by-id.
+      const purchaseNumber = (nextRepeatablePurchases[nodeId] ?? 0) + 1;
+      nextRepeatablePurchases = { ...nextRepeatablePurchases, [nodeId]: purchaseNumber };
+      const modifier = modifierForRepeatablePurchase(node, purchaseNumber);
+      nextModifiers = modifier ? registerModifier(nextModifiers, modifier) : nextModifiers;
+    } else {
+      const modifier = node ? modifierForNode(node) : null;
+      nextCompleted = [...nextCompleted, nodeId];
+      nextModifiers = modifier ? registerModifier(nextModifiers, modifier) : nextModifiers;
+    }
     return null;
   }
 
@@ -99,7 +138,7 @@ export function resolveResearch(
   }
 
   return {
-    research: { completed: nextCompleted, inProgress, secondInProgress },
+    research: { completed: nextCompleted, inProgress, secondInProgress, repeatablePurchases: nextRepeatablePurchases },
     modifiers: nextModifiers,
     justCompletedIds,
   };

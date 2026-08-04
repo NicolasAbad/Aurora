@@ -46,6 +46,39 @@ describe('resolveOffline — 1h clock-manipulation test', () => {
   });
 });
 
+// ECONOMY §5c v4.3 (Sprint 11.6): Operations research's "Round-the-clock automation"
+// fork — the one node in the whole tree redesign scoped to this exact resolution path.
+describe('resolveOffline — offline.rateMult modifier (Sprint 11.6)', () => {
+  it('boosts the effective offline rate above the standard 60%', () => {
+    const state = staffedFinanceState();
+    const roundTheClockModifier = {
+      id: 'research:roundTheClockAutomation',
+      source: 'roundTheClockAutomation',
+      target: 'offline.rateMult' as const,
+      op: 'mult' as const,
+      value: 1.15,
+    };
+    const baseline = resolveOffline(state.resources, state.buildings, state.staff, [], [], 0, HOUR);
+    const boosted = resolveOffline(
+      state.resources,
+      state.buildings,
+      state.staff,
+      [],
+      [],
+      0,
+      HOUR,
+      OFFLINE_CAP_MS,
+      false,
+      [roundTheClockModifier],
+    );
+    // Both credited and deducted amounts scale with the rate, so the NET gain (credited
+    // minus deducted) scales too — comparing net gain from the starting 1000 baseline.
+    const baselineGain = baseline.resources.funding.amount - 1000;
+    const boostedGain = boosted.resources.funding.amount - 1000;
+    expect(boostedGain).toBeCloseTo(baselineGain * 1.15, 0);
+  });
+});
+
 describe('resolveOffline — offline cap (10h)', () => {
   it('caps applied time at OFFLINE_CAP_MS even when the real gap is much longer', () => {
     const state = staffedFinanceState();
